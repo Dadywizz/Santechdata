@@ -1,22 +1,45 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SanTech Data VTU Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication & registration
+  - name: wallet
+    description: Wallet management
+  - name: data
+    description: Data bundle purchases
+  - name: airtime
+    description: Airtime purchases
+  - name: electricity
+    description: Electricity token purchases
+  - name: cable
+    description: Cable TV subscriptions
+  - name: exam
+    description: Examination token purchases
+  - name: transactions
+    description: Transaction history
+  - name: referrals
+    description: Referral system
+  - name: notifications
+    description: Notifications
+  - name: support
+    description: Help desk & ticketing
+  - name: admin
+    description: Admin management
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +47,1884 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── AUTH ───────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Verify email with OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpInput"
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/resend-otp:
+    post:
+      operationId: resendOtp
+      tags: [auth]
+      summary: Resend OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendOtpInput"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change password (authenticated)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/profile:
+    patch:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── WALLET ─────────────────────────────────────────────────────────────────
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get wallet balance and info
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Wallet info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallet/fund/initiate:
+    post:
+      operationId: initiateFunding
+      tags: [wallet]
+      summary: Initiate wallet funding via payment gateway
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FundingInput"
+      responses:
+        "200":
+          description: Payment URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentInitResponse"
+
+  /wallet/fund/verify:
+    post:
+      operationId: verifyFunding
+      tags: [wallet]
+      summary: Verify payment and credit wallet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPaymentInput"
+      responses:
+        "200":
+          description: Funding verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallet/transfer:
+    post:
+      operationId: walletTransfer
+      tags: [wallet]
+      summary: Transfer funds to another user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletTransferInput"
+      responses:
+        "200":
+          description: Transfer successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── DATA BUNDLES ────────────────────────────────────────────────────────────
+  /data/plans:
+    get:
+      operationId: getDataPlans
+      tags: [data]
+      summary: Get available data plans
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: network
+          in: query
+          schema:
+            type: string
+            enum: [MTN, AIRTEL, GLO, 9MOBILE]
+      responses:
+        "200":
+          description: Data plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DataPlan"
+
+  /data/purchase:
+    post:
+      operationId: purchaseData
+      tags: [data]
+      summary: Purchase a data bundle
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPurchaseInput"
+      responses:
+        "200":
+          description: Data purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  # ─── AIRTIME ─────────────────────────────────────────────────────────────────
+  /airtime/purchase:
+    post:
+      operationId: purchaseAirtime
+      tags: [airtime]
+      summary: Purchase airtime
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AirtimePurchaseInput"
+      responses:
+        "200":
+          description: Airtime purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  # ─── ELECTRICITY ─────────────────────────────────────────────────────────────
+  /electricity/providers:
+    get:
+      operationId: getElectricityProviders
+      tags: [electricity]
+      summary: Get electricity providers (DISCOs)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Providers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ElectricityProvider"
+
+  /electricity/verify-meter:
+    post:
+      operationId: verifyMeter
+      tags: [electricity]
+      summary: Verify meter number
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeterVerifyInput"
+      responses:
+        "200":
+          description: Meter info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeterInfo"
+
+  /electricity/purchase:
+    post:
+      operationId: purchaseElectricity
+      tags: [electricity]
+      summary: Purchase electricity token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ElectricityPurchaseInput"
+      responses:
+        "200":
+          description: Token purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ElectricityTransaction"
+
+  # ─── CABLE TV ────────────────────────────────────────────────────────────────
+  /cable/providers:
+    get:
+      operationId: getCableProviders
+      tags: [cable]
+      summary: Get cable TV providers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cable providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CableProvider"
+
+  /cable/plans:
+    get:
+      operationId: getCablePlans
+      tags: [cable]
+      summary: Get cable TV plans
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+            enum: [DSTV, GOTV, STARTIMES]
+      responses:
+        "200":
+          description: Cable plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CablePlan"
+
+  /cable/verify-smartcard:
+    post:
+      operationId: verifySmartcard
+      tags: [cable]
+      summary: Verify smartcard/IUC number
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmartcardVerifyInput"
+      responses:
+        "200":
+          description: Smartcard info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartcardInfo"
+
+  /cable/subscribe:
+    post:
+      operationId: subscribeCable
+      tags: [cable]
+      summary: Subscribe to cable TV plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CableSubscribeInput"
+      responses:
+        "200":
+          description: Subscription successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  # ─── EXAM TOKENS ─────────────────────────────────────────────────────────────
+  /exam/types:
+    get:
+      operationId: getExamTypes
+      tags: [exam]
+      summary: Get available exam types
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Exam types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExamType"
+
+  /exam/purchase:
+    post:
+      operationId: purchaseExamToken
+      tags: [exam]
+      summary: Purchase exam token/pin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamPurchaseInput"
+      responses:
+        "200":
+          description: Exam token purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamTransaction"
+
+  # ─── TRANSACTIONS ────────────────────────────────────────────────────────────
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [transactions]
+      summary: Get transaction history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get single transaction with receipt
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transaction detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/summary:
+    get:
+      operationId: getTransactionSummary
+      tags: [transactions]
+      summary: Get spending summary by category
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionSummary"
+
+  # ─── REFERRALS ───────────────────────────────────────────────────────────────
+  /referrals:
+    get:
+      operationId: getReferrals
+      tags: [referrals]
+      summary: Get referral info and referred users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Referral data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralInfo"
+
+  # ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get user notifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: unread
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ─── SUPPORT / TICKETS ───────────────────────────────────────────────────────
+  /support/tickets:
+    get:
+      operationId: getTickets
+      tags: [support]
+      summary: Get user's support tickets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ticket"
+    post:
+      operationId: createTicket
+      tags: [support]
+      summary: Create support ticket
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketInput"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /support/tickets/{id}:
+    get:
+      operationId: getTicket
+      tags: [support]
+      summary: Get ticket with messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /support/tickets/{id}/messages:
+    post:
+      operationId: replyTicket
+      tags: [support]
+      summary: Reply to a ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMessage"
+
+  # ─── DASHBOARD SUMMARY ────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [transactions]
+      summary: Customer dashboard summary (totals, recent activity)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  # ─── ADMIN ───────────────────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Admin overview stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/users:
+    get:
+      operationId: adminGetUsers
+      tags: [admin]
+      summary: List all users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+
+  /admin/users/{id}:
+    get:
+      operationId: adminGetUser
+      tags: [admin]
+      summary: Get user details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admin/users/{id}/status:
+    patch:
+      operationId: adminUpdateUserStatus
+      tags: [admin]
+      summary: Suspend or activate user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusUpdate"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admin/users/{id}/fund:
+    post:
+      operationId: adminFundUser
+      tags: [admin]
+      summary: Manually fund user wallet
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminFundInput"
+      responses:
+        "200":
+          description: Wallet funded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/transactions:
+    get:
+      operationId: adminGetTransactions
+      tags: [admin]
+      summary: List all transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+
+  /admin/data-plans:
+    get:
+      operationId: adminGetDataPlans
+      tags: [admin]
+      summary: List all data plans for pricing management
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Data plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DataPlan"
+    post:
+      operationId: adminCreateDataPlan
+      tags: [admin]
+      summary: Create data plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPlanInput"
+      responses:
+        "201":
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPlan"
+
+  /admin/data-plans/{id}:
+    patch:
+      operationId: adminUpdateDataPlan
+      tags: [admin]
+      summary: Update data plan pricing
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataPlanUpdate"
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataPlan"
+    delete:
+      operationId: adminDeleteDataPlan
+      tags: [admin]
+      summary: Delete data plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/tickets:
+    get:
+      operationId: adminGetTickets
+      tags: [admin]
+      summary: Get all support tickets
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Ticket"
+
+  /admin/tickets/{id}/reply:
+    post:
+      operationId: adminReplyTicket
+      tags: [admin]
+      summary: Admin reply to ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketMessageInput"
+      responses:
+        "201":
+          description: Reply sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMessage"
+
+  /admin/tickets/{id}/status:
+    patch:
+      operationId: adminUpdateTicketStatus
+      tags: [admin]
+      summary: Update ticket status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketStatusUpdate"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /admin/analytics/revenue:
+    get:
+      operationId: getRevenueAnalytics
+      tags: [admin]
+      summary: Revenue analytics by day/week/month
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [daily, weekly, monthly]
+            default: daily
+      responses:
+        "200":
+          description: Revenue data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RevenuePoint"
+
+  /admin/analytics/services:
+    get:
+      operationId: getServiceAnalytics
+      tags: [admin]
+      summary: Service usage analytics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Service analytics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceStat"
+
+  /admin/notifications/broadcast:
+    post:
+      operationId: broadcastNotification
+      tags: [admin]
+      summary: Broadcast notification to all or specific users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastInput"
+      responses:
+        "200":
+          description: Broadcast sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    # ─── AUTH SCHEMAS ─────────────────────────────────────────────────────────
+    RegisterInput:
+      type: object
+      required: [fullName, email, phone, password]
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+        referralCode:
+          type: ["string", "null"]
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    OtpInput:
+      type: object
+      required: [email, otp]
+      properties:
+        email:
+          type: string
+        otp:
+          type: string
+
+    ResendOtpInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+
+    ForgotPasswordInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+
+    ResetPasswordInput:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    ProfileUpdate:
+      type: object
+      properties:
+        fullName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, fullName, email, phone, role, status, emailVerified, createdAt]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [customer, admin]
+        status:
+          type: string
+          enum: [active, suspended]
+        emailVerified:
+          type: boolean
+        referralCode:
+          type: ["string", "null"]
+        referredBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UserList:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    UserStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, suspended]
+
+    # ─── WALLET SCHEMAS ───────────────────────────────────────────────────────
+    Wallet:
+      type: object
+      required: [id, userId, balance, currency, updatedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        balance:
+          type: number
+        currency:
+          type: string
+        updatedAt:
+          type: string
+
+    FundingInput:
+      type: object
+      required: [amount, gateway]
+      properties:
+        amount:
+          type: number
+        gateway:
+          type: string
+          enum: [paystack, flutterwave, monnify]
+
+    PaymentInitResponse:
+      type: object
+      required: [paymentUrl, reference]
+      properties:
+        paymentUrl:
+          type: string
+        reference:
+          type: string
+        gateway:
+          type: string
+
+    VerifyPaymentInput:
+      type: object
+      required: [reference, gateway]
+      properties:
+        reference:
+          type: string
+        gateway:
+          type: string
+          enum: [paystack, flutterwave, monnify]
+
+    WalletTransferInput:
+      type: object
+      required: [recipientPhone, amount]
+      properties:
+        recipientPhone:
+          type: string
+        amount:
+          type: number
+        note:
+          type: ["string", "null"]
+
+    AdminFundInput:
+      type: object
+      required: [amount, note]
+      properties:
+        amount:
+          type: number
+        note:
+          type: string
+
+    # ─── DATA SCHEMAS ─────────────────────────────────────────────────────────
+    DataPlan:
+      type: object
+      required: [id, network, name, size, validity, price, isActive]
+      properties:
+        id:
+          type: string
+        network:
+          type: string
+          enum: [MTN, AIRTEL, GLO, 9MOBILE]
+        name:
+          type: string
+        size:
+          type: string
+        validity:
+          type: string
+        price:
+          type: number
+        costPrice:
+          type: ["number", "null"]
+        isActive:
+          type: boolean
+
+    DataPlanInput:
+      type: object
+      required: [network, name, size, validity, price, costPrice]
+      properties:
+        network:
+          type: string
+        name:
+          type: string
+        size:
+          type: string
+        validity:
+          type: string
+        price:
+          type: number
+        costPrice:
+          type: number
+
+    DataPlanUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        price:
+          type: ["number", "null"]
+        costPrice:
+          type: ["number", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    DataPurchaseInput:
+      type: object
+      required: [planId, phone]
+      properties:
+        planId:
+          type: string
+        phone:
+          type: string
+
+    # ─── AIRTIME SCHEMAS ──────────────────────────────────────────────────────
+    AirtimePurchaseInput:
+      type: object
+      required: [network, phone, amount]
+      properties:
+        network:
+          type: string
+          enum: [MTN, AIRTEL, GLO, 9MOBILE]
+        phone:
+          type: string
+        amount:
+          type: number
+
+    # ─── ELECTRICITY SCHEMAS ──────────────────────────────────────────────────
+    ElectricityProvider:
+      type: object
+      required: [id, name, code]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+
+    MeterVerifyInput:
+      type: object
+      required: [meterNumber, providerCode, meterType]
+      properties:
+        meterNumber:
+          type: string
+        providerCode:
+          type: string
+        meterType:
+          type: string
+          enum: [prepaid, postpaid]
+
+    MeterInfo:
+      type: object
+      required: [meterNumber, name, address]
+      properties:
+        meterNumber:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+
+    ElectricityPurchaseInput:
+      type: object
+      required: [meterNumber, providerCode, meterType, amount, phone]
+      properties:
+        meterNumber:
+          type: string
+        providerCode:
+          type: string
+        meterType:
+          type: string
+          enum: [prepaid, postpaid]
+        amount:
+          type: number
+        phone:
+          type: string
+
+    ElectricityTransaction:
+      type: object
+      required: [id, status, token, amount, meterNumber, createdAt]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        token:
+          type: ["string", "null"]
+        amount:
+          type: number
+        meterNumber:
+          type: string
+        createdAt:
+          type: string
+
+    # ─── CABLE SCHEMAS ────────────────────────────────────────────────────────
+    CableProvider:
+      type: object
+      required: [id, name, code]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+
+    CablePlan:
+      type: object
+      required: [id, provider, name, price, validity]
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+          enum: [DSTV, GOTV, STARTIMES]
+        name:
+          type: string
+        price:
+          type: number
+        validity:
+          type: string
+
+    SmartcardVerifyInput:
+      type: object
+      required: [smartcardNumber, provider]
+      properties:
+        smartcardNumber:
+          type: string
+        provider:
+          type: string
+          enum: [DSTV, GOTV, STARTIMES]
+
+    SmartcardInfo:
+      type: object
+      required: [smartcardNumber, name, currentPlan]
+      properties:
+        smartcardNumber:
+          type: string
+        name:
+          type: string
+        currentPlan:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+
+    CableSubscribeInput:
+      type: object
+      required: [planId, smartcardNumber, provider]
+      properties:
+        planId:
+          type: string
+        smartcardNumber:
+          type: string
+        provider:
+          type: string
+          enum: [DSTV, GOTV, STARTIMES]
+
+    # ─── EXAM SCHEMAS ─────────────────────────────────────────────────────────
+    ExamType:
+      type: object
+      required: [id, name, code, price]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+          enum: [WAEC, NECO, JAMB, NABTEB]
+        price:
+          type: number
+        description:
+          type: ["string", "null"]
+
+    ExamPurchaseInput:
+      type: object
+      required: [examTypeId, quantity, phone]
+      properties:
+        examTypeId:
+          type: string
+        quantity:
+          type: integer
+        phone:
+          type: string
+
+    ExamTransaction:
+      type: object
+      required: [id, status, pins, examType, amount, createdAt]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        pins:
+          type: array
+          items:
+            type: object
+            required: [pin, serial]
+            properties:
+              pin:
+                type: string
+              serial:
+                type: string
+        examType:
+          type: string
+        amount:
+          type: number
+        createdAt:
+          type: string
+
+    # ─── TRANSACTION SCHEMAS ──────────────────────────────────────────────────
+    Transaction:
+      type: object
+      required: [id, type, status, amount, description, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [data, airtime, electricity, cable, exam, wallet_fund, wallet_transfer]
+        status:
+          type: string
+          enum: [pending, success, failed]
+        amount:
+          type: number
+        description:
+          type: string
+        reference:
+          type: ["string", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+        userId:
+          type: string
+        createdAt:
+          type: string
+
+    TransactionList:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    TransactionSummary:
+      type: object
+      required: [totalSpent, byCategory, recentTransactions]
+      properties:
+        totalSpent:
+          type: number
+        byCategory:
+          type: array
+          items:
+            type: object
+            required: [type, total, count]
+            properties:
+              type:
+                type: string
+              total:
+                type: number
+              count:
+                type: integer
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+
+    DashboardSummary:
+      type: object
+      required: [walletBalance, totalSpent, totalTransactions, monthlySpend, recentTransactions, notificationCount]
+      properties:
+        walletBalance:
+          type: number
+        totalSpent:
+          type: number
+        totalTransactions:
+          type: integer
+        monthlySpend:
+          type: number
+        recentTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        notificationCount:
+          type: integer
+
+    # ─── REFERRAL SCHEMAS ─────────────────────────────────────────────────────
+    ReferralInfo:
+      type: object
+      required: [referralCode, referralLink, totalReferrals, totalEarnings, referrals]
+      properties:
+        referralCode:
+          type: string
+        referralLink:
+          type: string
+        totalReferrals:
+          type: integer
+        totalEarnings:
+          type: number
+        referrals:
+          type: array
+          items:
+            type: object
+            required: [name, date, bonus]
+            properties:
+              name:
+                type: string
+              date:
+                type: string
+              bonus:
+                type: number
+
+    # ─── NOTIFICATION SCHEMAS ─────────────────────────────────────────────────
+    Notification:
+      type: object
+      required: [id, title, message, isRead, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: ["string", "null"]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+
+    BroadcastInput:
+      type: object
+      required: [title, message]
+      properties:
+        title:
+          type: string
+        message:
+          type: string
+        targetUserId:
+          type: ["string", "null"]
+
+    # ─── SUPPORT SCHEMAS ──────────────────────────────────────────────────────
+    Ticket:
+      type: object
+      required: [id, subject, status, priority, createdAt, messages]
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved, closed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        userId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/TicketMessage"
+
+    TicketInput:
+      type: object
+      required: [subject, message, priority]
+      properties:
+        subject:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+
+    TicketMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    TicketMessage:
+      type: object
+      required: [id, message, senderRole, createdAt]
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        senderRole:
+          type: string
+          enum: [customer, admin]
+        createdAt:
+          type: string
+
+    TicketStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [open, in_progress, resolved, closed]
+
+    # ─── ADMIN ANALYTICS SCHEMAS ──────────────────────────────────────────────
+    AdminStats:
+      type: object
+      required: [totalUsers, activeUsers, totalTransactions, totalRevenue, totalWalletBalance, pendingTickets, todayTransactions, todayRevenue]
+      properties:
+        totalUsers:
+          type: integer
+        activeUsers:
+          type: integer
+        totalTransactions:
+          type: integer
+        totalRevenue:
+          type: number
+        totalWalletBalance:
+          type: number
+        pendingTickets:
+          type: integer
+        todayTransactions:
+          type: integer
+        todayRevenue:
+          type: number
+
+    RevenuePoint:
+      type: object
+      required: [date, revenue, profit, transactions]
+      properties:
+        date:
+          type: string
+        revenue:
+          type: number
+        profit:
+          type: number
+        transactions:
+          type: integer
+
+    ServiceStat:
+      type: object
+      required: [service, count, revenue, percentage]
+      properties:
+        service:
+          type: string
+        count:
+          type: integer
+        revenue:
+          type: number
+        percentage:
+          type: number

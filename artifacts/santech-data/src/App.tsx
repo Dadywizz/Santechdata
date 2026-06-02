@@ -1,0 +1,97 @@
+import { Switch, Route, Router as WouterRouter } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import NotFound from "@/pages/not-found";
+
+import Login from "@/pages/login";
+import Register from "@/pages/register";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
+import VerifyEmail from "@/pages/verify-email";
+
+import Dashboard from "@/pages/dashboard";
+import BuyData from "@/pages/buy-data";
+import BuyAirtime from "@/pages/buy-airtime";
+import BuyElectricity from "@/pages/buy-electricity";
+import BuyCable from "@/pages/buy-cable";
+import BuyExam from "@/pages/buy-exam";
+import FundWallet from "@/pages/fund-wallet";
+import Transactions from "@/pages/transactions";
+import Referrals from "@/pages/referrals";
+import Notifications from "@/pages/notifications";
+import Support from "@/pages/support";
+import Profile from "@/pages/profile";
+
+import AdminDashboard from "@/pages/admin/index";
+import AdminUsers from "@/pages/admin/users";
+import AdminTransactions from "@/pages/admin/transactions";
+import AdminDataPlans from "@/pages/admin/data-plans";
+import AdminTickets from "@/pages/admin/tickets";
+import AdminAnalytics from "@/pages/admin/analytics";
+import AdminNotifications from "@/pages/admin/notifications";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/verify-email" component={VerifyEmail} />
+
+      <Route path="/" component={() => {
+        window.location.replace("/dashboard");
+        return null;
+      }} />
+
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/buy-data" component={BuyData} />
+      <Route path="/buy-airtime" component={BuyAirtime} />
+      <Route path="/buy-electricity" component={BuyElectricity} />
+      <Route path="/buy-cable" component={BuyCable} />
+      <Route path="/buy-exam" component={BuyExam} />
+      <Route path="/fund-wallet" component={FundWallet} />
+      <Route path="/transactions" component={Transactions} />
+      <Route path="/referrals" component={Referrals} />
+      <Route path="/notifications" component={Notifications} />
+      <Route path="/support" component={Support} />
+      <Route path="/profile" component={Profile} />
+
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/transactions" component={AdminTransactions} />
+      <Route path="/admin/data-plans" component={AdminDataPlans} />
+      <Route path="/admin/tickets" component={AdminTickets} />
+      <Route path="/admin/analytics" component={AdminAnalytics} />
+      <Route path="/admin/notifications" component={AdminNotifications} />
+
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AuthProvider>
+            <Router />
+          </AuthProvider>
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}

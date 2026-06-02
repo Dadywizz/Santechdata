@@ -1,0 +1,162 @@
+import { useState } from "react";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/PageHeader";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useGetCableProviders, useGetCablePlans, useVerifySmartcard, useSubscribeCable } from "@workspace/api-client-react";
+import { Tv, CheckCircle2 } from "lucide-react";
+
+type CableProvider = "DSTV" | "GOTV" | "STARTIMES";
+
+export default function BuyCable() {
+  const { toast } = useToast();
+  const [provider, setProvider] = useState<CableProvider | "">("");
+  const [smartcardNumber, setSmartcardNumber] = useState("");
+  const [planId, setPlanId] = useState<string>("");
+  const [verified, setVerified] = useState<{ name: string } | null>(null);
+
+  const { data: providers = [] } = useGetCableProviders();
+  const { data: plans = [] } = useGetCablePlans(
+    provider ? { provider: provider as CableProvider } : undefined,
+    { query: { enabled: !!provider, queryKey: [`/api/cable/plans`, provider] as const } }
+  );
+
+  const verifyMutation = useVerifySmartcard({
+    mutation: {
+      onSuccess: (data: any) => setVerified({ name: data.name }),
+      onError: () => {
+        toast({ title: "Smartcard not found", description: "Check the number and try again", variant: "destructive" });
+        setVerified(null);
+      },
+    },
+  });
+
+  const subscribeMutation = useSubscribeCable({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Subscription Successful!", description: "Your cable TV has been renewed" });
+        setSmartcardNumber(""); setPlanId(""); setVerified(null);
+      },
+      onError: (error: any) => {
+        toast({ title: "Subscription Failed", description: error.data?.error || "Could not complete subscription", variant: "destructive" });
+      },
+    },
+  });
+
+  const selectedPlan = (plans as any[]).find((p: any) => p.id === planId);
+
+  const handleVerify = () => {
+    if (!provider) { toast({ title: "Select a provider", variant: "destructive" }); return; }
+    if (!smartcardNumber) { toast({ title: "Enter smartcard number", variant: "destructive" }); return; }
+    verifyMutation.mutate({ data: { provider: provider as CableProvider, smartcardNumber } });
+  };
+
+  const handleSubscribe = () => {
+    if (!selectedPlan) { toast({ title: "Select a plan", variant: "destructive" }); return; }
+    subscribeMutation.mutate({ data: { provider: provider as CableProvider, smartcardNumber, planId } });
+  };
+
+  return (
+    <AppLayout>
+      <PageHeader title="Cable TV" description="DStv, GOtv & Startimes subscription" />
+
+      <div className="max-w-2xl space-y-6">
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div>
+              <Label className="font-semibold mb-3 block">Select Provider</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {(providers as any[]).map((p: any) => (
+                  <button
+                    key={p.code}
+                    onClick={() => { setProvider(p.code as CableProvider); setPlanId(""); setVerified(null); }}
+                    className={`rounded-xl p-4 border-2 font-semibold text-sm transition-all ${
+                      provider === p.code ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="font-semibold mb-2 block">Smartcard / IUC Number</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter smartcard number"
+                  value={smartcardNumber}
+                  onChange={(e) => { setSmartcardNumber(e.target.value); setVerified(null); }}
+                  className="h-12 flex-1"
+                />
+                <Button variant="outline" onClick={handleVerify} disabled={verifyMutation.isPending} className="h-12 shrink-0">
+                  {verifyMutation.isPending ? "..." : "Verify"}
+                </Button>
+              </div>
+            </div>
+
+            {verified && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <CheckCircle2 className="text-green-600 shrink-0" size={18} />
+                <p className="font-semibold text-green-800 dark:text-green-200">{verified.name}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {verified && (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <Label className="font-semibold mb-3 block">Select Subscription Plan</Label>
+              {(plans as any[]).length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No plans available for this provider</p>
+              ) : (
+                <div className="grid gap-3 max-h-80 overflow-y-auto pr-1">
+                  {(plans as any[]).map((plan: any) => (
+                    <button
+                      key={plan.id}
+                      onClick={() => setPlanId(plan.id)}
+                      className={`text-left p-4 rounded-xl border-2 transition-all ${
+                        planId === plan.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold">{plan.name}</p>
+                          <p className="text-sm text-muted-foreground">{plan.duration}</p>
+                        </div>
+                        <span className="font-bold text-primary text-lg">₦{plan.price?.toLocaleString()}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedPlan && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-purple-500/10 text-purple-600 p-3 rounded-full">
+                        <Tv size={22} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">{verified.name}</p>
+                        <p className="font-bold">{selectedPlan.name}</p>
+                      </div>
+                    </div>
+                    <Button size="lg" onClick={handleSubscribe} disabled={subscribeMutation.isPending}>
+                      {subscribeMutation.isPending ? "Processing..." : `Pay ₦${selectedPlan.price?.toLocaleString()}`}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
