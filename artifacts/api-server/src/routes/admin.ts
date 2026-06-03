@@ -304,7 +304,14 @@ router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: A
     try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
     res.json(data);
   } catch (err: any) {
-    res.status(502).json({ error: "Failed to reach VTpass", detail: err?.message ?? String(err) });
+    const cause = err?.cause as any;
+    res.status(502).json({
+      error: "Failed to reach VTpass",
+      detail: err?.message ?? String(err),
+      cause: cause?.message ?? cause?.code ?? String(cause ?? ""),
+      base: BASE,
+      hasKey: !!(process.env.VTPASS_API_KEY),
+    });
   }
 });
 
