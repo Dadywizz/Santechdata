@@ -13,4 +13,6 @@ export interface DataPlanInput {
   validity: string;
   price: number;
   costPrice: number;
+  /** @nullable */
+  providerCode?: string | null;
 }

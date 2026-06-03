@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGetDataPlans, getGetDataPlansQueryKey, usePurchaseData, DataPlanNetwork, DataPlan } from "@workspace/api-client-react";
 import { Check, Wifi } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const NETWORKS = [
   { id: DataPlanNetwork.MTN, name: "MTN", color: "bg-[#FFCB00] text-black", border: "border-[#FFCB00]" },
@@ -21,6 +22,7 @@ export default function BuyData() {
   const [network, setNetwork] = useState<DataPlanNetwork | null>(null);
   const [phone, setPhone] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
   const { data: plans = [], isLoading: isLoadingPlans } = useGetDataPlans(
     { network: network || undefined },
@@ -29,10 +31,17 @@ export default function BuyData() {
 
   const purchaseMutation = usePurchaseData({
     mutation: {
-      onSuccess: () => {
-        toast({
-          title: "Purchase Successful",
-          description: `Data successfully sent to ${phone}`,
+      onSuccess: (tx: any) => {
+        setReceipt({
+          reference: tx.reference,
+          description: tx.description,
+          amount: tx.amount,
+          network: (tx.metadata as any)?.network,
+          phone: (tx.metadata as any)?.phone,
+          size: (tx.metadata as any)?.size,
+          validity: (tx.metadata as any)?.validity,
+          createdAt: tx.createdAt,
+          type: "data",
         });
         setPhone("");
         setSelectedPlan(null);
@@ -175,6 +184,8 @@ export default function BuyData() {
           )}
         </div>
       </div>
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }

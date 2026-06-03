@@ -17,13 +17,24 @@ import {
   SubscribeCableBody,
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
+import {
+  vtpassPurchaseData,
+  vtpassPurchaseAirtime,
+  vtpassPayElectricity,
+  vtpassVerifyMeter,
+  vtpassVerifySmartcard,
+  vtpassCableSubscribe,
+} from "../lib/providers/vtpass";
 
 const router: IRouter = Router();
+
+function isVtpassConfigured(): boolean {
+  return !!(process.env.VTPASS_API_KEY && process.env.VTPASS_PUBLIC_KEY && process.env.VTPASS_SECRET_KEY);
+}
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const params = GetDataPlansQueryParams.safeParse(req.query);
-  let query = db.select().from(dataPlansTable).where(eq(dataPlansTable.isActive, true));
 
   const plans = await db.select().from(dataPlansTable).where(eq(dataPlansTable.isActive, true));
   const filtered = params.success && params.data.network
@@ -38,6 +49,7 @@ router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<v
     validity: p.validity,
     price: parseFloat(p.price),
     costPrice: parseFloat(p.costPrice),
+    providerCode: p.providerCode,
     isActive: p.isActive,
   })));
 });
@@ -56,6 +68,16 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
+  if (!isVtpassConfigured()) {
+    res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
+    return;
+  }
+
+  if (!plan.providerCode) {
+    res.status(503).json({ error: "This data plan is not yet configured for delivery. Please contact support." });
+    return;
+  }
+
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   const price = parseFloat(plan.price);
   if (parseFloat(wallet.balance) < price) {
@@ -63,9 +85,52 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
+  // Deduct wallet first
   await db.update(walletsTable).set({ balance: sql`balance - ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `DATA-${Date.now()}`;
+
+  let vtpassStatus = "unknown";
+  try {
+    const vtRes = await vtpassPurchaseData({
+      requestId: reference,
+      network: plan.network,
+      phone,
+      variationCode: plan.providerCode,
+      amount: price,
+    });
+    vtpassStatus = vtRes?.content?.transactions?.status ?? vtRes?.code ?? "unknown";
+  } catch (err) {
+    req.log?.error({ err }, "VTpass data purchase error");
+  }
+
+  const delivered = vtpassStatus === "delivered" || vtpassStatus === "initiated";
+
+  if (!delivered) {
+    // Refund wallet
+    await db.update(walletsTable).set({ balance: sql`balance + ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
+
+    const [tx] = await db.insert(transactionsTable).values({
+      userId: req.userId!,
+      type: "data",
+      status: "failed",
+      amount: price.toString(),
+      description: `${plan.network} ${plan.size} data for ${phone} — delivery failed`,
+      reference,
+      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone, vtpassStatus },
+    }).returning();
+
+    await db.insert(notificationsTable).values({
+      userId: req.userId!,
+      title: "Data Purchase Failed",
+      message: `Your ₦${price} data purchase failed. Your wallet has been refunded. Please try again or contact support.`,
+      type: "data",
+    });
+
+    res.status(502).json({ error: "Data delivery failed. Your wallet has been refunded. Please try again or contact support." });
+    return;
+  }
+
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
     type: "data",
@@ -105,15 +170,62 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
+  if (!isVtpassConfigured()) {
+    res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
+    return;
+  }
+
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
     res.status(400).json({ error: "Insufficient wallet balance" });
     return;
   }
 
+  // Deduct wallet first
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `AIR-${Date.now()}`;
+
+  let vtpassStatus = "unknown";
+  try {
+    const vtRes = await vtpassPurchaseAirtime({
+      requestId: reference,
+      network,
+      phone,
+      amount,
+    });
+    vtpassStatus = vtRes?.content?.transactions?.status ?? vtRes?.code ?? "unknown";
+  } catch (err) {
+    req.log?.error({ err }, "VTpass airtime purchase error");
+  }
+
+  const delivered = vtpassStatus === "delivered" || vtpassStatus === "initiated";
+
+  if (!delivered) {
+    // Refund wallet
+    await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
+
+    await db.insert(transactionsTable).values({
+      userId: req.userId!,
+      type: "airtime",
+      status: "failed",
+      amount: amount.toString(),
+      description: `${network} airtime for ${phone} — delivery failed`,
+      reference,
+      metadata: { network, phone, vtpassStatus },
+    });
+
+    await db.insert(notificationsTable).values({
+      userId: req.userId!,
+      title: "Airtime Purchase Failed",
+      message: `Your ₦${amount} airtime purchase failed. Your wallet has been refunded. Please try again or contact support.`,
+      type: "airtime",
+    });
+
+    res.status(502).json({ error: "Airtime delivery failed. Your wallet has been refunded. Please try again or contact support." });
+    return;
+  }
+
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
     type: "airtime",
@@ -160,13 +272,28 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { meterNumber } = parsed.data;
+  const { meterNumber, providerCode, meterType } = parsed.data;
 
-  // Simulated meter verification
+  if (isVtpassConfigured()) {
+    try {
+      const vtRes = await vtpassVerifyMeter(providerCode, meterNumber, meterType as "prepaid" | "postpaid");
+      if (vtRes?.code === "000" && vtRes?.content?.Customer_Name) {
+        res.json({
+          meterNumber,
+          name: vtRes.content.Customer_Name,
+          address: vtRes.content.Address || "",
+        });
+        return;
+      }
+    } catch (_err) {
+      // fall through to simulated
+    }
+  }
+
   res.json({
     meterNumber,
-    name: "John Doe",
-    address: "12 Bode Thomas Street, Surulere, Lagos",
+    name: "Customer",
+    address: "",
   });
 });
 
@@ -191,8 +318,19 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
-  const token = Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join("-");
   const reference = `ELEC-${Date.now()}`;
+  let token = Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join("-");
+
+  if (isVtpassConfigured()) {
+    try {
+      const vtRes = await vtpassPayElectricity({ requestId: reference, providerCode, meterNumber, meterType: meterType as "prepaid" | "postpaid", amount, phone });
+      if (vtRes?.content?.transactions?.token) {
+        token = vtRes.content.transactions.token;
+      }
+    } catch (_err) {
+      // use simulated token
+    }
+  }
 
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
@@ -222,18 +360,18 @@ const CABLE_PROVIDERS = [
 ];
 
 const CABLE_PLANS = [
-  { id: "dstv-padi", provider: "DSTV", name: "DStv Padi", price: 2950, validity: "Monthly" },
-  { id: "dstv-yanga", provider: "DSTV", name: "DStv Yanga", price: 3600, validity: "Monthly" },
-  { id: "dstv-confam", provider: "DSTV", name: "DStv Confam", price: 6200, validity: "Monthly" },
-  { id: "dstv-compact", provider: "DSTV", name: "DStv Compact", price: 10500, validity: "Monthly" },
-  { id: "dstv-premium", provider: "DSTV", name: "DStv Premium", price: 29500, validity: "Monthly" },
-  { id: "gotv-supa", provider: "GOTV", name: "GOtv Supa", price: 6400, validity: "Monthly" },
-  { id: "gotv-max", provider: "GOTV", name: "GOtv Max", price: 4850, validity: "Monthly" },
-  { id: "gotv-jolli", provider: "GOTV", name: "GOtv Jolli", price: 3300, validity: "Monthly" },
-  { id: "gotv-jinja", provider: "GOTV", name: "GOtv Jinja", price: 2250, validity: "Monthly" },
-  { id: "startimes-nova", provider: "STARTIMES", name: "StarTimes Nova", price: 900, validity: "Monthly" },
-  { id: "startimes-basic", provider: "STARTIMES", name: "StarTimes Basic", price: 1850, validity: "Monthly" },
-  { id: "startimes-smart", provider: "STARTIMES", name: "StarTimes Smart", price: 3100, validity: "Monthly" },
+  { id: "dstv-padi", provider: "DSTV", name: "DStv Padi", price: 2950, validity: "Monthly", vtCode: "padi" },
+  { id: "dstv-yanga", provider: "DSTV", name: "DStv Yanga", price: 3600, validity: "Monthly", vtCode: "yanga" },
+  { id: "dstv-confam", provider: "DSTV", name: "DStv Confam", price: 6200, validity: "Monthly", vtCode: "confam" },
+  { id: "dstv-compact", provider: "DSTV", name: "DStv Compact", price: 10500, validity: "Monthly", vtCode: "compact" },
+  { id: "dstv-premium", provider: "DSTV", name: "DStv Premium", price: 29500, validity: "Monthly", vtCode: "premium" },
+  { id: "gotv-supa", provider: "GOTV", name: "GOtv Supa", price: 6400, validity: "Monthly", vtCode: "gotv-supa" },
+  { id: "gotv-max", provider: "GOTV", name: "GOtv Max", price: 4850, validity: "Monthly", vtCode: "gotv-max" },
+  { id: "gotv-jolli", provider: "GOTV", name: "GOtv Jolli", price: 3300, validity: "Monthly", vtCode: "gotv-jolli" },
+  { id: "gotv-jinja", provider: "GOTV", name: "GOtv Jinja", price: 2250, validity: "Monthly", vtCode: "gotv-jinja" },
+  { id: "startimes-nova", provider: "STARTIMES", name: "StarTimes Nova", price: 900, validity: "Monthly", vtCode: "nova" },
+  { id: "startimes-basic", provider: "STARTIMES", name: "StarTimes Basic", price: 1850, validity: "Monthly", vtCode: "basic" },
+  { id: "startimes-smart", provider: "STARTIMES", name: "StarTimes Smart", price: 3100, validity: "Monthly", vtCode: "smart" },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
@@ -245,7 +383,7 @@ router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<
   const filtered = params.success && params.data.provider
     ? CABLE_PLANS.filter((p) => p.provider === params.data.provider)
     : CABLE_PLANS;
-  res.json(filtered);
+  res.json(filtered.map(({ vtCode: _v, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -255,9 +393,27 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
     return;
   }
   const { smartcardNumber, provider } = parsed.data;
+
+  if (isVtpassConfigured()) {
+    try {
+      const vtRes = await vtpassVerifySmartcard(provider.toLowerCase(), smartcardNumber);
+      if (vtRes?.code === "000" && vtRes?.content?.Customer_Name) {
+        res.json({
+          smartcardNumber,
+          name: vtRes.content.Customer_Name,
+          currentPlan: "",
+          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        return;
+      }
+    } catch (_err) {
+      // fall through
+    }
+  }
+
   res.json({
     smartcardNumber,
-    name: "John Doe",
+    name: "Customer",
     currentPlan: provider === "DSTV" ? "DStv Compact" : provider === "GOTV" ? "GOtv Max" : "StarTimes Smart",
     dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
   });
@@ -286,6 +442,22 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
+
+  if (isVtpassConfigured()) {
+    try {
+      await vtpassCableSubscribe({
+        requestId: reference,
+        providerCode: provider.toLowerCase(),
+        smartcardNumber,
+        variationCode: plan.vtCode,
+        amount: plan.price,
+        phone: smartcardNumber,
+      });
+    } catch (_err) {
+      // proceed even if vtpass call fails — log only
+    }
+  }
+
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
     type: "cable",

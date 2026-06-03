@@ -16,5 +16,7 @@ export interface DataPlan {
   price: number;
   /** @nullable */
   costPrice?: number | null;
+  /** @nullable */
+  providerCode?: string | null;
   isActive: boolean;
 }

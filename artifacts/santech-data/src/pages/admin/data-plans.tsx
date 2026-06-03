@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useAdminGetDataPlans, getAdminGetDataPlansQueryKey, useAdminCreateDataPlan, useAdminUpdateDataPlan, useAdminDeleteDataPlan } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wifi } from "lucide-react";
+import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle } from "lucide-react";
 
 const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"];
 const NETWORK_COLORS: Record<string, string> = {
@@ -31,6 +32,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
     validity: plan?.validity || "30 Days",
     price: plan?.price?.toString() || "",
     costPrice: plan?.costPrice?.toString() || "",
+    providerCode: plan?.providerCode || "",
   });
 
   const createMutation = useAdminCreateDataPlan({
@@ -56,11 +58,28 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
   });
 
   const handleSubmit = () => {
-    const payload = { ...form, price: parseFloat(form.price), costPrice: parseFloat(form.costPrice) };
     if (plan) {
-      updateMutation.mutate({ id: plan.id, data: { price: payload.price, costPrice: payload.costPrice, name: payload.name } });
+      updateMutation.mutate({
+        id: plan.id,
+        data: {
+          price: parseFloat(form.price),
+          costPrice: parseFloat(form.costPrice),
+          name: form.name,
+          providerCode: form.providerCode,
+        } as any,
+      });
     } else {
-      createMutation.mutate({ data: payload as any });
+      createMutation.mutate({
+        data: {
+          network: form.network,
+          name: form.name,
+          size: form.size,
+          validity: form.validity,
+          price: parseFloat(form.price),
+          costPrice: parseFloat(form.costPrice),
+          providerCode: form.providerCode,
+        } as any,
+      });
     }
   };
 
@@ -105,6 +124,18 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
           <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm(f => ({ ...f, costPrice: e.target.value }))} className="h-12" />
         </div>
       </div>
+      <div>
+        <Label className="font-semibold mb-2 block">VTpass Provider Code</Label>
+        <Input
+          placeholder="e.g. mtn-10mb-500 (from VTpass dashboard)"
+          value={form.providerCode}
+          onChange={(e) => setForm(f => ({ ...f, providerCode: e.target.value }))}
+          className="h-12 font-mono text-sm"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Get this code from your VTpass dashboard under "Variation Codes" for data plans.
+        </p>
+      </div>
       <Button className="w-full" onClick={handleSubmit} disabled={isPending}>
         {isPending ? "Saving..." : plan ? "Update Plan" : "Create Plan"}
       </Button>
@@ -137,6 +168,7 @@ export default function AdminDataPlans() {
   });
 
   const plans = filterNetwork === "all" ? (data as any[]) : (data as any[]).filter((p) => p.network === filterNetwork);
+  const configuredCount = (data as any[]).filter((p: any) => p.providerCode).length;
 
   return (
     <AdminLayout>
@@ -146,6 +178,15 @@ export default function AdminDataPlans() {
           <Plus className="mr-2 h-4 w-4" /> Add Plan
         </Button>
       </div>
+
+      {configuredCount < (data as any[]).length && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing a VTpass provider code — customers won't be able to purchase them until you set the code. Edit each plan to add the VTpass variation code.
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6 flex-wrap">
         {["all", ...NETWORKS].map((n) => (
@@ -190,6 +231,17 @@ export default function AdminDataPlans() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{plan.name}</p>
                     <p className="text-sm text-muted-foreground">{plan.size} · {plan.validity}</p>
+                    {plan.providerCode ? (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 size={11} className="text-green-500" />
+                        <span className="text-xs font-mono text-muted-foreground">{plan.providerCode}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <AlertCircle size={11} className="text-amber-500" />
+                        <span className="text-xs text-amber-600">No provider code — set to enable delivery</span>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-primary">₦{plan.price?.toLocaleString()}</p>
@@ -197,7 +249,7 @@ export default function AdminDataPlans() {
                   </div>
                   <Switch
                     checked={plan.isActive}
-                    onCheckedChange={(v) => updateMutation.mutate({ id: plan.id, data: { isActive: v } })}
+                    onCheckedChange={(v) => updateMutation.mutate({ id: plan.id, data: { isActive: v } as any })}
                   />
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" onClick={() => { setEditPlan(plan); setDialogMode("edit"); }}>

@@ -189,6 +189,8 @@ export interface DataPlan {
   price: number;
   /** @nullable */
   costPrice?: number | null;
+  /** @nullable */
+  providerCode?: string | null;
   isActive: boolean;
 }
 
@@ -199,6 +201,8 @@ export interface DataPlanInput {
   validity: string;
   price: number;
   costPrice: number;
+  /** @nullable */
+  providerCode?: string | null;
 }
 
 export interface DataPlanUpdate {
@@ -208,6 +212,8 @@ export interface DataPlanUpdate {
   price?: number | null;
   /** @nullable */
   costPrice?: number | null;
+  /** @nullable */
+  providerCode?: string | null;
   /** @nullable */
   isActive?: boolean | null;
 }

@@ -228,6 +228,7 @@ export const GetDataPlansResponseItem = zod.object({
   "validity": zod.string(),
   "price": zod.number(),
   "costPrice": zod.number().nullish(),
+  "providerCode": zod.string().nullish(),
   "isActive": zod.boolean()
 })
 export const GetDataPlansResponse = zod.array(GetDataPlansResponseItem)
@@ -795,6 +796,7 @@ export const AdminGetDataPlansResponseItem = zod.object({
   "validity": zod.string(),
   "price": zod.number(),
   "costPrice": zod.number().nullish(),
+  "providerCode": zod.string().nullish(),
   "isActive": zod.boolean()
 })
 export const AdminGetDataPlansResponse = zod.array(AdminGetDataPlansResponseItem)
@@ -809,7 +811,8 @@ export const AdminCreateDataPlanBody = zod.object({
   "size": zod.string(),
   "validity": zod.string(),
   "price": zod.number(),
-  "costPrice": zod.number()
+  "costPrice": zod.number(),
+  "providerCode": zod.string().nullish()
 })
 
 
@@ -824,6 +827,7 @@ export const AdminUpdateDataPlanBody = zod.object({
   "name": zod.string().nullish(),
   "price": zod.number().nullish(),
   "costPrice": zod.number().nullish(),
+  "providerCode": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 
@@ -835,6 +839,7 @@ export const AdminUpdateDataPlanResponse = zod.object({
   "validity": zod.string(),
   "price": zod.number(),
   "costPrice": zod.number().nullish(),
+  "providerCode": zod.string().nullish(),
   "isActive": zod.boolean()
 })
 

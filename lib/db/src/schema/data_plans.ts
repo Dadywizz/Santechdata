@@ -10,6 +10,7 @@ export const dataPlansTable = pgTable("data_plans", {
   validity: varchar("validity", { length: 50 }).notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   costPrice: numeric("cost_price", { precision: 10, scale: 2 }).notNull(),
+  providerCode: varchar("provider_code", { length: 100 }).default("").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

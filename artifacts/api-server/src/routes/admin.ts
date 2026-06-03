@@ -37,6 +37,14 @@ function txToJson(tx: typeof transactionsTable.$inferSelect) {
   };
 }
 
+function planToJson(p: typeof dataPlansTable.$inferSelect) {
+  return {
+    id: p.id, network: p.network, name: p.name, size: p.size,
+    validity: p.validity, price: parseFloat(p.price), costPrice: parseFloat(p.costPrice),
+    providerCode: p.providerCode, isActive: p.isActive,
+  };
+}
+
 // GET /admin/stats
 router.get("/admin/stats", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const allUsers = await db.select().from(usersTable);
@@ -50,141 +58,100 @@ router.get("/admin/stats", authenticate, requireAdmin, async (_req, res): Promis
   const allWallets = await db.select().from(walletsTable);
   const totalWalletBalance = allWallets.reduce((s, w) => s + parseFloat(w.balance), 0);
 
-  const openTickets = await db.select().from(ticketsTable).where(eq(ticketsTable.status, "open"));
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayTx = allTx.filter((tx) => new Date(tx.createdAt) >= today);
-  const todayRevenue = todayTx
-    .filter((tx) => ["data", "airtime", "electricity", "cable", "exam"].includes(tx.type))
-    .reduce((s, tx) => s + parseFloat(tx.amount), 0);
+  const pendingTickets = await db.select().from(ticketsTable).where(eq(ticketsTable.status, "open"));
 
   res.json({
     totalUsers: allUsers.length,
     activeUsers,
-    totalTransactions: allTx.length,
     totalRevenue,
     totalWalletBalance,
-    pendingTickets: openTickets.length,
-    todayTransactions: todayTx.length,
-    todayRevenue,
+    totalTransactions: allTx.length,
+    pendingTickets: pendingTickets.length,
   });
 });
 
 // GET /admin/users
 router.get("/admin/users", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = AdminGetUsersQueryParams.safeParse(req.query);
-  const page = params.success ? (params.data.page ?? 1) : 1;
-  const limit = params.success ? (params.data.limit ?? 20) : 20;
-  const search = params.success ? params.data.search : undefined;
-  const status = params.success ? params.data.status : undefined;
-  const offset = (page - 1) * limit;
+  const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+  const filtered = params.success && params.data.search
+    ? users.filter((u) =>
+        u.email.toLowerCase().includes(params.data.search!.toLowerCase()) ||
+        u.fullName.toLowerCase().includes(params.data.search!.toLowerCase())
+      )
+    : users;
 
-  let users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+  const withBalances = await Promise.all(
+    filtered.map(async (u) => {
+      const [w] = await db.select().from(walletsTable).where(eq(walletsTable.userId, u.id));
+      return { ...userToJson(u), balance: w ? parseFloat(w.balance) : 0 };
+    })
+  );
 
-  if (search) {
-    const s = search.toLowerCase();
-    users = users.filter((u) =>
-      u.fullName.toLowerCase().includes(s) ||
-      u.email.toLowerCase().includes(s) ||
-      u.phone.includes(s),
-    );
-  }
-  if (status) {
-    users = users.filter((u) => u.status === status);
-  }
-
-  res.json({
-    data: users.slice(offset, offset + limit).map(userToJson),
-    total: users.length,
-    page,
-    limit,
-  });
+  res.json(withBalances);
 });
 
 // GET /admin/users/:id
 router.get("/admin/users/:id", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, raw));
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-  res.json(userToJson(user));
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, id));
+  res.json({ ...userToJson(user), balance: wallet ? parseFloat(wallet.balance) : 0 });
 });
 
 // PATCH /admin/users/:id/status
 router.patch("/admin/users/:id/status", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const { status } = req.body as { status: string };
-
-  const [user] = await db.update(usersTable)
-    .set({ status: status as "active" | "suspended", updatedAt: new Date() })
-    .where(eq(usersTable.id, raw))
-    .returning();
-
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
+  const [user] = await db.update(usersTable).set({ status: status as "active" | "suspended", updatedAt: new Date() }).where(eq(usersTable.id, id)).returning();
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
   res.json(userToJson(user));
 });
 
 // POST /admin/users/:id/fund
 router.post("/admin/users/:id/fund", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const { amount, note } = req.body as { amount: number; note: string };
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { amount, note } = req.body as { amount: number; note?: string };
+  if (!amount || amount <= 0) { res.status(400).json({ error: "Invalid amount" }); return; }
 
-  await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, raw));
+  const [wallet] = await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, id)).returning();
+  if (!wallet) { res.status(404).json({ error: "User wallet not found" }); return; }
+
   await db.insert(transactionsTable).values({
-    userId: raw,
+    userId: id,
     type: "wallet_fund",
     status: "success",
     amount: amount.toString(),
-    description: `Admin credit: ${note}`,
-    reference: `ADM-${Date.now()}`,
-    metadata: { note, adminId: req.userId },
+    description: note || "Admin wallet credit",
+    reference: `ADMIN-FUND-${Date.now()}`,
+    metadata: { adminFund: true },
   });
+
   await db.insert(notificationsTable).values({
-    userId: raw,
+    userId: id,
     title: "Wallet Credited",
-    message: `Your wallet has been credited with ₦${amount.toLocaleString()} by admin.`,
+    message: `Your wallet has been credited with ₦${amount.toLocaleString()} by admin.${note ? ` Note: ${note}` : ""}`,
     type: "wallet",
   });
 
-  res.json({ message: "Wallet funded successfully" });
+  res.json({ balance: parseFloat(wallet.balance) });
 });
 
 // GET /admin/transactions
 router.get("/admin/transactions", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = AdminGetTransactionsQueryParams.safeParse(req.query);
-  const page = params.success ? (params.data.page ?? 1) : 1;
-  const limit = params.success ? (params.data.limit ?? 20) : 20;
-  const offset = (page - 1) * limit;
-
-  let all = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt));
-
-  if (params.success) {
-    if (params.data.type) all = all.filter((tx) => tx.type === params.data.type);
-    if (params.data.status) all = all.filter((tx) => tx.status === params.data.status);
-    if (params.data.userId) all = all.filter((tx) => tx.userId === params.data.userId);
-  }
-
-  res.json({
-    data: all.slice(offset, offset + limit).map(txToJson),
-    total: all.length,
-    page,
-    limit,
-  });
+  const txList = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt));
+  const filtered = params.success && params.data.type && params.data.type !== "all"
+    ? txList.filter((tx) => tx.type === params.data.type)
+    : txList;
+  res.json(filtered.map(txToJson));
 });
 
 // GET /admin/data-plans
 router.get("/admin/data-plans", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const plans = await db.select().from(dataPlansTable).orderBy(dataPlansTable.network, dataPlansTable.price);
-  res.json(plans.map((p) => ({
-    id: p.id, network: p.network, name: p.name, size: p.size,
-    validity: p.validity, price: parseFloat(p.price), costPrice: parseFloat(p.costPrice), isActive: p.isActive,
-  })));
+  res.json(plans.map(planToJson));
 });
 
 // POST /admin/data-plans
@@ -195,16 +162,15 @@ router.post("/admin/data-plans", authenticate, requireAdmin, async (req: AuthReq
     return;
   }
   const { network, name, size, validity, price, costPrice } = parsed.data;
+  const providerCode = (req.body as any).providerCode ?? "";
   const [plan] = await db.insert(dataPlansTable).values({
     network: network as "MTN" | "AIRTEL" | "GLO" | "9MOBILE",
     name, size, validity,
     price: price.toString(),
     costPrice: costPrice.toString(),
+    providerCode,
   }).returning();
-  res.status(201).json({
-    id: plan.id, network: plan.network, name: plan.name, size: plan.size,
-    validity: plan.validity, price: parseFloat(plan.price), costPrice: parseFloat(plan.costPrice), isActive: plan.isActive,
-  });
+  res.status(201).json(planToJson(plan));
 });
 
 // PATCH /admin/data-plans/:id
@@ -221,16 +187,14 @@ router.patch("/admin/data-plans/:id", authenticate, requireAdmin, async (req: Au
   if (parsed.data.price != null) updates.price = parsed.data.price.toString();
   if (parsed.data.costPrice != null) updates.costPrice = parsed.data.costPrice.toString();
   if (parsed.data.isActive != null) updates.isActive = parsed.data.isActive;
+  if ((parsed.data as any).providerCode != null) updates.providerCode = (parsed.data as any).providerCode;
 
   const [plan] = await db.update(dataPlansTable).set(updates).where(eq(dataPlansTable.id, raw)).returning();
   if (!plan) {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
-  res.json({
-    id: plan.id, network: plan.network, name: plan.name, size: plan.size,
-    validity: plan.validity, price: parseFloat(plan.price), costPrice: parseFloat(plan.costPrice), isActive: plan.isActive,
-  });
+  res.json(planToJson(plan));
 });
 
 // DELETE /admin/data-plans/:id
@@ -248,119 +212,94 @@ router.get("/admin/analytics/revenue", authenticate, requireAdmin, async (req: A
   const grouped = new Map<string, { revenue: number; profit: number; transactions: number }>();
 
   for (const tx of allTx) {
-    const d = new Date(tx.createdAt);
+    if (!["data", "airtime", "electricity", "cable", "exam"].includes(tx.type)) continue;
+    const date = new Date(tx.createdAt);
     let key: string;
     if (period === "monthly") {
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     } else if (period === "weekly") {
-      const weekNum = Math.ceil(d.getDate() / 7);
-      key = `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+      const startOfYear = new Date(date.getFullYear(), 0, 1);
+      const week = Math.ceil(((date.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7);
+      key = `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
     } else {
-      key = d.toISOString().slice(0, 10);
+      key = date.toISOString().slice(0, 10);
     }
 
-    if (!grouped.has(key)) grouped.set(key, { revenue: 0, profit: 0, transactions: 0 });
-    const entry = grouped.get(key)!;
-    const amt = parseFloat(tx.amount);
-    if (["data", "airtime", "electricity", "cable", "exam"].includes(tx.type)) {
-      entry.revenue += amt;
-      entry.profit += amt * 0.05;
-    }
-    entry.transactions += 1;
+    const existing = grouped.get(key) ?? { revenue: 0, profit: 0, transactions: 0 };
+    existing.revenue += parseFloat(tx.amount);
+    existing.transactions++;
+    grouped.set(key, existing);
   }
 
-  const result = Array.from(grouped.entries())
+  const data = Array.from(grouped.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-30)
-    .map(([date, vals]) => ({ date, ...vals }));
+    .map(([date, v]) => ({ date, ...v }));
 
-  res.json(result);
+  res.json(data);
 });
 
 // GET /admin/analytics/services
 router.get("/admin/analytics/services", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const allTx = await db.select().from(transactionsTable).where(eq(transactionsTable.status, "success"));
-
-  const serviceMap = new Map<string, { count: number; revenue: number }>();
-  let totalRevenue = 0;
-
-  for (const tx of allTx) {
-    if (!["data", "airtime", "electricity", "cable", "exam"].includes(tx.type)) continue;
-    if (!serviceMap.has(tx.type)) serviceMap.set(tx.type, { count: 0, revenue: 0 });
-    const entry = serviceMap.get(tx.type)!;
-    const amt = parseFloat(tx.amount);
-    entry.count += 1;
-    entry.revenue += amt;
-    totalRevenue += amt;
-  }
-
-  const result = Array.from(serviceMap.entries()).map(([service, { count, revenue }]) => ({
-    service, count, revenue,
-    percentage: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0,
-  }));
-
-  res.json(result);
+  const serviceTypes = ["data", "airtime", "electricity", "cable", "exam"];
+  const data = serviceTypes.map((type) => {
+    const txs = allTx.filter((tx) => tx.type === type);
+    return { type, count: txs.length, revenue: txs.reduce((s, tx) => s + parseFloat(tx.amount), 0) };
+  });
+  res.json(data);
 });
 
-// POST /admin/notifications/broadcast
-router.post("/admin/notifications/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+// GET /admin/tickets
+router.get("/admin/tickets", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const tickets = await db.select().from(ticketsTable).orderBy(desc(ticketsTable.createdAt));
+  const withUsers = await Promise.all(
+    tickets.map(async (t) => {
+      const [user] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, t.userId));
+      return { ...t, userEmail: user?.email, userFullName: user?.fullName };
+    })
+  );
+  res.json(withUsers);
+});
+
+// PATCH /admin/tickets/:id
+router.patch("/admin/tickets/:id", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { status } = req.body as { status: string };
+  const [ticket] = await db.update(ticketsTable).set({ status: status as any, updatedAt: new Date() }).where(eq(ticketsTable.id, id)).returning();
+  if (!ticket) { res.status(404).json({ error: "Ticket not found" }); return; }
+  res.json(ticket);
+});
+
+// POST /admin/broadcast
+router.post("/admin/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = BroadcastNotificationBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const { title, message, targetUserId } = parsed.data;
-
-  if (targetUserId) {
-    await db.insert(notificationsTable).values({ userId: targetUserId, title, message, type: "broadcast" });
-  } else {
-    const users = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.status, "active"));
-    if (users.length > 0) {
-      await db.insert(notificationsTable).values(users.map((u) => ({ userId: u.id, title, message, type: "broadcast" })));
-    }
-  }
-
-  res.json({ message: "Notification broadcast sent" });
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { title, message, type } = parsed.data;
+  const users = await db.select({ id: usersTable.id }).from(usersTable);
+  await Promise.all(
+    users.map((u) =>
+      db.insert(notificationsTable).values({ userId: u.id, title, message, type: type ?? "general" })
+    )
+  );
+  res.json({ sent: users.length });
 });
 
 // GET /admin/settings
 router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Promise<void> => {
-  const rows = await db.select().from(settingsTable);
-  const result: Record<string, string> = {};
-  for (const row of rows) result[row.key] = row.value;
-  res.json(result);
+  const settings = await db.select().from(settingsTable);
+  const obj: Record<string, string> = {};
+  for (const s of settings) obj[s.key] = s.value;
+  res.json(obj);
 });
 
-// PATCH /admin/settings
-router.patch("/admin/settings", authenticate, requireAdmin, async (req, res): Promise<void> => {
-  const data = req.body as Record<string, string>;
-  for (const [key, value] of Object.entries(data)) {
-    await db.insert(settingsTable).values({ key, value })
-      .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+// PUT /admin/settings
+router.put("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const entries = Object.entries(req.body as Record<string, string>);
+  for (const [key, value] of entries) {
+    await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
   }
-  res.json({ message: "Settings saved" });
-});
-
-// GET /admin/export/transactions.csv
-router.get("/admin/export/transactions.csv", authenticate, requireAdmin, async (_req, res): Promise<void> => {
-  const all = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt));
-  const rows = [
-    ["ID", "User ID", "Type", "Status", "Amount (N)", "Description", "Reference", "Date"],
-    ...all.map((tx) => [
-      tx.id,
-      tx.userId,
-      tx.type,
-      tx.status,
-      tx.amount,
-      `"${(tx.description ?? "").replace(/"/g, '""')}"`,
-      tx.reference ?? "",
-      tx.createdAt?.toISOString() ?? "",
-    ]),
-  ];
-  const csv = rows.map((r) => r.join(",")).join("\n");
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", `attachment; filename="transactions-${Date.now()}.csv"`);
-  res.send(csv);
+  res.json({ updated: entries.length });
 });
 
 export default router;

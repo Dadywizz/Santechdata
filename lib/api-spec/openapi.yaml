@@ -1439,6 +1439,8 @@ components:
           type: number
         costPrice:
           type: ["number", "null"]
+        providerCode:
+          type: ["string", "null"]
         isActive:
           type: boolean
 
@@ -1458,6 +1460,8 @@ components:
           type: number
         costPrice:
           type: number
+        providerCode:
+          type: ["string", "null"]
 
     DataPlanUpdate:
       type: object
@@ -1468,6 +1472,8 @@ components:
           type: ["number", "null"]
         costPrice:
           type: ["number", "null"]
+        providerCode:
+          type: ["string", "null"]
         isActive:
           type: ["boolean", "null"]
 

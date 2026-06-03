@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchaseAirtime } from "@workspace/api-client-react";
 import { Check, Phone } from "lucide-react";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const NETWORKS = [
   { id: "MTN", name: "MTN", color: "bg-[#FFCB00] text-black", border: "border-[#FFCB00]" },
@@ -24,11 +25,20 @@ export default function BuyAirtime() {
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
   const mutation = usePurchaseAirtime({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Airtime Sent!", description: `Airtime successfully sent to ${phone}` });
+      onSuccess: (tx: any) => {
+        setReceipt({
+          reference: tx.reference,
+          description: tx.description,
+          amount: tx.amount,
+          network: (tx.metadata as any)?.network,
+          phone: (tx.metadata as any)?.phone,
+          createdAt: tx.createdAt,
+          type: "airtime",
+        });
         setPhone("");
         setAmount(null);
         setCustomAmount("");
@@ -133,6 +143,8 @@ export default function BuyAirtime() {
           )}
         </div>
       </div>
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }
