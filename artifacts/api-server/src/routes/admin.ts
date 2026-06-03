@@ -285,6 +285,27 @@ router.post("/admin/broadcast", authenticate, requireAdmin, async (req: AuthRequ
   res.json({ sent: users.length });
 });
 
+// GET /admin/vtpass-variations — proxy VTpass variation codes for a service
+router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const serviceID = req.query.serviceID as string;
+  if (!serviceID) { res.status(400).json({ error: "serviceID required" }); return; }
+  const BASE = process.env.VTPASS_SANDBOX === "true"
+    ? "https://sandbox.vtpass.com.ng/api"
+    : "https://vtpass.com.ng/api";
+  try {
+    const r = await fetch(`${BASE}/service-variations?serviceID=${encodeURIComponent(serviceID)}`, {
+      headers: {
+        "api-key": process.env.VTPASS_API_KEY ?? "",
+        "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
+      },
+    });
+    const data = await r.json() as any;
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: "Failed to reach VTpass" });
+  }
+});
+
 // GET /admin/settings
 router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const settings = await db.select().from(settingsTable);
