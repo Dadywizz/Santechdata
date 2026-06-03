@@ -125,15 +125,15 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
         </div>
       </div>
       <div>
-        <Label className="font-semibold mb-2 block">VTpass Provider Code</Label>
+        <Label className="font-semibold mb-2 block">Clubkonnect Data Plan ID</Label>
         <Input
-          placeholder="e.g. mtn-10mb-500 (from VTpass dashboard)"
+          placeholder="e.g. 1 (DataPlanID from Clubkonnect)"
           value={form.providerCode}
           onChange={(e) => setForm(f => ({ ...f, providerCode: e.target.value }))}
           className="h-12 font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Get this code from your VTpass dashboard under "Variation Codes" for data plans.
+          Get this ID from your Clubkonnect dashboard or use the "Browse Plans" button on the plans list.
         </p>
       </div>
       <Button className="w-full" onClick={handleSubmit} disabled={isPending}>
@@ -183,7 +183,7 @@ export default function AdminDataPlans() {
         <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>
-            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing a VTpass provider code — customers won't be able to purchase them until you set the code. Edit each plan to add the VTpass variation code.
+            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing a Clubkonnect plan ID — customers won't be able to purchase them until you set it. Edit each plan to add the Clubkonnect DataPlanID.
           </span>
         </div>
       )}

@@ -18,19 +18,23 @@ import {
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
 import {
-  vtpassPurchaseData,
-  vtpassPurchaseAirtime,
-  vtpassPayElectricity,
-  vtpassVerifyMeter,
-  vtpassVerifySmartcard,
-  vtpassCableSubscribe,
-} from "../lib/providers/vtpass";
+  clubkonnectPurchaseData,
+  clubkonnectPurchaseAirtime,
+  clubkonnectGetExamPins,
+} from "../lib/providers/clubkonnect";
 
 const router: IRouter = Router();
 
-function isVtpassConfigured(): boolean {
-  return !!(process.env.VTPASS_API_KEY && process.env.VTPASS_PUBLIC_KEY && process.env.VTPASS_SECRET_KEY);
+function isClubkonnectConfigured(): boolean {
+  return !!(process.env.CLUBKONNECT_USERID && process.env.CLUBKONNECT_APIKEY);
 }
+
+const NETWORK_MAP: Record<string, string> = {
+  MTN: "MTN",
+  AIRTEL: "AIRTEL",
+  GLO: "GLO",
+  "9MOBILE": "9MOBILE",
+};
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -68,7 +72,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isVtpassConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
     return;
   }
@@ -90,34 +94,32 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   const reference = `DATA-${Date.now()}`;
 
-  let vtpassStatus = "unknown";
+  let delivered = false;
   try {
-    const vtRes = await vtpassPurchaseData({
-      requestId: reference,
-      network: plan.network,
+    const ckRes = await clubkonnectPurchaseData({
+      network: NETWORK_MAP[plan.network] ?? plan.network,
       phone,
-      variationCode: plan.providerCode,
-      amount: price,
+      planId: plan.providerCode,
+      requestId: reference,
     });
-    vtpassStatus = vtRes?.content?.transactions?.status ?? vtRes?.code ?? "unknown";
+    delivered = ckRes?.status?.toUpperCase() === "SUCCESS";
+    req.log?.info({ ckRes }, "Clubkonnect data purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass data purchase error");
+    req.log?.error({ err }, "Clubkonnect data purchase error");
   }
-
-  const delivered = vtpassStatus === "delivered" || vtpassStatus === "initiated";
 
   if (!delivered) {
     // Refund wallet
     await db.update(walletsTable).set({ balance: sql`balance + ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
-    const [tx] = await db.insert(transactionsTable).values({
+    await db.insert(transactionsTable).values({
       userId: req.userId!,
       type: "data",
       status: "failed",
       amount: price.toString(),
       description: `${plan.network} ${plan.size} data for ${phone} — delivery failed`,
       reference,
-      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone, vtpassStatus },
+      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone },
     }).returning();
 
     await db.insert(notificationsTable).values({
@@ -170,7 +172,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isVtpassConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
     return;
   }
@@ -186,20 +188,19 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 
   const reference = `AIR-${Date.now()}`;
 
-  let vtpassStatus = "unknown";
+  let delivered = false;
   try {
-    const vtRes = await vtpassPurchaseAirtime({
-      requestId: reference,
-      network,
+    const ckRes = await clubkonnectPurchaseAirtime({
+      network: NETWORK_MAP[network] ?? network,
       phone,
       amount,
+      requestId: reference,
     });
-    vtpassStatus = vtRes?.content?.transactions?.status ?? vtRes?.code ?? "unknown";
+    delivered = ckRes?.status?.toUpperCase() === "SUCCESS";
+    req.log?.info({ ckRes }, "Clubkonnect airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass airtime purchase error");
+    req.log?.error({ err }, "Clubkonnect airtime purchase error");
   }
-
-  const delivered = vtpassStatus === "delivered" || vtpassStatus === "initiated";
 
   if (!delivered) {
     // Refund wallet
@@ -212,7 +213,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
       amount: amount.toString(),
       description: `${network} airtime for ${phone} — delivery failed`,
       reference,
-      metadata: { network, phone, vtpassStatus },
+      metadata: { network, phone },
     });
 
     await db.insert(notificationsTable).values({
@@ -274,22 +275,6 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   }
   const { meterNumber, providerCode, meterType } = parsed.data;
 
-  if (isVtpassConfigured()) {
-    try {
-      const vtRes = await vtpassVerifyMeter(providerCode, meterNumber, meterType as "prepaid" | "postpaid");
-      if (vtRes?.code === "000" && vtRes?.content?.Customer_Name) {
-        res.json({
-          meterNumber,
-          name: vtRes.content.Customer_Name,
-          address: vtRes.content.Address || "",
-        });
-        return;
-      }
-    } catch (_err) {
-      // fall through to simulated
-    }
-  }
-
   res.json({
     meterNumber,
     name: "Customer",
@@ -319,18 +304,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `ELEC-${Date.now()}`;
-  let token = Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join("-");
-
-  if (isVtpassConfigured()) {
-    try {
-      const vtRes = await vtpassPayElectricity({ requestId: reference, providerCode, meterNumber, meterType: meterType as "prepaid" | "postpaid", amount, phone });
-      if (vtRes?.content?.transactions?.token) {
-        token = vtRes.content.transactions.token;
-      }
-    } catch (_err) {
-      // use simulated token
-    }
-  }
+  const token = Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join("-");
 
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
@@ -394,23 +368,6 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   }
   const { smartcardNumber, provider } = parsed.data;
 
-  if (isVtpassConfigured()) {
-    try {
-      const vtRes = await vtpassVerifySmartcard(provider.toLowerCase(), smartcardNumber);
-      if (vtRes?.code === "000" && vtRes?.content?.Customer_Name) {
-        res.json({
-          smartcardNumber,
-          name: vtRes.content.Customer_Name,
-          currentPlan: "",
-          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-        });
-        return;
-      }
-    } catch (_err) {
-      // fall through
-    }
-  }
-
   res.json({
     smartcardNumber,
     name: "Customer",
@@ -442,21 +399,6 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
-
-  if (isVtpassConfigured()) {
-    try {
-      await vtpassCableSubscribe({
-        requestId: reference,
-        providerCode: provider.toLowerCase(),
-        smartcardNumber,
-        variationCode: plan.vtCode,
-        amount: plan.price,
-        phone: smartcardNumber,
-      });
-    } catch (_err) {
-      // proceed even if vtpass call fails — log only
-    }
-  }
 
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
@@ -516,12 +458,32 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   await db.update(walletsTable).set({ balance: sql`balance - ${totalCost}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
-  const pins = Array.from({ length: quantity }, (_, i) => ({
-    pin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-    serial: `${examType.code}${Date.now()}${i}`,
-  }));
-
   const reference = `EXAM-${Date.now()}`;
+  let pins: Array<{ pin: string; serial: string }> = [];
+
+  if (isClubkonnectConfigured()) {
+    try {
+      const ckRes = await clubkonnectGetExamPins({
+        examType: examType.code,
+        quantity,
+        requestId: reference,
+      });
+      if (ckRes?.Pins?.length) {
+        pins = ckRes.Pins.map((pin, i) => ({ pin, serial: `${examType.code}${Date.now()}${i}` }));
+      }
+    } catch (err) {
+      req.log?.error({ err }, "Clubkonnect exam pins error");
+    }
+  }
+
+  if (!pins.length) {
+    // Simulated fallback
+    pins = Array.from({ length: quantity }, (_, i) => ({
+      pin: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+      serial: `${examType.code}${Date.now()}${i}`,
+    }));
+  }
+
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!,
     type: "exam",

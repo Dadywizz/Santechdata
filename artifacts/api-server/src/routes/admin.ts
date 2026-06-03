@@ -275,14 +275,41 @@ router.patch("/admin/tickets/:id", authenticate, requireAdmin, async (req: AuthR
 router.post("/admin/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = BroadcastNotificationBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  const { title, message, type } = parsed.data;
+  const { title, message } = parsed.data;
   const users = await db.select({ id: usersTable.id }).from(usersTable);
   await Promise.all(
     users.map((u) =>
-      db.insert(notificationsTable).values({ userId: u.id, title, message, type: type ?? "general" })
+      db.insert(notificationsTable).values({ userId: u.id, title, message, type: "general" })
     )
   );
   res.json({ sent: users.length });
+});
+
+// GET /admin/clubkonnect-plans?network=MTN
+router.get("/admin/clubkonnect-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const network = req.query.network as string;
+  if (!network) { res.status(400).json({ error: "network required (MTN, AIRTEL, GLO, 9MOBILE)" }); return; }
+  const userId = process.env.CLUBKONNECT_USERID ?? "";
+  const apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
+  if (!userId || !apiKey) {
+    res.status(503).json({ error: "Clubkonnect credentials not configured (CLUBKONNECT_USERID, CLUBKONNECT_APIKEY)" });
+    return;
+  }
+  try {
+    const params = new URLSearchParams({ UserID: userId, APIKey: apiKey, NetworkID: network });
+    const r = await fetch(`https://www.clubkonnect.com/api/v1/getDataPlanList?${params}`);
+    const text = await r.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
+    res.json(data);
+  } catch (err: any) {
+    const cause = err?.cause as any;
+    res.status(502).json({
+      error: "Failed to reach Clubkonnect",
+      detail: err?.message ?? String(err),
+      cause: cause?.message ?? cause?.code ?? String(cause ?? ""),
+    });
+  }
 });
 
 // GET /admin/vtpass-variations — proxy VTpass variation codes for a service
