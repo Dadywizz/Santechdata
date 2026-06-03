@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetTransactions, getGetTransactionsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { History, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, ArrowRightLeft, Search } from "lucide-react";
+import { History, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, ArrowRightLeft, Search, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const TYPE_ICONS: Record<string, { icon: any; color: string; bg: string }> = {
@@ -30,6 +31,7 @@ export default function Transactions() {
   const [type, setType] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [, navigate] = useLocation();
 
   const { data, isLoading } = useGetTransactions(
     { page, limit: 20, type: type || undefined, status: status || undefined },
@@ -43,6 +45,14 @@ export default function Transactions() {
   const filtered = search
     ? transactions.filter((tx: any) => tx.description?.toLowerCase().includes(search.toLowerCase()) || tx.reference?.includes(search))
     : transactions;
+
+  const handleReportIssue = (tx: any) => {
+    const subject = encodeURIComponent(`Payment Issue – ₦${Number(tx.amount).toLocaleString()} not credited`);
+    const message = encodeURIComponent(
+      `I made a payment of ₦${Number(tx.amount).toLocaleString()} on ${format(new Date(tx.createdAt), "MMM d, yyyy h:mm a")} but it was not credited to my wallet.\n\nTransaction Reference: ${tx.reference}\nStatus: ${tx.status}\n\nPlease investigate and credit my wallet.`
+    );
+    navigate(`/support?subject=${subject}&message=${message}&priority=high`);
+  };
 
   return (
     <AppLayout>
@@ -107,23 +117,42 @@ export default function Transactions() {
                 const typeInfo = TYPE_ICONS[tx.type] || TYPE_ICONS.wallet_fund;
                 const Icon = typeInfo.icon;
                 const isCredit = tx.type === "wallet_fund";
+                const isFailedFunding = tx.type === "wallet_fund" && tx.status === "failed";
                 return (
-                  <div key={tx.id} className="p-4 flex items-center gap-4 hover:bg-muted/50 transition-colors">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${typeInfo.bg} ${typeInfo.color}`}>
-                      <Icon size={18} />
+                  <div key={tx.id} className="p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${typeInfo.bg} ${typeInfo.color}`}>
+                        <Icon size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), "MMM d, yyyy h:mm a")} · {tx.reference}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`font-semibold ${isCredit ? "text-green-600" : ""}`}>
+                          {isCredit ? "+" : "-"}₦{Number(tx.amount).toLocaleString()}
+                        </p>
+                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[tx.status] || STATUS_BADGE.pending}`}>
+                          {tx.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), "MMM d, yyyy h:mm a")} · {tx.reference}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`font-semibold ${isCredit ? "text-green-600" : ""}`}>
-                        {isCredit ? "+" : "-"}₦{Number(tx.amount).toLocaleString()}
-                      </p>
-                      <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[tx.status] || STATUS_BADGE.pending}`}>
-                        {tx.status}
-                      </span>
-                    </div>
+                    {isFailedFunding && (
+                      <div className="mt-3 ml-14 flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
+                        <AlertCircle size={15} className="text-red-500 shrink-0" />
+                        <p className="text-xs text-red-600 dark:text-red-400 flex-1">
+                          This payment was not completed. If money was deducted from your account, please report it.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="text-xs h-7 px-3 shrink-0"
+                          onClick={() => handleReportIssue(tx)}
+                        >
+                          Report Issue
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

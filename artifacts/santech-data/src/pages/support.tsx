@@ -21,21 +21,28 @@ const STATUS_BADGE: Record<string, string> = {
   closed: "bg-muted text-muted-foreground",
 };
 
-function NewTicketForm({ onClose }: { onClose: () => void }) {
+interface NewTicketFormProps {
+  onClose: () => void;
+  initialSubject?: string;
+  initialMessage?: string;
+  initialPriority?: "low" | "medium" | "high";
+}
+
+function NewTicketForm({ onClose, initialSubject = "", initialMessage = "", initialPriority = "medium" }: NewTicketFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [subject, setSubject] = useState("");
-  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
-  const [message, setMessage] = useState("");
+  const [subject, setSubject] = useState(initialSubject);
+  const [priority, setPriority] = useState<"low" | "medium" | "high">(initialPriority);
+  const [message, setMessage] = useState(initialMessage);
 
   const mutation = useCreateTicket({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Ticket created!", description: "We'll respond within 24 hours" });
+        toast({ title: "Complaint submitted!", description: "We'll review and respond within 24 hours." });
         queryClient.invalidateQueries({ queryKey: getGetTicketsQueryKey() });
         onClose();
       },
-      onError: (error: any) => toast({ title: "Failed to create ticket", description: error.data?.error, variant: "destructive" }),
+      onError: (error: any) => toast({ title: "Failed to submit", description: error.data?.error, variant: "destructive" }),
     },
   });
 
@@ -44,7 +51,7 @@ function NewTicketForm({ onClose }: { onClose: () => void }) {
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft size={16} /></Button>
-          <CardTitle>New Support Ticket</CardTitle>
+          <CardTitle>Submit a Complaint / Ticket</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -64,12 +71,12 @@ function NewTicketForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
         <div>
-          <Label className="font-semibold mb-2 block">Message</Label>
+          <Label className="font-semibold mb-2 block">Details</Label>
           <Textarea
-            placeholder="Describe your issue in detail..."
+            placeholder="Describe your issue in detail — include amounts, dates and any reference numbers..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="min-h-[120px] resize-none"
+            className="min-h-[140px] resize-none"
           />
         </div>
         <Button
@@ -77,7 +84,7 @@ function NewTicketForm({ onClose }: { onClose: () => void }) {
           onClick={() => mutation.mutate({ data: { subject, priority, message } })}
           disabled={mutation.isPending || !subject || !message}
         >
-          {mutation.isPending ? "Submitting..." : "Submit Ticket"}
+          {mutation.isPending ? "Submitting..." : "Submit Complaint"}
         </Button>
       </CardContent>
     </Card>
@@ -101,59 +108,54 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
     },
   });
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading ticket...</div>;
-  if (!ticket) return null;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 space-y-4 animate-pulse">
+          <div className="h-5 bg-muted rounded w-48" />
+          <div className="h-4 bg-muted rounded w-32" />
+          <div className="h-20 bg-muted rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   const t = ticket as any;
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3 mb-1">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft size={16} /></Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-base">{t.subject}</CardTitle>
-              <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium capitalize", STATUS_BADGE[t.status] || STATUS_BADGE.open)}>
-                {t.status?.replace("_", " ")}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{t.priority} priority · {format(new Date(t.createdAt), "MMM d, yyyy")}</p>
+          <div>
+            <CardTitle className="text-base">{t?.subject}</CardTitle>
+            <p className="text-sm text-muted-foreground capitalize mt-0.5">{t?.priority} priority · {t?.status?.replace("_", " ")}</p>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {t.messages?.map((msg: any) => (
-            <div key={msg.id} className={cn("flex gap-3", msg.senderRole === "admin" ? "flex-row-reverse" : "")}>
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                msg.senderRole === "admin" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              )}>
-                {msg.senderRole === "admin" ? "A" : "U"}
-              </div>
-              <div className={cn(
-                "max-w-[75%] px-4 py-3 rounded-2xl text-sm",
-                msg.senderRole === "admin"
-                  ? "bg-primary text-primary-foreground rounded-tr-sm"
-                  : "bg-muted rounded-tl-sm"
-              )}>
-                <p>{msg.message}</p>
-                <p className={cn("text-[10px] mt-1 opacity-70", msg.senderRole === "admin" ? "text-right" : "")}>
-                  {format(new Date(msg.createdAt), "h:mm a")}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+      <CardContent className="space-y-3">
+        {(t?.messages ?? []).map((msg: any) => (
+          <div
+            key={msg.id}
+            className={cn(
+              "p-3 rounded-xl text-sm max-w-[85%]",
+              msg.senderRole === "admin"
+                ? "bg-primary/10 text-foreground ml-0"
+                : "bg-muted text-foreground ml-auto"
+            )}
+          >
+            <p className="font-medium text-xs text-muted-foreground mb-1 capitalize">{msg.senderRole === "admin" ? "Support Team" : "You"} · {format(new Date(msg.createdAt), "MMM d, h:mm a")}</p>
+            <p className="whitespace-pre-wrap">{msg.message}</p>
+          </div>
+        ))}
 
-        {t.status !== "closed" && t.status !== "resolved" && (
-          <div className="flex gap-2 pt-2 border-t border-border">
+        {t?.status !== "closed" && t?.status !== "resolved" && (
+          <div className="flex gap-2 pt-2">
             <Textarea
               placeholder="Type your reply..."
               value={reply}
               onChange={(e) => setReply(e.target.value)}
-              className="min-h-[60px] resize-none flex-1"
+              className="resize-none min-h-[80px] text-sm"
             />
             <Button
               size="icon"
@@ -171,7 +173,13 @@ function TicketDetail({ ticketId, onBack }: { ticketId: string; onBack: () => vo
 }
 
 export default function Support() {
-  const [view, setView] = useState<"list" | "new" | "detail">("list");
+  const params = new URLSearchParams(window.location.search);
+  const prefillSubject = params.get("subject") || "";
+  const prefillMessage = params.get("message") || "";
+  const prefillPriority = (params.get("priority") as "low" | "medium" | "high") || "medium";
+  const hasPreFill = Boolean(prefillSubject || prefillMessage);
+
+  const [view, setView] = useState<"list" | "new" | "detail">(hasPreFill ? "new" : "list");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const { data, isLoading } = useGetTickets({ query: { queryKey: getGetTicketsQueryKey() } });
@@ -181,7 +189,12 @@ export default function Support() {
     return (
       <AppLayout>
         <PageHeader title="Support" description="Get help from our team" />
-        <NewTicketForm onClose={() => setView("list")} />
+        <NewTicketForm
+          onClose={() => setView("list")}
+          initialSubject={prefillSubject}
+          initialMessage={prefillMessage}
+          initialPriority={prefillPriority}
+        />
       </AppLayout>
     );
   }

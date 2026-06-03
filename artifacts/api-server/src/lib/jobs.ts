@@ -31,8 +31,8 @@ async function expirePendingPayments(): Promise<void> {
 
     const notifications = expired.map((t) => ({
       userId: t.userId,
-      title: "Payment Expired",
-      message: `Your wallet funding of ₦${Number(t.amount).toLocaleString()} was not completed and has been cancelled. Please try again.`,
+      title: "Payment Not Completed",
+      message: `Your wallet funding of ₦${Number(t.amount).toLocaleString()} was not completed and has been marked as failed. If money was deducted from your account, go to Transactions, find the failed payment and tap "Report Issue" to file a complaint — we will resolve it within 24 hours.`,
       type: "wallet" as const,
     }));
 
