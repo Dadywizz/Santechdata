@@ -299,10 +299,12 @@ router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: A
         "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
       },
     });
-    const data = await r.json() as any;
+    const text = await r.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
     res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: "Failed to reach VTpass" });
+  } catch (err: any) {
+    res.status(502).json({ error: "Failed to reach VTpass", detail: err?.message ?? String(err) });
   }
 });
 
