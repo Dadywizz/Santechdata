@@ -1,0 +1,37 @@
+uploads = []
+
+[[generated]]
+id = "AM35TWGmDm-NfBaoR_pPK"
+uri = "file://attached_assets/santech-logo-blue-green.png"
+type = "image"
+title = "SanTech Data logo blue green"
+
+[[generated]]
+id = "6f3TL3ocBZThn9eypV5qd"
+uri = "file://attached_assets/santech-logo-navy-gold.png"
+type = "image"
+title = "SanTech Data logo navy gold"
+
+[[generated]]
+id = "TzpTDYQQNUuhUKhYOLbQz"
+uri = "file://attached_assets/santech-logo-minimal-blue.png"
+type = "image"
+title = "SanTech Data minimal blue logo"
+
+[[outputs]]
+id = "hZ6Tfe1RqOM4VF9l43a2S"
+uri = "file://attached_assets/santech-logo-blue-green.png"
+type = "image"
+title = "Option 1 — Blue & Green (Shield/Signal)"
+
+[[outputs]]
+id = "NsYC_OUF1yuJZMaZd2IF0"
+uri = "file://attached_assets/santech-logo-navy-gold.png"
+type = "image"
+title = "Option 2 — Navy & Gold (Premium)"
+
+[[outputs]]
+id = "WHAXB1bg5e9n5qYrT8fgj"
+uri = "file://attached_assets/santech-logo-minimal-blue.png"
+type = "image"
+title = "Option 3 — Minimal Blue (Clean)"
