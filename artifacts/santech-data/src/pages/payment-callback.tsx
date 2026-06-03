@@ -27,25 +27,38 @@ export default function PaymentCallback() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Flutterwave params: tx_ref, transaction_id, status
     const txRef = params.get("tx_ref");
     const transactionId = params.get("transaction_id");
     const flwStatus = params.get("status");
 
-    if (!txRef) {
+    // Monnify params: paymentReference, transactionReference, paymentStatus
+    const monnifyRef = params.get("paymentReference");
+    const monnifyStatus = params.get("paymentStatus");
+
+    const reference = txRef || monnifyRef;
+
+    if (!reference) {
       setErrorMsg("Invalid payment callback. Missing reference.");
       setStatus("failed");
       return;
     }
 
-    if (flwStatus === "cancelled") {
+    if (flwStatus === "cancelled" || monnifyStatus === "CANCELLED") {
       setErrorMsg("You cancelled the payment. No charge was made.");
       setStatus("failed");
       return;
     }
 
-    // Call verify with both reference and transactionId
+    if (monnifyStatus === "FAILED") {
+      setErrorMsg("Payment failed. No charge was made to your wallet.");
+      setStatus("failed");
+      return;
+    }
+
     verifyMutation.mutate({
-      data: { reference: txRef, transactionId } as any,
+      data: { reference, transactionId } as any,
     });
   }, []);
 

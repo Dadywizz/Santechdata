@@ -4,7 +4,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyInitTransaction, monnifyVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -66,11 +66,18 @@ router.post("/wallet/fund/initiate", authenticate, async (req: AuthRequest, res)
         redirectUrl,
       });
       paymentUrl = flwData.link;
+    } else if (gateway === "monnify" && process.env.MONNIFY_API_KEY) {
+      const monnifyData = await monnifyInitTransaction({
+        email: user.email,
+        amount,
+        reference,
+        name: user.fullName || user.email,
+        redirectUrl,
+      });
+      paymentUrl = monnifyData.checkoutUrl;
     } else if (gateway === "paystack" && process.env.PAYSTACK_SECRET_KEY) {
-      // Paystack real integration (add key when available)
       paymentUrl = `https://checkout.paystack.com/pay/${reference}`;
     } else {
-      // Fallback stub — shows a clear message in the UI
       res.status(503).json({ error: `${gateway} is not configured yet. Please contact support.` });
       return;
     }
@@ -132,8 +139,16 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
       res.status(502).json({ error: "Could not verify payment with Flutterwave. Please contact support." });
       return;
     }
+  } else if (gateway === "monnify" && process.env.MONNIFY_API_KEY) {
+    try {
+      const result = await monnifyVerifyTransaction(reference);
+      verified = result.success;
+      verifiedAmount = result.amount;
+    } catch {
+      res.status(502).json({ error: "Could not verify payment with Monnify. Please contact support." });
+      return;
+    }
   } else {
-    // No real gateway key — reject in production
     res.status(400).json({ error: "Payment verification failed. Please contact support with your reference: " + reference });
     return;
   }
