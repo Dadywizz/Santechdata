@@ -1,43 +1,54 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useVerifyFunding } from "@workspace/api-client-react";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Status = "loading" | "success" | "failed";
 
 export default function PaymentCallback() {
   const [, navigate] = useLocation();
+  const { isInitialized, token } = useAuth();
   const [status, setStatus] = useState<Status>("loading");
   const [amount, setAmount] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const hasVerified = useRef(false);
 
   const verifyMutation = useVerifyFunding({
     mutation: {
       onSuccess: (data: any) => {
+        localStorage.removeItem("santech_pending_payment");
         setAmount(data.balance);
         setStatus("success");
       },
       onError: (error: any) => {
-        setErrorMsg(error.data?.error || "Payment verification failed. Please contact support.");
+        const errMsg = (error.data?.error as string) || "";
+        if (error.status === 401 || errMsg.toLowerCase().includes("unauthorized")) {
+          const params = window.location.search;
+          localStorage.setItem("santech_pending_payment", params);
+          navigate(`/login?returnTo=${encodeURIComponent("/payment/callback" + params)}`);
+          return;
+        }
+        setErrorMsg(errMsg || "Payment verification failed. Please contact support.");
         setStatus("failed");
       },
     },
   });
 
   useEffect(() => {
+    if (!isInitialized) return;
+    if (hasVerified.current) return;
+
     const params = new URLSearchParams(window.location.search);
 
-    // Flutterwave params: tx_ref, transaction_id, status
     const txRef = params.get("tx_ref");
     const transactionId = params.get("transaction_id");
     const flwStatus = params.get("status");
 
-    // Monnify params: paymentReference, paymentStatus
     const monnifyRef = params.get("paymentReference");
     const monnifyStatus = params.get("paymentStatus");
 
-    // Paystack params: reference, trxref
     const paystackRef = params.get("reference") || params.get("trxref");
 
     const reference = txRef || monnifyRef || paystackRef;
@@ -60,10 +71,17 @@ export default function PaymentCallback() {
       return;
     }
 
+    if (!token) {
+      localStorage.setItem("santech_pending_payment", window.location.search);
+      navigate(`/login?returnTo=${encodeURIComponent("/payment/callback" + window.location.search)}`);
+      return;
+    }
+
+    hasVerified.current = true;
     verifyMutation.mutate({
       data: { reference, transactionId } as any,
     });
-  }, []);
+  }, [isInitialized, token]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -72,7 +90,7 @@ export default function PaymentCallback() {
           <>
             <Loader2 className="h-16 w-16 text-primary animate-spin mx-auto" />
             <h2 className="text-2xl font-bold">Verifying your payment...</h2>
-            <p className="text-muted-foreground">Please wait while we confirm your payment with Flutterwave.</p>
+            <p className="text-muted-foreground">Please wait while we confirm your payment.</p>
           </>
         )}
 

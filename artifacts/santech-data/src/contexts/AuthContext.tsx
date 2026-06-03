@@ -5,6 +5,7 @@ import { User, AuthResponse } from "@workspace/api-client-react";
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isInitialized: boolean;
   login: (data: AuthResponse) => void;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem("santech_user");
       }
     }
+    setIsInitialized(true);
   }, []);
 
   const login = (data: AuthResponse) => {
@@ -52,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, isInitialized, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

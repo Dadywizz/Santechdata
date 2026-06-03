@@ -33,6 +33,9 @@ export default function FundWallet() {
     mutation: {
       onSuccess: (data: any) => {
         if (data.paymentUrl) {
+          if (data.reference) {
+            localStorage.setItem("santech_last_ref", data.reference);
+          }
           window.location.href = data.paymentUrl;
         }
       },

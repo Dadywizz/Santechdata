@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,11 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function Login() {
   const { login: setAuth } = useAuth();
   const { toast } = useToast();
-  
+  const [, navigate] = useLocation();
+
+  const params = new URLSearchParams(window.location.search);
+  const returnTo = params.get("returnTo") || "";
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -45,6 +49,9 @@ export default function Login() {
           title: "Welcome back",
           description: "You have successfully logged in.",
         });
+        if (returnTo) {
+          navigate(returnTo);
+        }
       },
       onError: (error) => {
         toast({

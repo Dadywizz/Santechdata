@@ -206,9 +206,10 @@ export default function Support() {
 
       <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 mb-6">
         <Phone className="text-primary shrink-0" size={20} />
-        <div>
+        <div className="space-y-0.5">
           <p className="font-semibold text-sm">Need urgent help?</p>
           <p className="text-sm text-muted-foreground">Call or WhatsApp: <a href="tel:09026329296" className="text-primary font-medium">09026329296</a></p>
+          <p className="text-sm text-muted-foreground">Email: <a href="mailto:santechdata@gmail.com" className="text-primary font-medium">santechdata@gmail.com</a></p>
         </div>
       </div>
 
