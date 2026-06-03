@@ -34,7 +34,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [supportEmail, setSupportEmail] = useState("support@santechdata.com.ng");
+  const [supportEmail, setSupportEmail] = useState("santechdata@gmail.com");
   const [supportPhone, setSupportPhone] = useState("09026329296");
   const [whatsapp, setWhatsapp] = useState("09026329296");
   const [announcement, setAnnouncement] = useState("");
