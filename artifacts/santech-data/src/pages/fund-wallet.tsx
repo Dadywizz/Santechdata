@@ -12,7 +12,7 @@ import { CreditCard, ArrowRightLeft, ExternalLink } from "lucide-react";
 const PROVIDERS = [
   { id: "flutterwave", name: "Flutterwave", desc: "Cards, Mobile Money, Bank Transfer", active: true },
   { id: "monnify", name: "Monnify", desc: "Bank Transfer, Cards, USSD", active: true },
-  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD — coming soon", active: false },
+  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD", active: true },
 ];
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];

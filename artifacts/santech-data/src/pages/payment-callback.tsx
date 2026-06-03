@@ -33,11 +33,14 @@ export default function PaymentCallback() {
     const transactionId = params.get("transaction_id");
     const flwStatus = params.get("status");
 
-    // Monnify params: paymentReference, transactionReference, paymentStatus
+    // Monnify params: paymentReference, paymentStatus
     const monnifyRef = params.get("paymentReference");
     const monnifyStatus = params.get("paymentStatus");
 
-    const reference = txRef || monnifyRef;
+    // Paystack params: reference, trxref
+    const paystackRef = params.get("reference") || params.get("trxref");
+
+    const reference = txRef || monnifyRef || paystackRef;
 
     if (!reference) {
       setErrorMsg("Invalid payment callback. Missing reference.");

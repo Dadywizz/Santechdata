@@ -4,7 +4,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyInitTransaction, monnifyVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyInitTransaction, monnifyVerifyTransaction, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -76,7 +76,13 @@ router.post("/wallet/fund/initiate", authenticate, async (req: AuthRequest, res)
       });
       paymentUrl = monnifyData.checkoutUrl;
     } else if (gateway === "paystack" && process.env.PAYSTACK_SECRET_KEY) {
-      paymentUrl = `https://checkout.paystack.com/pay/${reference}`;
+      const psData = await paystackInitTransaction({
+        email: user.email,
+        amount,
+        reference,
+        callbackUrl: redirectUrl,
+      });
+      paymentUrl = psData.authorization_url;
     } else {
       res.status(503).json({ error: `${gateway} is not configured yet. Please contact support.` });
       return;
@@ -146,6 +152,15 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
       verifiedAmount = result.amount;
     } catch {
       res.status(502).json({ error: "Could not verify payment with Monnify. Please contact support." });
+      return;
+    }
+  } else if (gateway === "paystack" && process.env.PAYSTACK_SECRET_KEY) {
+    try {
+      const result = await paystackVerifyTransaction(reference);
+      verified = result.success;
+      verifiedAmount = result.amount;
+    } catch {
+      res.status(502).json({ error: "Could not verify payment with Paystack. Please contact support." });
       return;
     }
   } else {
