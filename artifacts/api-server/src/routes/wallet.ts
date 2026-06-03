@@ -4,6 +4,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -40,13 +41,36 @@ router.post("/wallet/fund/initiate", authenticate, async (req: AuthRequest, res)
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   const reference = `SANTECH-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
+  // Build redirect URL (works for both custom domain and replit.app)
+  const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+  const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
+  const redirectUrl = `${proto}://${host}/payment/callback`;
+
   let paymentUrl = "";
-  if (gateway === "paystack") {
-    paymentUrl = `https://checkout.paystack.com/pay/${reference}?amount=${amount * 100}&email=${user.email}`;
-  } else if (gateway === "flutterwave") {
-    paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay?tx_ref=${reference}&amount=${amount}`;
-  } else {
-    paymentUrl = `https://sandbox.monnify.com/checkout/${reference}`;
+
+  try {
+    if (gateway === "flutterwave" && process.env.FLUTTERWAVE_SECRET_KEY) {
+      const flwData = await flutterwaveInitPayment({
+        email: user.email,
+        amount,
+        reference,
+        name: user.fullName || user.email,
+        phone: user.phone || "",
+        redirectUrl,
+      });
+      paymentUrl = flwData.link;
+    } else if (gateway === "paystack" && process.env.PAYSTACK_SECRET_KEY) {
+      // Paystack real integration (add key when available)
+      paymentUrl = `https://checkout.paystack.com/pay/${reference}`;
+    } else {
+      // Fallback stub — shows a clear message in the UI
+      res.status(503).json({ error: `${gateway} is not configured yet. Please contact support.` });
+      return;
+    }
+  } catch (err) {
+    req.log?.error({ err }, "Payment gateway error");
+    res.status(502).json({ error: "Could not connect to payment gateway. Please try again." });
+    return;
   }
 
   // Create pending transaction
@@ -72,6 +96,7 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
   }
 
   const { reference } = parsed.data;
+  const transactionId = req.body.transactionId as string | undefined;
 
   const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
   if (!tx) {
@@ -85,17 +110,43 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
     return;
   }
 
-  // Simulate payment success (in production, verify with gateway API)
-  const amount = parseFloat(tx.amount);
+  const meta = tx.metadata as Record<string, any>;
+  const gateway = meta?.gateway as string;
+  let verified = false;
+  let verifiedAmount = parseFloat(tx.amount);
+
+  // Real gateway verification
+  if (gateway === "flutterwave" && transactionId && process.env.FLUTTERWAVE_SECRET_KEY) {
+    try {
+      const result = await flutterwaveVerifyTransaction(transactionId);
+      verified = result.success;
+      verifiedAmount = result.amount;
+    } catch {
+      res.status(502).json({ error: "Could not verify payment with Flutterwave. Please contact support." });
+      return;
+    }
+  } else {
+    // No real gateway key — reject in production
+    res.status(400).json({ error: "Payment verification failed. Please contact support with your reference: " + reference });
+    return;
+  }
+
+  if (!verified) {
+    await db.update(transactionsTable).set({ status: "failed" }).where(eq(transactionsTable.id, tx.id));
+    res.status(400).json({ error: "Payment was not successful. No charge was made to your wallet." });
+    return;
+  }
+
+  // Credit the wallet
   await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
   await db.update(walletsTable)
-    .set({ balance: sql`balance + ${amount}`, updatedAt: new Date() })
+    .set({ balance: sql`balance + ${verifiedAmount}`, updatedAt: new Date() })
     .where(eq(walletsTable.userId, req.userId!));
 
   await db.insert(notificationsTable).values({
     userId: req.userId!,
     title: "Wallet Funded",
-    message: `Your wallet has been credited with ₦${amount.toLocaleString()}.`,
+    message: `Your wallet has been credited with ₦${verifiedAmount.toLocaleString()}.`,
     type: "wallet",
   });
 

@@ -23,6 +23,7 @@ import Referrals from "@/pages/referrals";
 import Notifications from "@/pages/notifications";
 import Support from "@/pages/support";
 import Profile from "@/pages/profile";
+import PaymentCallback from "@/pages/payment-callback";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsers from "@/pages/admin/users";
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/support" component={Support} />
       <Route path="/profile" component={Profile} />
+      <Route path="/payment/callback" component={PaymentCallback} />
 
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/users" component={AdminUsers} />

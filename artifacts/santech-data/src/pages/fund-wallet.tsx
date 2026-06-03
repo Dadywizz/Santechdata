@@ -32,9 +32,8 @@ export default function FundWallet() {
   const fundMutation = useInitiateFunding({
     mutation: {
       onSuccess: (data: any) => {
-        if (data.checkoutUrl) {
-          window.open(data.checkoutUrl, "_blank");
-          toast({ title: "Payment window opened", description: "Complete your payment in the new tab" });
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl;
         }
       },
       onError: (error: any) => {
