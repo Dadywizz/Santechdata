@@ -58,8 +58,10 @@ export async function flutterwaveInitPayment(opts: {
       customizations: { title: "SanTech Data", description: "Wallet funding", logo: "" },
     }),
   });
-  const data = await res.json() as { status: string; data: { link: string } };
-  if (data.status !== "success") throw new Error("Flutterwave initialization failed");
+  const data = await res.json() as { status: string; message?: string; data: { link: string } };
+  if (data.status !== "success") {
+    throw new Error(`Flutterwave initialization failed: ${data.message ?? JSON.stringify(data)}`);
+  }
   return data.data;
 }
 
@@ -67,8 +69,11 @@ export async function flutterwaveVerifyTransaction(transactionId: string) {
   const res = await fetch(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
     headers: { Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}` },
   });
-  const data = await res.json() as { status: string; data: { status: string; amount: number } };
-  return { success: data.status === "success" && data.data?.status === "successful", amount: data.data?.amount ?? 0 };
+  const data = await res.json() as { status: string; message?: string; data: { status: string; amount: number } };
+  if (data.status !== "success") {
+    throw new Error(`Flutterwave verify failed: ${data.message ?? JSON.stringify(data)}`);
+  }
+  return { success: data.data?.status === "successful", amount: data.data?.amount ?? 0 };
 }
 
 // ── MONNIFY ───────────────────────────────────────────────────────────────────

@@ -10,9 +10,9 @@ import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-rea
 import { CreditCard, ArrowRightLeft, ExternalLink } from "lucide-react";
 
 const PROVIDERS = [
-  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD" },
-  { id: "flutterwave", name: "Flutterwave", desc: "Cards, Mobile Money, Bank" },
-  { id: "monnify", name: "Monnify", desc: "Bank Transfer, Cards" },
+  { id: "flutterwave", name: "Flutterwave", desc: "Cards, Mobile Money, Bank Transfer", active: true },
+  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD — coming soon", active: false },
+  { id: "monnify", name: "Monnify", desc: "Bank Transfer, Cards — coming soon", active: false },
 ];
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
@@ -22,7 +22,7 @@ type Tab = "fund" | "transfer";
 export default function FundWallet() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("fund");
-  const [provider, setProvider] = useState("paystack");
+  const [provider, setProvider] = useState("flutterwave");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [transferPhone, setTransferPhone] = useState("");
@@ -94,9 +94,14 @@ export default function FundWallet() {
                   {PROVIDERS.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setProvider(p.id)}
+                      onClick={() => p.active && setProvider(p.id)}
+                      disabled={!p.active}
                       className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                        provider === p.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                        !p.active
+                          ? "border-border opacity-40 cursor-not-allowed"
+                          : provider === p.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/30"
                       }`}
                     >
                       <div className={`w-10 h-10 rounded-lg bg-muted flex items-center justify-center font-bold text-xs ${
