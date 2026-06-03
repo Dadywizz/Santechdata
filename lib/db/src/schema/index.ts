@@ -6,3 +6,4 @@ export * from "./exam_types";
 export * from "./notifications";
 export * from "./tickets";
 export * from "./otps";
+export * from "./settings";

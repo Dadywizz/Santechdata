@@ -7,6 +7,7 @@ import {
   dataPlansTable,
   notificationsTable,
   ticketsTable,
+  settingsTable,
 } from "@workspace/db";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
@@ -320,6 +321,24 @@ router.post("/admin/notifications/broadcast", authenticate, requireAdmin, async 
   }
 
   res.json({ message: "Notification broadcast sent" });
+});
+
+// GET /admin/settings
+router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const rows = await db.select().from(settingsTable);
+  const result: Record<string, string> = {};
+  for (const row of rows) result[row.key] = row.value;
+  res.json(result);
+});
+
+// PATCH /admin/settings
+router.patch("/admin/settings", authenticate, requireAdmin, async (req, res): Promise<void> => {
+  const data = req.body as Record<string, string>;
+  for (const [key, value] of Object.entries(data)) {
+    await db.insert(settingsTable).values({ key, value })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+  }
+  res.json({ message: "Settings saved" });
 });
 
 // GET /admin/export/transactions.csv

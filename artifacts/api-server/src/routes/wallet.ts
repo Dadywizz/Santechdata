@@ -41,10 +41,17 @@ router.post("/wallet/fund/initiate", authenticate, async (req: AuthRequest, res)
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   const reference = `SANTECH-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-  // Build redirect URL (works for both custom domain and replit.app)
-  const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-  const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
-  const redirectUrl = `${proto}://${host}/payment/callback`;
+  // Build redirect URL — prefer REPLIT_DOMAINS (production), fall back to request host (dev)
+  const replitDomains = process.env.REPLIT_DOMAINS;
+  let redirectUrl: string;
+  if (replitDomains) {
+    const primaryDomain = replitDomains.split(",")[0].trim();
+    redirectUrl = `https://${primaryDomain}/payment/callback`;
+  } else {
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "localhost";
+    redirectUrl = `${proto}://${host}/payment/callback`;
+  }
 
   let paymentUrl = "";
 

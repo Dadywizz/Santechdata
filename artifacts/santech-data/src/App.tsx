@@ -32,6 +32,7 @@ import AdminDataPlans from "@/pages/admin/data-plans";
 import AdminTickets from "@/pages/admin/tickets";
 import AdminAnalytics from "@/pages/admin/analytics";
 import AdminNotifications from "@/pages/admin/notifications";
+import AdminSettings from "@/pages/admin/settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,6 +78,7 @@ function Router() {
       <Route path="/admin/tickets" component={AdminTickets} />
       <Route path="/admin/analytics" component={AdminAnalytics} />
       <Route path="/admin/notifications" component={AdminNotifications} />
+      <Route path="/admin/settings" component={AdminSettings} />
 
       <Route component={NotFound} />
     </Switch>
