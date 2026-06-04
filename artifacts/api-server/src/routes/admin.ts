@@ -342,6 +342,17 @@ router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: A
   }
 });
 
+// GET /admin/server-ip — returns this server's outbound IP (for Clubkonnect whitelisting)
+router.get("/admin/server-ip", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const r = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(8000) });
+    const d = await r.json() as { ip: string };
+    res.json({ ip: d.ip });
+  } catch (err: any) {
+    res.status(502).json({ error: "Could not determine server IP", detail: err?.message });
+  }
+});
+
 // GET /admin/settings
 router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const settings = await db.select().from(settingsTable);
