@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, Phone, CreditCard, Megaphone, Save, Loader2 } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Server, RefreshCw, Copy, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -27,6 +27,96 @@ async function saveSettings(data: Record<string, string>): Promise<void> {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to save settings");
+}
+
+function ServerIPCard() {
+  const { toast } = useToast();
+  const [ip, setIp] = useState<string | null>(null);
+  const [ckStatus, setCkStatus] = useState<"idle" | "loading" | "ok" | "blocked">("idle");
+  const [copied, setCopied] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchIp = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const r = await fetch("/api/admin/server-ip", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      setIp(d.ip ?? "unknown");
+    } catch { setIp("error"); }
+    setRefreshing(false);
+  }, []);
+
+  const testClubkonnect = useCallback(async () => {
+    setCkStatus("loading");
+    try {
+      const token = localStorage.getItem("santech_token");
+      const r = await fetch("/api/admin/clubkonnect-test", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      const status = d?.response?.status ?? "";
+      if (status === "INVALID_CREDENTIALS3") setCkStatus("blocked");
+      else if (status.startsWith("INVALID") || status.startsWith("MISSING")) setCkStatus("blocked");
+      else setCkStatus("ok");
+    } catch { setCkStatus("blocked"); }
+  }, []);
+
+  useEffect(() => { fetchIp(); }, [fetchIp]);
+
+  const copyIp = () => {
+    if (!ip) return;
+    navigator.clipboard.writeText(ip);
+    setCopied(true);
+    toast({ title: "IP copied!", description: `${ip} copied to clipboard` });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Server className="text-primary" size={18} />
+          <CardTitle className="text-base">Server IP (Clubkonnect Whitelist)</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Clubkonnect requires your server's outbound IP to be whitelisted. Copy this IP and add it in{" "}
+          <a href="https://www.clubkonnect.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+            Clubkonnect → Developer's API → IP Whitelisting
+          </a>.
+          <br />
+          <span className="text-yellow-600 dark:text-yellow-400 font-medium">⚠ The IP can change after each deployment. Re-check after any redeploy.</span>
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 font-mono text-base bg-muted rounded-md px-4 py-3 border select-all">
+            {refreshing ? <Loader2 className="h-4 w-4 animate-spin inline" /> : (ip ?? "loading...")}
+          </div>
+          <Button variant="outline" size="icon" onClick={copyIp} disabled={!ip}>
+            {copied ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+          </Button>
+          <Button variant="outline" size="icon" onClick={fetchIp} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={testClubkonnect} disabled={ckStatus === "loading"}>
+            {ckStatus === "loading" ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+            Test Clubkonnect Connection
+          </Button>
+          {ckStatus === "ok" && (
+            <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
+              <CheckCircle2 className="h-4 w-4" /> Connected — IP is whitelisted ✓
+            </span>
+          )}
+          {ckStatus === "blocked" && (
+            <span className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400 font-medium">
+              <AlertTriangle className="h-4 w-4" /> IP not whitelisted — add the IP above to Clubkonnect
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function AdminSettings() {
@@ -101,6 +191,9 @@ export default function AdminSettings() {
       </div>
 
       <div className="space-y-6 max-w-2xl">
+
+        {/* Server IP / Clubkonnect Whitelist */}
+        <ServerIPCard />
 
         {/* Contact & Support */}
         <Card>
