@@ -335,6 +335,18 @@ router.get("/admin/clubkonnect-plans", authenticate, requireAdmin, async (req: A
   }
 });
 
+// GET /admin/flutterwave-plans?network=MTN — list Flutterwave data bundle plans for a network
+router.get("/admin/flutterwave-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const network = (req.query.network as string ?? "MTN").toUpperCase();
+  try {
+    const { flutterwaveGetDataPlans } = await import("../lib/providers/flutterwave-vtu");
+    const plans = await flutterwaveGetDataPlans(network);
+    res.json({ network, plans });
+  } catch (err: any) {
+    res.status(502).json({ error: "Failed to fetch Flutterwave plans", detail: err?.message });
+  }
+});
+
 // GET /admin/vtpass-variations — proxy VTpass variation codes for a service
 router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const serviceID = req.query.serviceID as string;

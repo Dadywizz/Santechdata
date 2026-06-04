@@ -18,23 +18,15 @@ import {
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
 import {
-  clubkonnectPurchaseData,
-  clubkonnectPurchaseAirtime,
   clubkonnectGetExamPins,
 } from "../lib/providers/clubkonnect";
+import {
+  flutterwavePurchaseData,
+  flutterwavePurchaseAirtime,
+  isFlutterwaveVtuConfigured,
+} from "../lib/providers/flutterwave-vtu";
 
 const router: IRouter = Router();
-
-function isClubkonnectConfigured(): boolean {
-  return !!(process.env.CLUBKONNECT_USERID && process.env.CLUBKONNECT_APIKEY);
-}
-
-const NETWORK_MAP: Record<string, string> = {
-  MTN: "MTN",
-  AIRTEL: "AIRTEL",
-  GLO: "GLO",
-  "9MOBILE": "9MOBILE",
-};
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -72,7 +64,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isClubkonnectConfigured()) {
+  if (!isFlutterwaveVtuConfigured()) {
     res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
     return;
   }
@@ -96,16 +88,17 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   let delivered = false;
   try {
-    const ckRes = await clubkonnectPurchaseData({
-      network: NETWORK_MAP[plan.network] ?? plan.network,
+    const flwRes = await flutterwavePurchaseData({
+      network: plan.network,
       phone,
-      planId: plan.providerCode,
-      requestId: reference,
+      itemCode: plan.providerCode,
+      amount: price,
+      reference,
     });
-    delivered = ckRes?.status?.toUpperCase() === "SUCCESS";
-    req.log?.info({ ckRes }, "Clubkonnect data purchase response");
+    delivered = flwRes?.status?.toLowerCase() === "success";
+    req.log?.info({ flwRes }, "Flutterwave data purchase response");
   } catch (err) {
-    req.log?.error({ err }, "Clubkonnect data purchase error");
+    req.log?.error({ err }, "Flutterwave data purchase error");
   }
 
   if (!delivered) {
@@ -172,7 +165,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isClubkonnectConfigured()) {
+  if (!isFlutterwaveVtuConfigured()) {
     res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
     return;
   }
@@ -190,16 +183,16 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 
   let delivered = false;
   try {
-    const ckRes = await clubkonnectPurchaseAirtime({
-      network: NETWORK_MAP[network] ?? network,
+    const flwRes = await flutterwavePurchaseAirtime({
+      network,
       phone,
       amount,
-      requestId: reference,
+      reference,
     });
-    delivered = ckRes?.status?.toUpperCase() === "SUCCESS";
-    req.log?.info({ ckRes }, "Clubkonnect airtime purchase response");
+    delivered = flwRes?.status?.toLowerCase() === "success";
+    req.log?.info({ flwRes }, "Flutterwave airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "Clubkonnect airtime purchase error");
+    req.log?.error({ err }, "Flutterwave airtime purchase error");
   }
 
   if (!delivered) {
@@ -461,7 +454,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   const reference = `EXAM-${Date.now()}`;
   let pins: Array<{ pin: string; serial: string }> = [];
 
-  if (isClubkonnectConfigured()) {
+  if (!!(process.env.CLUBKONNECT_USERID && process.env.CLUBKONNECT_APIKEY)) {
     try {
       const ckRes = await clubkonnectGetExamPins({
         examType: examType.code,
