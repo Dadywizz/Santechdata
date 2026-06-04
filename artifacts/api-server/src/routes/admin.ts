@@ -285,6 +285,29 @@ router.post("/admin/broadcast", authenticate, requireAdmin, async (req: AuthRequ
   res.json({ sent: users.length });
 });
 
+// GET /admin/clubkonnect-test — ping Clubkonnect from production to verify IP whitelist
+router.get("/admin/clubkonnect-test", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const userId = process.env.CLUBKONNECT_USERID ?? "";
+  const apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
+  if (!userId || !apiKey) { res.status(503).json({ error: "Clubkonnect credentials not configured" }); return; }
+  try {
+    const body = new URLSearchParams({
+      UserID: userId, APIKey: apiKey, NetworkID: "MTN",
+      MobileNumber: "08000000000", DataPlan: "1", RequestID: `IPTEST${Date.now()}`,
+    });
+    const r = await fetch("https://www.clubkonnect.com/APIEPINDatabundleV1.asp", {
+      method: "POST", body, signal: AbortSignal.timeout(10000),
+    });
+    const text = await r.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 300) }; }
+    res.json({ httpStatus: r.status, response: data });
+  } catch (err: any) {
+    const cause = err?.cause as any;
+    res.status(502).json({ error: "Failed to reach Clubkonnect", detail: err?.message, cause: cause?.message ?? cause?.code });
+  }
+});
+
 // GET /admin/clubkonnect-plans?network=MTN
 router.get("/admin/clubkonnect-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const network = req.query.network as string;
@@ -296,8 +319,8 @@ router.get("/admin/clubkonnect-plans", authenticate, requireAdmin, async (req: A
     return;
   }
   try {
-    const params = new URLSearchParams({ UserID: userId, APIKey: apiKey, NetworkID: network });
-    const r = await fetch(`https://www.clubkonnect.com/api/v1/getDataPlanList?${params}`);
+    const body = new URLSearchParams({ UserID: userId, APIKey: apiKey, NetworkID: network });
+    const r = await fetch("https://www.clubkonnect.com/APIEPINDatabundleV1.asp", { method: "POST", body, signal: AbortSignal.timeout(10000) });
     const text = await r.text();
     let data: any;
     try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
