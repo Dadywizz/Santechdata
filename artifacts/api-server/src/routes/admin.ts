@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { customFetch } from "../lib/custom-fetch";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -246,9 +247,8 @@ router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: 
 
   for (const svc of SERVICES) {
     try {
-      const r = await fetch(`${BASE}/service-variations?serviceID=${svc.serviceID}`, {
+      const r = await customFetch(`${BASE}/service-variations?serviceID=${svc.serviceID}`, {
         headers: vtHeaders,
-        signal: AbortSignal.timeout(12000),
       });
       const data = await r.json() as {
         content?: { varations?: Array<{ variation_code: string; name: string; variation_amount: string }> };

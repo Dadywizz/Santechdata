@@ -4,7 +4,12 @@
  * Set env vars: VTPASS_API_KEY, VTPASS_PUBLIC_KEY, VTPASS_SECRET_KEY
  * Base URL (sandbox): https://sandbox.vtpass.com.ng
  * Base URL (live):    https://api-service.vtpass.com.ng
+ *
+ * Uses customFetch (https.request + Google DNS) because Replit's production
+ * resolver fails to look up .ng TLD domains via the default OS getaddrinfo.
  */
+
+import { customFetch } from "../custom-fetch";
 
 const BASE_URL = process.env.VTPASS_SANDBOX === "true"
   ? "https://sandbox.vtpass.com.ng/api"
@@ -18,7 +23,7 @@ const headers = () => ({
 });
 
 export async function vtpassVerifyMeter(providerCode: string, meterNumber: string, meterType: "prepaid" | "postpaid") {
-  const res = await fetch(`${BASE_URL}/merchant-verify`, {
+  const res = await customFetch(`${BASE_URL}/merchant-verify`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ serviceID: providerCode.toLowerCase(), billersCode: meterNumber, type: meterType }),
@@ -30,7 +35,7 @@ export async function vtpassPayElectricity(opts: {
   requestId: string; providerCode: string; meterNumber: string;
   meterType: "prepaid" | "postpaid"; amount: number; phone: string;
 }) {
-  const res = await fetch(`${BASE_URL}/pay`, {
+  const res = await customFetch(`${BASE_URL}/pay`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
@@ -46,7 +51,7 @@ export async function vtpassPayElectricity(opts: {
 }
 
 export async function vtpassVerifySmartcard(providerCode: string, smartcardNumber: string) {
-  const res = await fetch(`${BASE_URL}/merchant-verify`, {
+  const res = await customFetch(`${BASE_URL}/merchant-verify`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ serviceID: providerCode.toLowerCase(), billersCode: smartcardNumber }),
@@ -57,7 +62,7 @@ export async function vtpassVerifySmartcard(providerCode: string, smartcardNumbe
 export async function vtpassCableSubscribe(opts: {
   requestId: string; providerCode: string; smartcardNumber: string; variationCode: string; amount: number; phone: string;
 }) {
-  const res = await fetch(`${BASE_URL}/pay`, {
+  const res = await customFetch(`${BASE_URL}/pay`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
@@ -76,7 +81,7 @@ export async function vtpassPurchaseData(opts: {
   requestId: string; network: string; phone: string; variationCode: string; amount: number;
 }) {
   const NETWORK_MAP: Record<string, string> = { MTN: "mtn-data", AIRTEL: "airtel-data", GLO: "glo-data", "9MOBILE": "etisalat-data" };
-  const res = await fetch(`${BASE_URL}/pay`, {
+  const res = await customFetch(`${BASE_URL}/pay`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
@@ -95,7 +100,7 @@ export async function vtpassPurchaseAirtime(opts: {
   requestId: string; network: string; phone: string; amount: number;
 }) {
   const NETWORK_MAP: Record<string, string> = { MTN: "mtn", AIRTEL: "airtel", GLO: "glo", "9MOBILE": "etisalat" };
-  const res = await fetch(`${BASE_URL}/pay`, {
+  const res = await customFetch(`${BASE_URL}/pay`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
@@ -105,7 +110,6 @@ export async function vtpassPurchaseAirtime(opts: {
       amount: opts.amount,
       phone: opts.phone,
     }),
-    signal: AbortSignal.timeout(30000),
   });
   return res.json() as Promise<{ code: string; content: { transactions: { status: string } } }>;
 }
@@ -126,7 +130,7 @@ export async function vtpassPurchaseExam(opts: {
     serviceID: opts.examCode.toLowerCase(),
     variationCode: opts.examCode.toLowerCase(),
   };
-  const res = await fetch(`${BASE_URL}/pay`, {
+  const res = await customFetch(`${BASE_URL}/pay`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
@@ -138,7 +142,6 @@ export async function vtpassPurchaseExam(opts: {
       phone: opts.phone,
       quantity: opts.quantity,
     }),
-    signal: AbortSignal.timeout(30000),
   });
   return res.json() as Promise<{
     code: string;
