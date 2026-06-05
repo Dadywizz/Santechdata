@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGetCableProviders, useGetCablePlans, useVerifySmartcard, useSubscribeCable } from "@workspace/api-client-react";
-import { Tv, CheckCircle2 } from "lucide-react";
+import { Tv, CheckCircle2, X, Check } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 type CableProvider = "DSTV" | "GOTV" | "STARTIMES";
@@ -74,7 +74,7 @@ export default function BuyCable() {
     <AppLayout>
       <PageHeader title="Cable TV" description="DStv, GOtv & Startimes subscription" />
 
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-2xl space-y-6 pb-28">
         <Card>
           <CardContent className="p-6 space-y-4">
             <div>
@@ -125,13 +125,15 @@ export default function BuyCable() {
               {(plans as any[]).length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No plans available for this provider</p>
               ) : (
-                <div className="grid gap-3 max-h-80 overflow-y-auto pr-1">
+                <div className="grid gap-3 max-h-96 overflow-y-auto pr-1">
                   {(plans as any[]).map((plan: any) => (
                     <button
                       key={plan.id}
                       onClick={() => setPlanId(plan.id)}
                       className={`text-left p-4 rounded-xl border-2 transition-all ${
-                        planId === plan.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                        planId === plan.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border hover:border-primary/30"
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -139,35 +141,53 @@ export default function BuyCable() {
                           <p className="font-semibold">{plan.name}</p>
                           <p className="text-sm text-muted-foreground">{plan.duration}</p>
                         </div>
-                        <span className="font-bold text-primary text-lg">₦{plan.price?.toLocaleString()}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-primary text-lg">₦{plan.price?.toLocaleString()}</span>
+                          {planId === plan.id && <Check size={16} className="text-primary" />}
+                        </div>
                       </div>
                     </button>
                   ))}
                 </div>
               )}
-
-              {selectedPlan && (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-purple-500/10 text-purple-600 p-3 rounded-full">
-                        <Tv size={22} />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">{verified.name}</p>
-                        <p className="font-bold">{selectedPlan.name}</p>
-                      </div>
-                    </div>
-                    <Button size="lg" onClick={handleSubscribe} disabled={subscribeMutation.isPending}>
-                      {subscribeMutation.isPending ? "Processing..." : `Pay ₦${selectedPlan.price?.toLocaleString()}`}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Sticky purchase bar */}
+      {selectedPlan && verified && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/95 backdrop-blur border-t border-border shadow-2xl">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-500/10 text-purple-600 p-2.5 rounded-full shrink-0">
+                <Tv size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-base leading-tight">{selectedPlan.name}</p>
+                <p className="text-sm text-muted-foreground">{verified.name} · {provider}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <button
+                onClick={() => setPlanId("")}
+                className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
+                aria-label="Clear selection"
+              >
+                <X size={18} />
+              </button>
+              <Button
+                size="lg"
+                onClick={handleSubscribe}
+                disabled={subscribeMutation.isPending}
+                className="gap-2 px-6"
+              >
+                {subscribeMutation.isPending ? "Processing..." : `Pay ₦${selectedPlan.price?.toLocaleString()}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>

@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchaseAirtime } from "@workspace/api-client-react";
-import { Check, Phone } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const NETWORKS = [
@@ -50,6 +49,7 @@ export default function BuyAirtime() {
   });
 
   const finalAmount = amount ?? (customAmount ? parseFloat(customAmount) : 0);
+  const isReady = !!network && phone.length >= 10 && finalAmount >= 50;
 
   const handlePurchase = () => {
     if (!network) { toast({ title: "Select a network", variant: "destructive" }); return; }
@@ -58,11 +58,13 @@ export default function BuyAirtime() {
     mutation.mutate({ data: { network: network as any, phone, amount: finalAmount } });
   };
 
+  const selectedNetwork = NETWORKS.find(n => n.id === network);
+
   return (
     <AppLayout>
       <PageHeader title="Buy Airtime" description="Instant airtime recharge for all networks" />
 
-      <div className="grid gap-8 md:grid-cols-3 max-w-4xl">
+      <div className="grid gap-8 md:grid-cols-3 max-w-4xl pb-28">
         <div className="md:col-span-1 space-y-6">
           <div>
             <Label className="text-base font-semibold mb-3 block">Select Network</Label>
@@ -104,10 +106,11 @@ export default function BuyAirtime() {
                   key={a}
                   onClick={() => { setAmount(a); setCustomAmount(""); }}
                   className={`rounded-xl p-3 border-2 font-semibold transition-all ${
-                    amount === a ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/30"
+                    amount === a ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border bg-card hover:border-primary/30"
                   }`}
                 >
                   ₦{a.toLocaleString()}
+                  {amount === a && <span className="block text-[10px] text-primary font-normal mt-0.5">Selected</span>}
                 </button>
               ))}
             </div>
@@ -122,27 +125,49 @@ export default function BuyAirtime() {
               />
             </div>
           </div>
-
-          {(amount || parseFloat(customAmount) > 0) && phone && network && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 text-primary p-3 rounded-full">
-                    <Phone size={22} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Sending airtime to</p>
-                    <p className="font-bold text-lg">{phone} • {network}</p>
-                  </div>
-                </div>
-                <Button size="lg" onClick={handlePurchase} disabled={mutation.isPending} className="w-full sm:w-auto">
-                  {mutation.isPending ? "Processing..." : `Pay ₦${finalAmount.toLocaleString()}`}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
+
+      {/* Sticky purchase bar */}
+      {finalAmount >= 50 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/95 backdrop-blur border-t border-border shadow-2xl">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              {selectedNetwork && (
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${selectedNetwork.color}`}>
+                  {selectedNetwork.name[0]}
+                </div>
+              )}
+              <div>
+                <p className="font-bold text-base leading-tight">
+                  ₦{finalAmount.toLocaleString()} Airtime
+                  {network && <span className="text-muted-foreground font-normal text-sm ml-2">· {network}</span>}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {phone.length >= 10 ? `→ ${phone}` : "Enter phone number"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <button
+                onClick={() => { setAmount(null); setCustomAmount(""); }}
+                className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
+                aria-label="Clear amount"
+              >
+                <X size={18} />
+              </button>
+              <Button
+                size="lg"
+                onClick={handlePurchase}
+                disabled={mutation.isPending || !isReady}
+                className="gap-2 px-6"
+              >
+                {mutation.isPending ? "Processing..." : `Pay ₦${finalAmount.toLocaleString()}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>

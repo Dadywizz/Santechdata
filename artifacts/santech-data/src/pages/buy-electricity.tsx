@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useGetElectricityProviders, useVerifyMeter, usePurchaseElectricity } from "@workspace/api-client-react";
-import { Zap, CheckCircle2 } from "lucide-react";
+import { Zap, CheckCircle2, X } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const AMOUNTS = [1000, 2000, 3000, 5000, 10000, 20000];
@@ -76,7 +76,7 @@ export default function BuyElectricity() {
     <AppLayout>
       <PageHeader title="Buy Electricity" description="Instant electricity token purchase" />
 
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-2xl space-y-6 pb-28">
         <Card>
           <CardContent className="p-6 space-y-4">
             <div>
@@ -153,10 +153,13 @@ export default function BuyElectricity() {
                     key={a}
                     onClick={() => { setAmount(a); setCustomAmount(""); }}
                     className={`rounded-xl p-3 border-2 font-semibold transition-all ${
-                      amount === a ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/30"
+                      amount === a
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                        : "border-border bg-card hover:border-primary/30"
                     }`}
                   >
                     ₦{a.toLocaleString()}
+                    {amount === a && <span className="block text-[10px] text-primary font-normal mt-0.5">Selected</span>}
                   </button>
                 ))}
               </div>
@@ -167,29 +170,47 @@ export default function BuyElectricity() {
                 onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
                 className="h-12"
               />
-
-              {finalAmount >= 1000 && (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-yellow-500/10 text-yellow-600 p-3 rounded-full">
-                        <Zap size={22} />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Token for {verified.name}</p>
-                        <p className="font-bold text-lg">₦{finalAmount.toLocaleString()} worth of units</p>
-                      </div>
-                    </div>
-                    <Button size="lg" onClick={handlePurchase} disabled={purchaseMutation.isPending}>
-                      {purchaseMutation.isPending ? "Processing..." : "Buy Token"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Sticky purchase bar */}
+      {verified && finalAmount >= 1000 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/95 backdrop-blur border-t border-border shadow-2xl">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-500/10 text-yellow-600 p-2.5 rounded-full shrink-0">
+                <Zap size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-base leading-tight">₦{finalAmount.toLocaleString()} Units</p>
+                <p className="text-sm text-muted-foreground">
+                  {verified.name}
+                  {phone.length >= 10 ? ` · ${phone}` : " · Enter phone above"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <button
+                onClick={() => { setAmount(null); setCustomAmount(""); }}
+                className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
+                aria-label="Clear amount"
+              >
+                <X size={18} />
+              </button>
+              <Button
+                size="lg"
+                onClick={handlePurchase}
+                disabled={purchaseMutation.isPending || !phone || phone.length < 10}
+                className="gap-2 px-6"
+              >
+                {purchaseMutation.isPending ? "Processing..." : "Buy Token"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>

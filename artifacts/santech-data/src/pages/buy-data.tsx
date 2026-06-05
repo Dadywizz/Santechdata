@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useGetDataPlans, getGetDataPlansQueryKey, usePurchaseData, DataPlanNetwork, DataPlan } from "@workspace/api-client-react";
-import { Check, Wifi } from "lucide-react";
+import { Check, Wifi, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
@@ -62,20 +62,17 @@ export default function BuyData() {
       toast({ title: "Invalid phone number", variant: "destructive" });
       return;
     }
-    
-    purchaseMutation.mutate({
-      data: {
-        planId: selectedPlan.id,
-        phone
-      }
-    });
+    purchaseMutation.mutate({ data: { planId: selectedPlan.id, phone } });
   };
+
+  const selectedNetwork = NETWORKS.find(n => n.id === network);
 
   return (
     <AppLayout>
       <PageHeader title="Buy Data" description="Instant data top-up for all networks" />
 
-      <div className="grid gap-8 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 pb-28">
+        {/* Left column — network + phone */}
         <div className="md:col-span-1 space-y-6">
           <div>
             <Label className="text-base font-semibold mb-3 block">Select Network</Label>
@@ -83,13 +80,10 @@ export default function BuyData() {
               {NETWORKS.map(net => (
                 <button
                   key={net.id}
-                  onClick={() => {
-                    setNetwork(net.id);
-                    setSelectedPlan(null);
-                  }}
+                  onClick={() => { setNetwork(net.id); setSelectedPlan(null); }}
                   className={`relative overflow-hidden rounded-xl p-4 flex flex-col items-center justify-center gap-2 border-2 transition-all ${
-                    network === net.id 
-                      ? `${net.border} shadow-md` 
+                    network === net.id
+                      ? `${net.border} shadow-md`
                       : 'border-transparent bg-muted hover:bg-muted/80'
                   }`}
                 >
@@ -109,9 +103,9 @@ export default function BuyData() {
 
           <div>
             <Label className="text-base font-semibold mb-3 block">Phone Number</Label>
-            <Input 
-              type="tel" 
-              placeholder="e.g. 08012345678" 
+            <Input
+              type="tel"
+              placeholder="e.g. 08012345678"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="h-12"
@@ -119,9 +113,10 @@ export default function BuyData() {
           </div>
         </div>
 
+        {/* Right column — data plans */}
         <div className="md:col-span-2">
           <Label className="text-base font-semibold mb-3 block">Select Data Plan</Label>
-          
+
           {!network ? (
             <div className="h-64 rounded-xl border border-dashed flex flex-col items-center justify-center text-muted-foreground bg-muted/30">
               <Wifi size={48} className="mb-4 opacity-20" />
@@ -140,14 +135,14 @@ export default function BuyData() {
               No plans available for this network currently.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {plans.map(plan => (
                 <button
                   key={plan.id}
                   onClick={() => setSelectedPlan(plan)}
                   className={`text-left p-4 rounded-xl border-2 transition-all ${
-                    selectedPlan?.id === plan.id 
-                      ? 'border-primary bg-primary/5 shadow-sm' 
+                    selectedPlan?.id === plan.id
+                      ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
                       : 'border-border bg-card hover:border-primary/30 hover:bg-accent/50'
                   }`}
                 >
@@ -159,31 +154,61 @@ export default function BuyData() {
                     <span>{plan.validity}</span>
                     <span>{plan.name}</span>
                   </div>
+                  {selectedPlan?.id === plan.id && (
+                    <div className="mt-2 flex items-center gap-1 text-primary text-xs font-semibold">
+                      <Check size={12} /> Selected
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
           )}
-
-          {selectedPlan && (
-            <Card className="mt-6 border-primary/20 bg-primary/5 shadow-sm">
-              <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">You are about to purchase</p>
-                  <p className="font-bold text-lg">{selectedPlan.size} for {phone || '...'}</p>
-                </div>
-                <Button 
-                  size="lg" 
-                  onClick={handlePurchase}
-                  disabled={purchaseMutation.isPending || !phone}
-                  className="w-full sm:w-auto"
-                >
-                  {purchaseMutation.isPending ? "Processing..." : `Pay ₦${selectedPlan.price.toLocaleString()}`}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
+
+      {/* Sticky purchase bar — appears immediately when a plan is selected */}
+      {selectedPlan && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/95 backdrop-blur border-t border-border shadow-2xl">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              {selectedNetwork && (
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${selectedNetwork.color}`}>
+                  {selectedNetwork.name[0]}
+                </div>
+              )}
+              <div>
+                <p className="font-bold text-base leading-tight">
+                  {selectedPlan.size}
+                  <span className="text-muted-foreground font-normal text-sm ml-2">{selectedPlan.validity}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {phone ? `→ ${phone}` : "Enter phone number above"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              <button
+                onClick={() => setSelectedPlan(null)}
+                className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-muted transition-colors"
+                aria-label="Clear selection"
+              >
+                <X size={18} />
+              </button>
+              <Button
+                size="lg"
+                onClick={handlePurchase}
+                disabled={purchaseMutation.isPending || !phone || phone.length < 10}
+                className="gap-2 px-6"
+              >
+                {purchaseMutation.isPending
+                  ? "Processing..."
+                  : `Pay ₦${selectedPlan.price.toLocaleString()}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
