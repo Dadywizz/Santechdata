@@ -19,14 +19,18 @@ import {
 } from "@workspace/api-zod";
 import {
   clubkonnectPurchaseData,
-  clubkonnectPurchaseAirtime,
   clubkonnectVerifyMeter,
   clubkonnectPayElectricity,
-  clubkonnectVerifySmartcard,
-  clubkonnectCableSubscribe,
   clubkonnectGetExamPins,
   isClubkonnectConfigured,
 } from "../lib/providers/clubkonnect";
+import {
+  nellobytePurchaseAirtime,
+  nellobyteVerifySmartcard,
+  nellobyteCableSubscribe,
+  isNellobyteconfigured,
+  NELLOBYTE_CABLE_ID,
+} from "../lib/providers/nellobyte";
 
 const router: IRouter = Router();
 
@@ -163,8 +167,8 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isClubkonnectConfigured()) {
-    res.status(503).json({ error: "VTU service is temporarily unavailable. Please contact support." });
+  if (!isNellobyteconfigured()) {
+    res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support." });
     return;
   }
 
@@ -180,11 +184,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    const ckRes = await clubkonnectPurchaseAirtime({ network, phone, amount, requestId: reference });
-    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ ckRes }, "Clubkonnect airtime purchase response");
+    const nbRes = await nellobytePurchaseAirtime({ network, phone, amount, requestId: reference });
+    delivered = nbRes?.status === "success" || nbRes?.status === "1" || nbRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ nbRes }, "Nellobyte airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "Clubkonnect airtime purchase error");
+    req.log?.error({ err }, "Nellobyte airtime purchase error");
   }
 
   if (!delivered) {
@@ -371,35 +375,35 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 });
 
 // ── CABLE TV ──────────────────────────────────────────────────────────────────
-// Clubkonnect cable NetworkIDs
+// Nellobytesystems Cable IDs: DSTV=01, GOTV=02, STARTIMES=03
 const CABLE_PROVIDERS = [
-  { id: "dstv",      name: "DStv",      ckId: "dstv"      },
-  { id: "gotv",      name: "GOtv",      ckId: "gotv"      },
-  { id: "startimes", name: "StarTimes", ckId: "startimes" },
+  { id: "dstv",      name: "DStv",      nbId: "01" },
+  { id: "gotv",      name: "GOtv",      nbId: "02" },
+  { id: "startimes", name: "StarTimes", nbId: "03" },
 ];
 
 const CABLE_PLANS = [
-  { id: "dstv-padi",         provider: "dstv",      name: "DStv Padi",        price: 2950,  validity: "Monthly", ckCode: "padi"         },
-  { id: "dstv-yanga",        provider: "dstv",      name: "DStv Yanga",       price: 3600,  validity: "Monthly", ckCode: "yanga"        },
-  { id: "dstv-confam",       provider: "dstv",      name: "DStv Confam",      price: 6200,  validity: "Monthly", ckCode: "confam"       },
-  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 10500, validity: "Monthly", ckCode: "compact"      },
-  { id: "dstv-compact-plus", provider: "dstv",      name: "DStv Compact+",    price: 16600, validity: "Monthly", ckCode: "compact-plus" },
-  { id: "dstv-premium",      provider: "dstv",      name: "DStv Premium",     price: 29500, validity: "Monthly", ckCode: "premium"      },
-  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 410,   validity: "Monthly", ckCode: "gotv-lite"    },
-  { id: "gotv-jinja",        provider: "gotv",      name: "GOtv Jinja",       price: 2250,  validity: "Monthly", ckCode: "gotv-jinja"   },
-  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 3300,  validity: "Monthly", ckCode: "gotv-jolli"   },
-  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 4850,  validity: "Monthly", ckCode: "gotv-max"     },
-  { id: "gotv-supa",         provider: "gotv",      name: "GOtv Supa",        price: 6400,  validity: "Monthly", ckCode: "gotv-supa"    },
-  { id: "gotv-supa-plus",    provider: "gotv",      name: "GOtv Supa+",       price: 9600,  validity: "Monthly", ckCode: "gotv-supa-plus" },
-  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", ckCode: "nova"         },
-  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1850,  validity: "Monthly", ckCode: "basic"        },
-  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 3100,  validity: "Monthly", ckCode: "smart"        },
-  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 2200,  validity: "Monthly", ckCode: "classic"      },
-  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4900,  validity: "Monthly", ckCode: "super"        },
+  { id: "dstv-padi",         provider: "dstv",      name: "DStv Padi",        price: 2950,  validity: "Monthly", nbCode: "1"  },
+  { id: "dstv-yanga",        provider: "dstv",      name: "DStv Yanga",       price: 3600,  validity: "Monthly", nbCode: "2"  },
+  { id: "dstv-confam",       provider: "dstv",      name: "DStv Confam",      price: 6200,  validity: "Monthly", nbCode: "3"  },
+  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 10500, validity: "Monthly", nbCode: "4"  },
+  { id: "dstv-compact-plus", provider: "dstv",      name: "DStv Compact+",    price: 16600, validity: "Monthly", nbCode: "5"  },
+  { id: "dstv-premium",      provider: "dstv",      name: "DStv Premium",     price: 29500, validity: "Monthly", nbCode: "6"  },
+  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 410,   validity: "Monthly", nbCode: "1"  },
+  { id: "gotv-jinja",        provider: "gotv",      name: "GOtv Jinja",       price: 2250,  validity: "Monthly", nbCode: "2"  },
+  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 3300,  validity: "Monthly", nbCode: "3"  },
+  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 4850,  validity: "Monthly", nbCode: "4"  },
+  { id: "gotv-supa",         provider: "gotv",      name: "GOtv Supa",        price: 6400,  validity: "Monthly", nbCode: "5"  },
+  { id: "gotv-supa-plus",    provider: "gotv",      name: "GOtv Supa+",       price: 9600,  validity: "Monthly", nbCode: "6"  },
+  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", nbCode: "1"  },
+  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1850,  validity: "Monthly", nbCode: "2"  },
+  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 3100,  validity: "Monthly", nbCode: "3"  },
+  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 2200,  validity: "Monthly", nbCode: "4"  },
+  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4900,  validity: "Monthly", nbCode: "5"  },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
-  res.json(CABLE_PROVIDERS.map(({ ckId: _c, ...p }) => p));
+  res.json(CABLE_PROVIDERS.map(({ nbId: _n, ...p }) => p));
 });
 
 router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -407,7 +411,7 @@ router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<
   const filtered = params.success && params.data.provider
     ? CABLE_PLANS.filter((p) => p.provider === params.data.provider?.toLowerCase())
     : CABLE_PLANS;
-  res.json(filtered.map(({ ckCode: _c, ...p }) => p));
+  res.json(filtered.map(({ nbCode: _n, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -418,25 +422,25 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   }
   const { smartcardNumber, provider } = parsed.data;
 
-  if (!isClubkonnectConfigured()) {
+  if (!isNellobyteconfigured()) {
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
     return;
   }
 
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === provider?.toLowerCase() || p.ckId === provider?.toLowerCase());
-  const networkId = cableProvider?.ckId ?? provider?.toLowerCase() ?? "";
+  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === provider?.toLowerCase());
+  const cableId = cableProvider?.nbId ?? NELLOBYTE_CABLE_ID[provider?.toLowerCase() ?? ""] ?? "01";
 
   try {
-    const ckRes = await clubkonnectVerifySmartcard({ smartcardNumber, networkId });
-    const ok = ckRes?.status === "success" || ckRes?.status === "1";
+    const nbRes = await nellobyteVerifySmartcard({ smartcardNumber, cableId });
+    const ok = nbRes?.status === "success" || nbRes?.status === "1";
     res.json({
       smartcardNumber,
-      name: ok ? (ckRes.CustomerName ?? "Customer") : "Customer",
-      currentPlan: "",
-      dueDate: "",
+      name: ok ? (nbRes.CustomerName ?? "Customer") : "Customer",
+      currentPlan: ok ? (nbRes.CustomerPackage ?? "") : "",
+      dueDate: ok ? (nbRes.CustomerDue ?? "") : "",
     });
   } catch (err) {
-    req.log?.error({ err }, "Clubkonnect smartcard verify error");
+    req.log?.error({ err }, "Nellobyte smartcard verify error");
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
   }
 });
@@ -455,7 +459,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     return;
   }
 
-  if (!isClubkonnectConfigured()) {
+  if (!isNellobyteconfigured()) {
     res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -469,23 +473,23 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === plan.provider || p.ckId === plan.provider);
-  const networkId = cableProvider?.ckId ?? plan.provider;
+  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === plan.provider);
+  const cableId = cableProvider?.nbId ?? NELLOBYTE_CABLE_ID[plan.provider] ?? "01";
 
   let delivered = false;
   try {
-    const ckRes = await clubkonnectCableSubscribe({
+    const nbRes = await nellobyteCableSubscribe({
+      cableId,
       smartcardNumber,
-      networkId,
-      planId: plan.ckCode,
+      planId: plan.nbCode,
       amount: plan.price,
       phone: smartcardNumber,
       requestId: reference,
     });
-    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ ckRes }, "Clubkonnect cable subscribe response");
+    delivered = nbRes?.status === "success" || nbRes?.status === "1" || nbRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ nbRes }, "Nellobyte cable subscribe response");
   } catch (err) {
-    req.log?.error({ err }, "Clubkonnect cable subscribe error");
+    req.log?.error({ err }, "Nellobyte cable subscribe error");
   }
 
   if (!delivered) {
