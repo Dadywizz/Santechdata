@@ -1,10 +1,11 @@
 /**
  * Clubkonnect Integration Layer
  * Docs: https://www.clubkonnect.com/APIDocs.asp
- * Env vars: CLUBKONNECT_PHONE (UserID), CLUBKONNECT_APIKEY
+ * Env vars: CLUBKONNECT_USERID (the CK... ID shown in API Settings), CLUBKONNECT_APIKEY
  *
  * NOTE: Server IP must be whitelisted on Clubkonnect dashboard before API calls work.
  * Error "INVALID_CREDENTIALS3" = IP not whitelisted.
+ * Error "INVALID_CREDENTIALS"  = wrong UserID or APIKey.
  *
  * Network IDs: MTN=1, AIRTEL=2, GLO=3, 9MOBILE=4
  */
@@ -12,12 +13,12 @@
 const BASE = "https://www.clubkonnect.com";
 
 const authParams = () => ({
-  UserID: process.env.CLUBKONNECT_PHONE ?? "",
+  UserID: process.env.CLUBKONNECT_USERID ?? process.env.CLUBKONNECT_PHONE ?? "",
   APIKey: process.env.CLUBKONNECT_APIKEY ?? "",
 });
 
 export function isClubkonnectConfigured(): boolean {
-  return !!(process.env.CLUBKONNECT_PHONE && process.env.CLUBKONNECT_APIKEY);
+  return !!((process.env.CLUBKONNECT_USERID ?? process.env.CLUBKONNECT_PHONE) && process.env.CLUBKONNECT_APIKEY);
 }
 
 // ─── Network helpers ────────────────────────────────────────────────────────
