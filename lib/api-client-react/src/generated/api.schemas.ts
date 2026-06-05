@@ -155,7 +155,9 @@ export const VerifyPaymentInputGateway = {
 
 export interface VerifyPaymentInput {
   reference: string;
-  gateway: VerifyPaymentInputGateway;
+  gateway?: VerifyPaymentInputGateway;
+  /** Flutterwave transaction ID (passed in redirect callback) */
+  transactionId?: string;
 }
 
 export interface WalletTransferInput {

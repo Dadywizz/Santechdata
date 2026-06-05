@@ -9,5 +9,7 @@ import type { VerifyPaymentInputGateway } from './verifyPaymentInputGateway';
 
 export interface VerifyPaymentInput {
   reference: string;
-  gateway: VerifyPaymentInputGateway;
+  gateway?: VerifyPaymentInputGateway;
+  /** Flutterwave transaction ID (passed in redirect callback) */
+  transactionId?: string;
 }

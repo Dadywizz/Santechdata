@@ -187,7 +187,8 @@ export const InitiateFundingResponse = zod.object({
  */
 export const VerifyFundingBody = zod.object({
   "reference": zod.string(),
-  "gateway": zod.enum(['paystack', 'flutterwave', 'monnify'])
+  "gateway": zod.enum(['paystack', 'flutterwave', 'monnify']).optional(),
+  "transactionId": zod.string().optional().describe('Flutterwave transaction ID (passed in redirect callback)')
 })
 
 export const VerifyFundingResponse = zod.object({

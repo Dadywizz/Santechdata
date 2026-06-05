@@ -1391,13 +1391,16 @@ components:
 
     VerifyPaymentInput:
       type: object
-      required: [reference, gateway]
+      required: [reference]
       properties:
         reference:
           type: string
         gateway:
           type: string
           enum: [paystack, flutterwave, monnify]
+        transactionId:
+          type: string
+          description: Flutterwave transaction ID (passed in redirect callback)
 
     WalletTransferInput:
       type: object
