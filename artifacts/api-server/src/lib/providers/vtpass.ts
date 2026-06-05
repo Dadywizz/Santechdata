@@ -3,12 +3,12 @@
  * Docs: https://vtpass.com.ng/documentation
  * Set env vars: VTPASS_API_KEY, VTPASS_PUBLIC_KEY, VTPASS_SECRET_KEY
  * Base URL (sandbox): https://sandbox.vtpass.com.ng
- * Base URL (live):    https://vtpass.com.ng
+ * Base URL (live):    https://api-service.vtpass.com.ng
  */
 
 const BASE_URL = process.env.VTPASS_SANDBOX === "true"
   ? "https://sandbox.vtpass.com.ng/api"
-  : "https://vtpass.com.ng/api";
+  : "https://api-service.vtpass.com.ng/api";
 
 const headers = () => ({
   "Content-Type": "application/json",

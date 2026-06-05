@@ -208,7 +208,7 @@ router.delete("/admin/data-plans/:id", authenticate, requireAdmin, async (req: A
 router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const BASE = process.env.VTPASS_SANDBOX === "true"
     ? "https://sandbox.vtpass.com.ng/api"
-    : "https://vtpass.com.ng/api";
+    : "https://api-service.vtpass.com.ng/api";
   const vtHeaders = {
     "api-key": process.env.VTPASS_API_KEY ?? "",
     "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
@@ -438,7 +438,7 @@ router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: A
   if (!serviceID) { res.status(400).json({ error: "serviceID required" }); return; }
   const BASE = process.env.VTPASS_SANDBOX === "true"
     ? "https://sandbox.vtpass.com.ng/api"
-    : "https://vtpass.com.ng/api";
+    : "https://api-service.vtpass.com.ng/api";
   try {
     const r = await fetch(`${BASE}/service-variations?serviceID=${encodeURIComponent(serviceID)}`, {
       headers: {
