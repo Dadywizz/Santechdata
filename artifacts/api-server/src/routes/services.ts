@@ -78,6 +78,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   const price = parseFloat(plan.price);
+  const costPrice = parseFloat(plan.costPrice);
   if (parseFloat(wallet.balance) < price) {
     res.status(400).json({ error: "Insufficient wallet balance" });
     return;
@@ -94,7 +95,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
       network: plan.network,
       phone,
       variationCode: plan.providerCode,
-      amount: price,
+      amount: costPrice,
     });
     delivered = vtRes?.code === "000";
     req.log?.info({ vtRes }, "VTpass data purchase response");
@@ -588,6 +589,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   }
 
   const totalCost = parseFloat(examType.price) * quantity;
+  const totalCostPrice = parseFloat(examType.costPrice) * quantity;
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < totalCost) {
     res.status(400).json({ error: "Insufficient wallet balance" });
@@ -606,7 +608,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
       examCode: examType.code,
       phone,
       quantity,
-      amount: totalCost,
+      amount: totalCostPrice,
     });
     delivered = vtRes?.code === "000";
     req.log?.info({ vtRes }, "VTpass exam purchase response");
