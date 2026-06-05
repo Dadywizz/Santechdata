@@ -170,7 +170,7 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
 
   if (!verified) {
     await db.update(transactionsTable).set({ status: "failed" }).where(eq(transactionsTable.id, tx.id));
-    res.status(400).json({ error: "Payment was not successful. No charge was made to your wallet." });
+    res.status(400).json({ error: "Payment not completed. Your wallet has NOT been charged — no money was taken. Please try again and complete the payment on the checkout page." });
     return;
   }
 

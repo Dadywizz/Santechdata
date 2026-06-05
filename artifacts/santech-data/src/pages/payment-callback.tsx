@@ -117,10 +117,13 @@ export default function PaymentCallback() {
 
         {status === "failed" && (
           <>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-full p-4 w-24 h-24 mx-auto flex items-center justify-center">
-              <XCircle className="h-14 w-14 text-red-600" />
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-full p-4 w-24 h-24 mx-auto flex items-center justify-center">
+              <XCircle className="h-14 w-14 text-orange-500" />
             </div>
-            <h2 className="text-2xl font-bold text-red-700 dark:text-red-400">Payment Failed</h2>
+            <h2 className="text-2xl font-bold text-orange-700 dark:text-orange-400">Payment Not Completed</h2>
+            <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-4 py-2">
+              ✓ No money was taken from you
+            </p>
             <p className="text-muted-foreground">{errorMsg}</p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate("/fund-wallet")}>Try Again</Button>
