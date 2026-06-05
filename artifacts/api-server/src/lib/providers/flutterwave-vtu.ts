@@ -121,6 +121,61 @@ export async function flutterwaveGetDataPlans(network: string): Promise<Array<{
   }>).filter(b => b.country === "NG" && !b.is_airtime && b.name === billerName);
 }
 
+// ─── Cable TV ────────────────────────────────────────────────────────────────
+// Flutterwave cable biller names & first item_code per provider (for validation)
+const CABLE_BILLER: Record<string, { billerName: string; itemCode: string }> = {
+  dstv:      { billerName: "DSTV Payment", itemCode: "CB140" },
+  gotv:      { billerName: "GOTV",         itemCode: "CB137" },
+  startimes: { billerName: "STARTIMES",    itemCode: "CB191" },
+};
+
+export async function flutterwaveVerifySmartcard(opts: {
+  provider: string; smartcardNumber: string;
+}): Promise<{ status: string; message?: string; name?: string; amount?: number; package?: string }> {
+  const biller = CABLE_BILLER[opts.provider.toLowerCase()];
+  if (!biller) return { status: "error", message: "Unknown cable provider" };
+  const res = await fetch(
+    `${FLW_API}/bill-items/${biller.itemCode}/validate?code=${encodeURIComponent(opts.smartcardNumber)}&customer=1`,
+    { headers: authHeader(), signal: AbortSignal.timeout(15000) },
+  );
+  const json = await res.json() as {
+    status: string; message?: string;
+    data?: { name?: string; customer?: string; response_message?: string; amount?: number };
+  };
+  return {
+    status: json.status,
+    message: json.message ?? json.data?.response_message,
+    name: json.data?.name ?? json.data?.customer,
+    amount: json.data?.amount,
+  };
+}
+
+export async function flutterwaveCableSubscribe(opts: {
+  provider: string; smartcardNumber: string; amount: number;
+  itemCode: string; reference: string;
+}): Promise<FlwBillResponse> {
+  const biller = CABLE_BILLER[opts.provider.toLowerCase()];
+  const billerName = biller?.billerName ?? opts.provider.toUpperCase();
+  const res = await fetch(`${FLW_API}/bills`, {
+    method: "POST",
+    headers: { ...authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      country: "NG",
+      customer: opts.smartcardNumber,
+      amount: opts.amount,
+      recurrence: "ONCE",
+      type: billerName,
+      reference: opts.reference,
+      biller_name: billerName,
+      item_code: opts.itemCode,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return res.json() as Promise<FlwBillResponse>;
+}
+
 export function isFlutterwaveVtuConfigured(): boolean {
   return !!process.env.FLUTTERWAVE_SECRET_KEY;
 }
+
+export { CABLE_BILLER as FLW_CABLE_BILLER };

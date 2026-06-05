@@ -25,12 +25,12 @@ import {
   isClubkonnectConfigured,
 } from "../lib/providers/clubkonnect";
 import {
-  nellobytePurchaseAirtime,
-  nellobyteVerifySmartcard,
-  nellobyteCableSubscribe,
-  isNellobyteconfigured,
-  NELLOBYTE_CABLE_ID,
-} from "../lib/providers/nellobyte";
+  flutterwavePurchaseAirtime,
+  flutterwaveVerifySmartcard,
+  flutterwaveCableSubscribe,
+  isFlutterwaveVtuConfigured,
+  FLW_CABLE_BILLER,
+} from "../lib/providers/flutterwave-vtu";
 
 const router: IRouter = Router();
 
@@ -167,7 +167,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isNellobyteconfigured()) {
+  if (!isFlutterwaveVtuConfigured()) {
     res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -184,11 +184,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    const nbRes = await nellobytePurchaseAirtime({ network, phone, amount, requestId: reference });
-    delivered = nbRes?.status === "success" || nbRes?.status === "1" || nbRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ nbRes }, "Nellobyte airtime purchase response");
+    const flwRes = await flutterwavePurchaseAirtime({ network, phone, amount, reference });
+    delivered = flwRes?.status === "success" || flwRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ flwRes }, "Flutterwave airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "Nellobyte airtime purchase error");
+    req.log?.error({ err }, "Flutterwave airtime purchase error");
   }
 
   if (!delivered) {
@@ -375,35 +375,29 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 });
 
 // ── CABLE TV ──────────────────────────────────────────────────────────────────
-// Nellobytesystems Cable IDs: DSTV=01, GOTV=02, STARTIMES=03
+// Flutterwave cable biller IDs match CABLE_BILLER keys in flutterwave-vtu.ts
 const CABLE_PROVIDERS = [
-  { id: "dstv",      name: "DStv",      nbId: "01" },
-  { id: "gotv",      name: "GOtv",      nbId: "02" },
-  { id: "startimes", name: "StarTimes", nbId: "03" },
+  { id: "dstv",      name: "DStv"      },
+  { id: "gotv",      name: "GOtv"      },
+  { id: "startimes", name: "StarTimes" },
 ];
 
+// Flutterwave item codes from /v3/bill-categories
 const CABLE_PLANS = [
-  { id: "dstv-padi",         provider: "dstv",      name: "DStv Padi",        price: 2950,  validity: "Monthly", nbCode: "1"  },
-  { id: "dstv-yanga",        provider: "dstv",      name: "DStv Yanga",       price: 3600,  validity: "Monthly", nbCode: "2"  },
-  { id: "dstv-confam",       provider: "dstv",      name: "DStv Confam",      price: 6200,  validity: "Monthly", nbCode: "3"  },
-  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 10500, validity: "Monthly", nbCode: "4"  },
-  { id: "dstv-compact-plus", provider: "dstv",      name: "DStv Compact+",    price: 16600, validity: "Monthly", nbCode: "5"  },
-  { id: "dstv-premium",      provider: "dstv",      name: "DStv Premium",     price: 29500, validity: "Monthly", nbCode: "6"  },
-  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 410,   validity: "Monthly", nbCode: "1"  },
-  { id: "gotv-jinja",        provider: "gotv",      name: "GOtv Jinja",       price: 2250,  validity: "Monthly", nbCode: "2"  },
-  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 3300,  validity: "Monthly", nbCode: "3"  },
-  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 4850,  validity: "Monthly", nbCode: "4"  },
-  { id: "gotv-supa",         provider: "gotv",      name: "GOtv Supa",        price: 6400,  validity: "Monthly", nbCode: "5"  },
-  { id: "gotv-supa-plus",    provider: "gotv",      name: "GOtv Supa+",       price: 9600,  validity: "Monthly", nbCode: "6"  },
-  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", nbCode: "1"  },
-  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1850,  validity: "Monthly", nbCode: "2"  },
-  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 3100,  validity: "Monthly", nbCode: "3"  },
-  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 2200,  validity: "Monthly", nbCode: "4"  },
-  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4900,  validity: "Monthly", nbCode: "5"  },
+  { id: "dstv-access",       provider: "dstv",      name: "DStv Access",      price: 1800,  validity: "Monthly", flwCode: "CB141" },
+  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 14600, validity: "Monthly", flwCode: "CB140" },
+  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 1050,  validity: "Monthly", flwCode: "CB137" },
+  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 1200,  validity: "Monthly", flwCode: "CB138" },
+  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 1800,  validity: "Monthly", flwCode: "CB139" },
+  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", flwCode: "CB191" },
+  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1700,  validity: "Monthly", flwCode: "CB260" },
+  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 2200,  validity: "Monthly", flwCode: "CB263" },
+  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 1200,  validity: "Monthly", flwCode: "CB265" },
+  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4200,  validity: "Monthly", flwCode: "CB272" },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
-  res.json(CABLE_PROVIDERS.map(({ nbId: _n, ...p }) => p));
+  res.json(CABLE_PROVIDERS);
 });
 
 router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -411,7 +405,7 @@ router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<
   const filtered = params.success && params.data.provider
     ? CABLE_PLANS.filter((p) => p.provider === params.data.provider?.toLowerCase())
     : CABLE_PLANS;
-  res.json(filtered.map(({ nbCode: _n, ...p }) => p));
+  res.json(filtered.map(({ flwCode: _f, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -422,25 +416,22 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   }
   const { smartcardNumber, provider } = parsed.data;
 
-  if (!isNellobyteconfigured()) {
+  if (!isFlutterwaveVtuConfigured()) {
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
     return;
   }
 
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === provider?.toLowerCase());
-  const cableId = cableProvider?.nbId ?? NELLOBYTE_CABLE_ID[provider?.toLowerCase() ?? ""] ?? "01";
-
   try {
-    const nbRes = await nellobyteVerifySmartcard({ smartcardNumber, cableId });
-    const ok = nbRes?.status === "success" || nbRes?.status === "1";
+    const flwRes = await flutterwaveVerifySmartcard({ provider: provider ?? "dstv", smartcardNumber });
+    const ok = flwRes?.status === "success";
     res.json({
       smartcardNumber,
-      name: ok ? (nbRes.CustomerName ?? "Customer") : "Customer",
-      currentPlan: ok ? (nbRes.CustomerPackage ?? "") : "",
-      dueDate: ok ? (nbRes.CustomerDue ?? "") : "",
+      name: ok ? (flwRes.name ?? "Customer") : "Customer",
+      currentPlan: "",
+      dueDate: "",
     });
   } catch (err) {
-    req.log?.error({ err }, "Nellobyte smartcard verify error");
+    req.log?.error({ err }, "Flutterwave smartcard verify error");
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
   }
 });
@@ -459,7 +450,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     return;
   }
 
-  if (!isNellobyteconfigured()) {
+  if (!isFlutterwaveVtuConfigured()) {
     res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -473,23 +464,20 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === plan.provider);
-  const cableId = cableProvider?.nbId ?? NELLOBYTE_CABLE_ID[plan.provider] ?? "01";
 
   let delivered = false;
   try {
-    const nbRes = await nellobyteCableSubscribe({
-      cableId,
+    const flwRes = await flutterwaveCableSubscribe({
+      provider: plan.provider,
       smartcardNumber,
-      planId: plan.nbCode,
+      itemCode: plan.flwCode,
       amount: plan.price,
-      phone: smartcardNumber,
-      requestId: reference,
+      reference,
     });
-    delivered = nbRes?.status === "success" || nbRes?.status === "1" || nbRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ nbRes }, "Nellobyte cable subscribe response");
+    delivered = flwRes?.status === "success" || flwRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ flwRes }, "Flutterwave cable subscribe response");
   } catch (err) {
-    req.log?.error({ err }, "Nellobyte cable subscribe error");
+    req.log?.error({ err }, "Flutterwave cable subscribe error");
   }
 
   if (!delivered) {
