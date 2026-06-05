@@ -5,7 +5,7 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Status = "loading" | "success" | "failed";
+type Status = "loading" | "success" | "failed" | "processing";
 
 export default function PaymentCallback() {
   const [, navigate] = useLocation();
@@ -28,6 +28,12 @@ export default function PaymentCallback() {
           const params = window.location.search;
           localStorage.setItem("santech_pending_payment", params);
           navigate(`/login?returnTo=${encodeURIComponent("/payment/callback" + params)}`);
+          return;
+        }
+        // 202 = bank transfer still processing — not a failure
+        if (error.status === 202) {
+          setErrorMsg(errMsg);
+          setStatus("processing");
           return;
         }
         setErrorMsg(errMsg || "Payment verification failed. Please contact support.");
@@ -112,6 +118,20 @@ export default function PaymentCallback() {
               <Button onClick={() => navigate("/dashboard")}>Go to Dashboard</Button>
               <Button variant="outline" onClick={() => navigate("/fund-wallet")}>Fund Again</Button>
             </div>
+          </>
+        )}
+
+        {status === "processing" && (
+          <>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-full p-4 w-24 h-24 mx-auto flex items-center justify-center">
+              <Loader2 className="h-14 w-14 text-blue-500 animate-spin" />
+            </div>
+            <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-400">Transfer Processing</h2>
+            <p className="text-sm font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-4 py-2">
+              ✓ Your bank transfer was received
+            </p>
+            <p className="text-muted-foreground text-center">{errorMsg}</p>
+            <Button onClick={() => navigate("/dashboard")}>Go to Dashboard</Button>
           </>
         )}
 

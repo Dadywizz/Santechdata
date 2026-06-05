@@ -35,7 +35,13 @@ export async function paystackVerifyTransaction(reference: string) {
     headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
   });
   const data = await res.json() as { status: boolean; data: { status: string; amount: number } };
-  return { success: data.status && data.data?.status === "success", amount: (data.data?.amount ?? 0) / 100 };
+  const rawStatus = data.data?.status ?? "unknown";
+  return {
+    success: data.status && rawStatus === "success",
+    pending: rawStatus === "pending",
+    amount: (data.data?.amount ?? 0) / 100,
+    rawStatus,
+  };
 }
 
 // ── FLUTTERWAVE ───────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { createHmac } from "crypto";
 import { db } from "@workspace/db";
 import { walletsTable, transactionsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
@@ -159,6 +160,11 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
       const result = await paystackVerifyTransaction(reference);
       verified = result.success;
       verifiedAmount = result.amount;
+      // Bank transfer initiated but not yet received by Paystack — don't fail, keep pending
+      if (result.pending) {
+        res.status(202).json({ error: "Your bank transfer is being processed. Your wallet will be credited automatically once Paystack confirms receipt — this usually takes 1–5 minutes. You do not need to do anything." });
+        return;
+      }
     } catch {
       res.status(502).json({ error: "Could not verify payment with Paystack. Please contact support." });
       return;
@@ -189,6 +195,42 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   res.json({ id: wallet.id, userId: wallet.userId, balance: parseFloat(wallet.balance), currency: wallet.currency, updatedAt: wallet.updatedAt });
+});
+
+// POST /wallet/webhook/paystack — no auth, verified by HMAC signature
+router.post("/wallet/webhook/paystack", async (req: Request, res: Response): Promise<void> => {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) { res.sendStatus(200); return; }
+
+  const sig = req.headers["x-paystack-signature"] as string;
+  const rawBody = (req as AuthRequest & { rawBody?: Buffer }).rawBody;
+  if (!sig || !rawBody) { res.sendStatus(400); return; }
+
+  const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
+  if (sig !== expected) { res.sendStatus(401); return; }
+
+  const event = req.body as { event: string; data: { reference: string; amount: number; status: string } };
+
+  if (event.event === "charge.success") {
+    const { reference, amount } = event.data;
+    const amountNaira = amount / 100;
+
+    const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
+    if (tx && tx.status !== "success") {
+      await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
+      await db.update(walletsTable)
+        .set({ balance: sql`balance + ${amountNaira}`, updatedAt: new Date() })
+        .where(eq(walletsTable.userId, tx.userId));
+      await db.insert(notificationsTable).values({
+        userId: tx.userId,
+        title: "Wallet Funded",
+        message: `Your wallet has been credited with ₦${amountNaira.toLocaleString()} via bank transfer.`,
+        type: "wallet",
+      });
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 // POST /wallet/transfer
