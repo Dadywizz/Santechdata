@@ -100,11 +100,55 @@ export async function vtpassPurchaseAirtime(opts: {
     headers: headers(),
     body: JSON.stringify({
       request_id: opts.requestId,
-      serviceID: NETWORK_MAP[opts.network] ?? opts.network.toLowerCase(),
+      serviceID: NETWORK_MAP[opts.network.toUpperCase()] ?? opts.network.toLowerCase(),
       billersCode: opts.phone,
       amount: opts.amount,
       phone: opts.phone,
     }),
+    signal: AbortSignal.timeout(30000),
   });
   return res.json() as Promise<{ code: string; content: { transactions: { status: string } } }>;
+}
+
+// Exam token purchase
+// VTpass serviceID mapping: WAEC→waec, NECO→neco, JAMB→jamb-utme, NABTEB→nabteb
+const EXAM_VTPASS_MAP: Record<string, { serviceID: string; variationCode: string }> = {
+  WAEC: { serviceID: "waec", variationCode: "waec-registration-card" },
+  NECO: { serviceID: "neco", variationCode: "neco-result-checker-pin" },
+  JAMB: { serviceID: "jamb-utme", variationCode: "utme-registration" },
+  NABTEB: { serviceID: "nabteb", variationCode: "nabteb-pin" },
+};
+
+export async function vtpassPurchaseExam(opts: {
+  requestId: string; examCode: string; phone: string; quantity: number; amount: number;
+}) {
+  const mapping = EXAM_VTPASS_MAP[opts.examCode.toUpperCase()] ?? {
+    serviceID: opts.examCode.toLowerCase(),
+    variationCode: opts.examCode.toLowerCase(),
+  };
+  const res = await fetch(`${BASE_URL}/pay`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      request_id: opts.requestId,
+      serviceID: mapping.serviceID,
+      billersCode: opts.phone,
+      variation_code: mapping.variationCode,
+      amount: opts.amount,
+      phone: opts.phone,
+      quantity: opts.quantity,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  return res.json() as Promise<{
+    code: string;
+    content: {
+      transactions: { status: string; token?: string; tokens?: string[] };
+      rawOutput?: string;
+    };
+  }>;
+}
+
+export function isVtpassConfigured(): boolean {
+  return !!(process.env.VTPASS_API_KEY && process.env.VTPASS_SECRET_KEY);
 }
