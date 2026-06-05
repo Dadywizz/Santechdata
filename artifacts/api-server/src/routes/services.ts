@@ -18,22 +18,21 @@ import {
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
 import {
-  vtpassPurchaseData,
-  vtpassPurchaseAirtime,
-  vtpassVerifyMeter,
-  vtpassPayElectricity,
-  vtpassVerifySmartcard,
-  vtpassCableSubscribe,
-  vtpassPurchaseExam,
-  isVtpassConfigured,
-} from "../lib/providers/vtpass";
+  clubkonnectPurchaseData,
+  clubkonnectPurchaseAirtime,
+  clubkonnectVerifyMeter,
+  clubkonnectPayElectricity,
+  clubkonnectVerifySmartcard,
+  clubkonnectCableSubscribe,
+  clubkonnectGetExamPins,
+  isClubkonnectConfigured,
+} from "../lib/providers/clubkonnect";
 
 const router: IRouter = Router();
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const params = GetDataPlansQueryParams.safeParse(req.query);
-
   const plans = await db.select().from(dataPlansTable).where(eq(dataPlansTable.isActive, true));
   const filtered = params.success && params.data.network
     ? plans.filter((p) => p.network === params.data.network)
@@ -66,41 +65,39 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
+  if (!isClubkonnectConfigured()) {
+    res.status(503).json({ error: "VTU service is temporarily unavailable. Please contact support." });
     return;
   }
 
   if (!plan.providerCode) {
-    res.status(503).json({ error: "This data plan is not yet configured for delivery. Please contact support." });
+    res.status(503).json({ error: "This data plan is not yet configured. Please contact support." });
     return;
   }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   const price = parseFloat(plan.price);
-  const costPrice = parseFloat(plan.costPrice);
   if (parseFloat(wallet.balance) < price) {
-    res.status(400).json({ error: "Insufficient wallet balance" });
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
     return;
   }
 
   await db.update(walletsTable).set({ balance: sql`balance - ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `DATA-${Date.now()}`;
-
   let delivered = false;
+
   try {
-    const vtRes = await vtpassPurchaseData({
-      requestId: reference,
+    const ckRes = await clubkonnectPurchaseData({
       network: plan.network,
       phone,
-      variationCode: plan.providerCode,
-      amount: costPrice,
+      planId: plan.providerCode,
+      requestId: reference,
     });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass data purchase response");
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect data purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass data purchase error");
+    req.log?.error({ err }, "Clubkonnect data purchase error");
   }
 
   if (!delivered) {
@@ -119,7 +116,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     await db.insert(notificationsTable).values({
       userId: req.userId!,
       title: "Data Purchase Failed",
-      message: `Your ₦${price} data purchase failed. Your wallet has been refunded. Please try again or contact support.`,
+      message: `Your ₦${price} data purchase failed. Your wallet has been refunded.`,
       type: "data",
     });
 
@@ -166,33 +163,28 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "VTU service is temporarily unavailable. Please try again later or contact support." });
+  if (!isClubkonnectConfigured()) {
+    res.status(503).json({ error: "VTU service is temporarily unavailable. Please contact support." });
     return;
   }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
-    res.status(400).json({ error: "Insufficient wallet balance" });
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
     return;
   }
 
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `AIR-${Date.now()}`;
-
   let delivered = false;
+
   try {
-    const vtRes = await vtpassPurchaseAirtime({
-      requestId: reference,
-      network,
-      phone,
-      amount,
-    });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass airtime purchase response");
+    const ckRes = await clubkonnectPurchaseAirtime({ network, phone, amount, requestId: reference });
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass airtime purchase error");
+    req.log?.error({ err }, "Clubkonnect airtime purchase error");
   }
 
   if (!delivered) {
@@ -211,7 +203,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     await db.insert(notificationsTable).values({
       userId: req.userId!,
       title: "Airtime Purchase Failed",
-      message: `Your ₦${amount} airtime purchase failed. Your wallet has been refunded. Please try again or contact support.`,
+      message: `Your ₦${amount} airtime purchase failed. Your wallet has been refunded.`,
       type: "airtime",
     });
 
@@ -245,22 +237,22 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 });
 
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────
-// VTpass serviceID is the provider id (e.g. ikeja-electric, eko-electric, phed, etc.)
+// Clubkonnect electricity NetworkIDs
 const ELECTRICITY_PROVIDERS = [
-  { id: "ikeja-electric", name: "Ikeja Electric", vtpassId: "ikeja-electric" },
-  { id: "eko-electric", name: "Eko Electric", vtpassId: "eko-electric" },
-  { id: "abuja-electric", name: "Abuja Electric", vtpassId: "abuja-electric" },
-  { id: "port-harcourt-electric", name: "Port Harcourt Electric", vtpassId: "phed" },
-  { id: "enugu-electric", name: "Enugu Electric", vtpassId: "enugu-electric" },
-  { id: "ibadan-electric", name: "Ibadan Electric", vtpassId: "ibadan-electric" },
-  { id: "kano-electric", name: "Kano Electric", vtpassId: "kano-electric" },
-  { id: "aba-electric", name: "Aba Electric", vtpassId: "aba-electric" },
-  { id: "jos-electric", name: "Jos Electric", vtpassId: "jos-electric" },
-  { id: "benin-electric", name: "Benin Electric", vtpassId: "benin-electric" },
+  { id: "ikeja-electric",       name: "Ikeja Electric",        ckId: "IKEDC" },
+  { id: "eko-electric",         name: "Eko Electric",          ckId: "EKEDC" },
+  { id: "abuja-electric",       name: "Abuja Electric",        ckId: "AEDC"  },
+  { id: "port-harcourt-electric", name: "Port Harcourt Electric", ckId: "PHED" },
+  { id: "enugu-electric",       name: "Enugu Electric",        ckId: "ENUGU" },
+  { id: "ibadan-electric",      name: "Ibadan Electric",       ckId: "IBEDC" },
+  { id: "kano-electric",        name: "Kano Electric",         ckId: "KEDCO" },
+  { id: "aba-electric",         name: "Aba Electric",          ckId: "APLE"  },
+  { id: "jos-electric",         name: "Jos Electric",          ckId: "JED"   },
+  { id: "benin-electric",       name: "Benin Electric",        ckId: "BEDC"  },
 ];
 
 router.get("/electricity/providers", authenticate, async (_req, res): Promise<void> => {
-  res.json(ELECTRICITY_PROVIDERS.map(({ vtpassId: _v, ...p }) => p));
+  res.json(ELECTRICITY_PROVIDERS.map(({ ckId: _c, ...p }) => p));
 });
 
 router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -271,27 +263,24 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   }
   const { meterNumber, providerCode, meterType } = parsed.data;
 
-  if (!isVtpassConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.json({ meterNumber, name: "Customer", address: "" });
     return;
   }
 
-  const provider = ELECTRICITY_PROVIDERS.find((p) => p.id === providerCode || p.vtpassId === providerCode);
-  const serviceID = provider?.vtpassId ?? providerCode;
+  const provider = ELECTRICITY_PROVIDERS.find((p) => p.id === providerCode || p.ckId === providerCode);
+  const networkId = provider?.ckId ?? providerCode;
 
   try {
-    const vtRes = await vtpassVerifyMeter(serviceID, meterNumber, meterType as "prepaid" | "postpaid");
-    if (vtRes?.code === "000" && vtRes.content?.Customer_Name) {
-      res.json({
-        meterNumber,
-        name: vtRes.content.Customer_Name,
-        address: vtRes.content.Address ?? "",
-      });
-    } else {
-      res.json({ meterNumber, name: "Customer", address: "" });
-    }
+    const ckRes = await clubkonnectVerifyMeter({ meterNumber, networkId, meterType });
+    const ok = ckRes?.status === "success" || ckRes?.status === "1";
+    res.json({
+      meterNumber,
+      name: ok ? (ckRes.CustomerName ?? "Customer") : "Customer",
+      address: ok ? (ckRes.CustomerAddress ?? "") : "",
+    });
   } catch (err) {
-    req.log?.error({ err }, "VTpass meter verify error");
+    req.log?.error({ err }, "Clubkonnect meter verify error");
     res.json({ meterNumber, name: "Customer", address: "" });
   }
 });
@@ -309,39 +298,32 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "Electricity service is temporarily unavailable. Please try again later or contact support." });
+  if (!isClubkonnectConfigured()) {
+    res.status(503).json({ error: "Electricity service is temporarily unavailable. Please contact support." });
     return;
   }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
-    res.status(400).json({ error: "Insufficient wallet balance" });
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
     return;
   }
 
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `ELEC-${Date.now()}`;
-  const provider = ELECTRICITY_PROVIDERS.find((p) => p.id === providerCode || p.vtpassId === providerCode);
-  const serviceID = provider?.vtpassId ?? providerCode;
+  const provider = ELECTRICITY_PROVIDERS.find((p) => p.id === providerCode || p.ckId === providerCode);
+  const networkId = provider?.ckId ?? providerCode;
 
   let token = "";
   let delivered = false;
   try {
-    const vtRes = await vtpassPayElectricity({
-      requestId: reference,
-      providerCode: serviceID,
-      meterNumber,
-      meterType: meterType as "prepaid" | "postpaid",
-      amount,
-      phone,
-    });
-    delivered = vtRes?.code === "000";
-    token = vtRes?.content?.transactions?.token ?? "";
-    req.log?.info({ vtRes }, "VTpass electricity purchase response");
+    const ckRes = await clubkonnectPayElectricity({ meterNumber, networkId, meterType, amount, phone, requestId: reference });
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    token = ckRes?.token ?? "";
+    req.log?.info({ ckRes }, "Clubkonnect electricity purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass electricity purchase error");
+    req.log?.error({ err }, "Clubkonnect electricity purchase error");
   }
 
   if (!delivered) {
@@ -360,7 +342,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     await db.insert(notificationsTable).values({
       userId: req.userId!,
       title: "Electricity Purchase Failed",
-      message: `Your ₦${amount} electricity purchase failed. Your wallet has been refunded. Please try again or contact support.`,
+      message: `Your ₦${amount} electricity purchase failed. Your wallet has been refunded.`,
       type: "electricity",
     });
 
@@ -389,36 +371,35 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 });
 
 // ── CABLE TV ──────────────────────────────────────────────────────────────────
-// vtpassId matches VTpass serviceID exactly
+// Clubkonnect cable NetworkIDs
 const CABLE_PROVIDERS = [
-  { id: "dstv", name: "DStv", vtpassId: "dstv" },
-  { id: "gotv", name: "GOtv", vtpassId: "gotv" },
-  { id: "startimes", name: "StarTimes", vtpassId: "startimes" },
+  { id: "dstv",      name: "DStv",      ckId: "dstv"      },
+  { id: "gotv",      name: "GOtv",      ckId: "gotv"      },
+  { id: "startimes", name: "StarTimes", ckId: "startimes" },
 ];
 
-// variation_code must match VTpass plan codes exactly
 const CABLE_PLANS = [
-  { id: "dstv-padi",        provider: "dstv",      name: "DStv Padi",       price: 2950,  validity: "Monthly", vtCode: "padi" },
-  { id: "dstv-yanga",       provider: "dstv",      name: "DStv Yanga",      price: 3600,  validity: "Monthly", vtCode: "yanga" },
-  { id: "dstv-confam",      provider: "dstv",      name: "DStv Confam",     price: 6200,  validity: "Monthly", vtCode: "confam" },
-  { id: "dstv-compact",     provider: "dstv",      name: "DStv Compact",    price: 10500, validity: "Monthly", vtCode: "compact" },
-  { id: "dstv-compact-plus",provider: "dstv",      name: "DStv Compact+",   price: 16600, validity: "Monthly", vtCode: "compact-plus" },
-  { id: "dstv-premium",     provider: "dstv",      name: "DStv Premium",    price: 29500, validity: "Monthly", vtCode: "premium" },
-  { id: "gotv-lite",        provider: "gotv",      name: "GOtv Lite",       price: 410,   validity: "Monthly", vtCode: "gotv-lite" },
-  { id: "gotv-jinja",       provider: "gotv",      name: "GOtv Jinja",      price: 2250,  validity: "Monthly", vtCode: "gotv-jinja" },
-  { id: "gotv-jolli",       provider: "gotv",      name: "GOtv Jolli",      price: 3300,  validity: "Monthly", vtCode: "gotv-jolli" },
-  { id: "gotv-max",         provider: "gotv",      name: "GOtv Max",        price: 4850,  validity: "Monthly", vtCode: "gotv-max" },
-  { id: "gotv-supa",        provider: "gotv",      name: "GOtv Supa",       price: 6400,  validity: "Monthly", vtCode: "gotv-supa" },
-  { id: "gotv-supa-plus",   provider: "gotv",      name: "GOtv Supa+",      price: 9600,  validity: "Monthly", vtCode: "gotv-supa-plus" },
-  { id: "startimes-nova",   provider: "startimes", name: "StarTimes Nova",  price: 900,   validity: "Monthly", vtCode: "nova" },
-  { id: "startimes-basic",  provider: "startimes", name: "StarTimes Basic", price: 1850,  validity: "Monthly", vtCode: "basic" },
-  { id: "startimes-smart",  provider: "startimes", name: "StarTimes Smart", price: 3100,  validity: "Monthly", vtCode: "smart" },
-  { id: "startimes-classic",provider: "startimes", name: "StarTimes Classic",price: 2200, validity: "Monthly", vtCode: "classic" },
-  { id: "startimes-super",  provider: "startimes", name: "StarTimes Super", price: 4900,  validity: "Monthly", vtCode: "super" },
+  { id: "dstv-padi",         provider: "dstv",      name: "DStv Padi",        price: 2950,  validity: "Monthly", ckCode: "padi"         },
+  { id: "dstv-yanga",        provider: "dstv",      name: "DStv Yanga",       price: 3600,  validity: "Monthly", ckCode: "yanga"        },
+  { id: "dstv-confam",       provider: "dstv",      name: "DStv Confam",      price: 6200,  validity: "Monthly", ckCode: "confam"       },
+  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 10500, validity: "Monthly", ckCode: "compact"      },
+  { id: "dstv-compact-plus", provider: "dstv",      name: "DStv Compact+",    price: 16600, validity: "Monthly", ckCode: "compact-plus" },
+  { id: "dstv-premium",      provider: "dstv",      name: "DStv Premium",     price: 29500, validity: "Monthly", ckCode: "premium"      },
+  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 410,   validity: "Monthly", ckCode: "gotv-lite"    },
+  { id: "gotv-jinja",        provider: "gotv",      name: "GOtv Jinja",       price: 2250,  validity: "Monthly", ckCode: "gotv-jinja"   },
+  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 3300,  validity: "Monthly", ckCode: "gotv-jolli"   },
+  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 4850,  validity: "Monthly", ckCode: "gotv-max"     },
+  { id: "gotv-supa",         provider: "gotv",      name: "GOtv Supa",        price: 6400,  validity: "Monthly", ckCode: "gotv-supa"    },
+  { id: "gotv-supa-plus",    provider: "gotv",      name: "GOtv Supa+",       price: 9600,  validity: "Monthly", ckCode: "gotv-supa-plus" },
+  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", ckCode: "nova"         },
+  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1850,  validity: "Monthly", ckCode: "basic"        },
+  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 3100,  validity: "Monthly", ckCode: "smart"        },
+  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 2200,  validity: "Monthly", ckCode: "classic"      },
+  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4900,  validity: "Monthly", ckCode: "super"        },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
-  res.json(CABLE_PROVIDERS.map(({ vtpassId: _v, ...p }) => p));
+  res.json(CABLE_PROVIDERS.map(({ ckId: _c, ...p }) => p));
 });
 
 router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -426,7 +407,7 @@ router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<
   const filtered = params.success && params.data.provider
     ? CABLE_PLANS.filter((p) => p.provider === params.data.provider?.toLowerCase())
     : CABLE_PLANS;
-  res.json(filtered.map(({ vtCode: _v, ...p }) => p));
+  res.json(filtered.map(({ ckCode: _c, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -437,28 +418,25 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   }
   const { smartcardNumber, provider } = parsed.data;
 
-  if (!isVtpassConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
     return;
   }
 
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === provider?.toLowerCase() || p.vtpassId === provider?.toLowerCase());
-  const serviceID = cableProvider?.vtpassId ?? provider?.toLowerCase();
+  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === provider?.toLowerCase() || p.ckId === provider?.toLowerCase());
+  const networkId = cableProvider?.ckId ?? provider?.toLowerCase() ?? "";
 
   try {
-    const vtRes = await vtpassVerifySmartcard(serviceID, smartcardNumber);
-    if (vtRes?.code === "000" && vtRes.content?.Customer_Name) {
-      res.json({
-        smartcardNumber,
-        name: vtRes.content.Customer_Name,
-        currentPlan: "",
-        dueDate: "",
-      });
-    } else {
-      res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
-    }
+    const ckRes = await clubkonnectVerifySmartcard({ smartcardNumber, networkId });
+    const ok = ckRes?.status === "success" || ckRes?.status === "1";
+    res.json({
+      smartcardNumber,
+      name: ok ? (ckRes.CustomerName ?? "Customer") : "Customer",
+      currentPlan: "",
+      dueDate: "",
+    });
   } catch (err) {
-    req.log?.error({ err }, "VTpass smartcard verify error");
+    req.log?.error({ err }, "Clubkonnect smartcard verify error");
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
   }
 });
@@ -477,37 +455,37 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please try again later or contact support." });
+  if (!isClubkonnectConfigured()) {
+    res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please contact support." });
     return;
   }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < plan.price) {
-    res.status(400).json({ error: "Insufficient wallet balance" });
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
     return;
   }
 
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
-  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === plan.provider || p.vtpassId === plan.provider);
-  const serviceID = cableProvider?.vtpassId ?? plan.provider;
+  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === plan.provider || p.ckId === plan.provider);
+  const networkId = cableProvider?.ckId ?? plan.provider;
 
   let delivered = false;
   try {
-    const vtRes = await vtpassCableSubscribe({
-      requestId: reference,
-      providerCode: serviceID,
+    const ckRes = await clubkonnectCableSubscribe({
       smartcardNumber,
-      variationCode: plan.vtCode,
+      networkId,
+      planId: plan.ckCode,
       amount: plan.price,
       phone: smartcardNumber,
+      requestId: reference,
     });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass cable subscribe response");
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect cable subscribe response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass cable subscribe error");
+    req.log?.error({ err }, "Clubkonnect cable subscribe error");
   }
 
   if (!delivered) {
@@ -526,7 +504,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     await db.insert(notificationsTable).values({
       userId: req.userId!,
       title: "Cable Subscription Failed",
-      message: `Your ${plan.name} subscription failed. Your wallet has been refunded. Please try again or contact support.`,
+      message: `Your ${plan.name} subscription failed. Your wallet has been refunded.`,
       type: "cable",
     });
 
@@ -583,16 +561,15 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "Exam token service is temporarily unavailable. Please try again later or contact support." });
+  if (!isClubkonnectConfigured()) {
+    res.status(503).json({ error: "Exam token service is temporarily unavailable. Please contact support." });
     return;
   }
 
   const totalCost = parseFloat(examType.price) * quantity;
-  const totalCostPrice = parseFloat(examType.costPrice) * quantity;
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < totalCost) {
-    res.status(400).json({ error: "Insufficient wallet balance" });
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
     return;
   }
 
@@ -603,32 +580,15 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const vtRes = await vtpassPurchaseExam({
-      requestId: reference,
-      examCode: examType.code,
-      phone,
-      quantity,
-      amount: totalCostPrice,
-    });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass exam purchase response");
+    const ckRes = await clubkonnectGetExamPins({ examType: examType.code, quantity, requestId: reference });
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect exam purchase response");
 
-    if (delivered) {
-      const rawOutput = vtRes?.content?.rawOutput ?? "";
-      const tokens: string[] = vtRes?.content?.transactions?.tokens ?? [];
-      if (tokens.length) {
-        pins = tokens.map((pin, i) => ({ pin, serial: `${examType.code}${Date.now()}${i}` }));
-      } else if (vtRes?.content?.transactions?.token) {
-        pins = [{ pin: vtRes.content.transactions.token, serial: `${examType.code}${Date.now()}0` }];
-      } else if (rawOutput) {
-        pins = rawOutput.split(",").filter(Boolean).map((pin, i) => ({
-          pin: pin.trim(),
-          serial: `${examType.code}${Date.now()}${i}`,
-        }));
-      }
+    if (delivered && ckRes?.Pins?.length) {
+      pins = ckRes.Pins.map((pin, i) => ({ pin, serial: `${examType.code}${Date.now()}${i}` }));
     }
   } catch (err) {
-    req.log?.error({ err }, "VTpass exam purchase error");
+    req.log?.error({ err }, "Clubkonnect exam purchase error");
   }
 
   if (!delivered) {
