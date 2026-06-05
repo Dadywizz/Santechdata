@@ -19,18 +19,14 @@ import {
 } from "@workspace/api-zod";
 import {
   clubkonnectPurchaseData,
+  clubkonnectPurchaseAirtime,
   clubkonnectVerifyMeter,
   clubkonnectPayElectricity,
+  clubkonnectVerifySmartcard,
+  clubkonnectCableSubscribe,
   clubkonnectGetExamPins,
   isClubkonnectConfigured,
 } from "../lib/providers/clubkonnect";
-import {
-  flutterwavePurchaseAirtime,
-  flutterwaveVerifySmartcard,
-  flutterwaveCableSubscribe,
-  isFlutterwaveVtuConfigured,
-  FLW_CABLE_BILLER,
-} from "../lib/providers/flutterwave-vtu";
 
 const router: IRouter = Router();
 
@@ -167,7 +163,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     return;
   }
 
-  if (!isFlutterwaveVtuConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -184,11 +180,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    const flwRes = await flutterwavePurchaseAirtime({ network, phone, amount, reference });
-    delivered = flwRes?.status === "success" || flwRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ flwRes }, "Flutterwave airtime purchase response");
+    const ckRes = await clubkonnectPurchaseAirtime({ network, phone, amount, requestId: reference });
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "Flutterwave airtime purchase error");
+    req.log?.error({ err }, "Clubkonnect airtime purchase error");
   }
 
   if (!delivered) {
@@ -375,37 +371,40 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 });
 
 // ── CABLE TV ──────────────────────────────────────────────────────────────────
-// Flutterwave cable biller IDs match CABLE_BILLER keys in flutterwave-vtu.ts
+// Clubkonnect cable NetworkIDs: DStv=04, GOtv=05, StarTimes=06
 const CABLE_PROVIDERS = [
-  { id: "dstv",      name: "DStv"      },
-  { id: "gotv",      name: "GOtv"      },
-  { id: "startimes", name: "StarTimes" },
+  { id: "dstv",      name: "DStv",      ckNetworkId: "04" },
+  { id: "gotv",      name: "GOtv",      ckNetworkId: "05" },
+  { id: "startimes", name: "StarTimes", ckNetworkId: "06" },
 ];
 
-// Flutterwave item codes from /v3/bill-categories
+// ckPlanId = Clubkonnect DataPlan code for each subscription package
 const CABLE_PLANS = [
-  { id: "dstv-access",       provider: "dstv",      name: "DStv Access",      price: 1800,  validity: "Monthly", flwCode: "CB141" },
-  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",     price: 14600, validity: "Monthly", flwCode: "CB140" },
-  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",        price: 1050,  validity: "Monthly", flwCode: "CB137" },
-  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",       price: 1200,  validity: "Monthly", flwCode: "CB138" },
-  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",         price: 1800,  validity: "Monthly", flwCode: "CB139" },
-  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",   price: 900,   validity: "Monthly", flwCode: "CB191" },
-  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",  price: 1700,  validity: "Monthly", flwCode: "CB260" },
-  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",  price: 2200,  validity: "Monthly", flwCode: "CB263" },
-  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic",price: 1200,  validity: "Monthly", flwCode: "CB265" },
-  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",  price: 4200,  validity: "Monthly", flwCode: "CB272" },
+  { id: "dstv-access",       provider: "dstv",      name: "DStv Access",       price: 1800,  validity: "Monthly", ckPlanId: "5" },
+  { id: "dstv-compact",      provider: "dstv",      name: "DStv Compact",      price: 14600, validity: "Monthly", ckPlanId: "3" },
+  { id: "dstv-compact-plus", provider: "dstv",      name: "DStv Compact Plus", price: 19800, validity: "Monthly", ckPlanId: "2" },
+  { id: "dstv-premium",      provider: "dstv",      name: "DStv Premium",      price: 29500, validity: "Monthly", ckPlanId: "1" },
+  { id: "gotv-lite",         provider: "gotv",      name: "GOtv Lite",         price: 900,   validity: "Monthly", ckPlanId: "4" },
+  { id: "gotv-jolli",        provider: "gotv",      name: "GOtv Jolli",        price: 1200,  validity: "Monthly", ckPlanId: "3" },
+  { id: "gotv-max",          provider: "gotv",      name: "GOtv Max",          price: 1800,  validity: "Monthly", ckPlanId: "2" },
+  { id: "gotv-supa",         provider: "gotv",      name: "GOtv Supa",         price: 2460,  validity: "Monthly", ckPlanId: "1" },
+  { id: "startimes-nova",    provider: "startimes", name: "StarTimes Nova",    price: 900,   validity: "Monthly", ckPlanId: "5" },
+  { id: "startimes-basic",   provider: "startimes", name: "StarTimes Basic",   price: 1700,  validity: "Monthly", ckPlanId: "4" },
+  { id: "startimes-smart",   provider: "startimes", name: "StarTimes Smart",   price: 2200,  validity: "Monthly", ckPlanId: "3" },
+  { id: "startimes-classic", provider: "startimes", name: "StarTimes Classic", price: 2500,  validity: "Monthly", ckPlanId: "2" },
+  { id: "startimes-super",   provider: "startimes", name: "StarTimes Super",   price: 4200,  validity: "Monthly", ckPlanId: "1" },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
-  res.json(CABLE_PROVIDERS);
+  res.json(CABLE_PROVIDERS.map(({ ckNetworkId: _c, ...p }) => p));
 });
 
 router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const params = GetCablePlansQueryParams.safeParse(req.query);
   const filtered = params.success && params.data.provider
-    ? CABLE_PLANS.filter((p) => p.provider === params.data.provider?.toLowerCase())
+    ? CABLE_PLANS.filter((p) => p.provider === (params.data.provider ?? "").toLowerCase())
     : CABLE_PLANS;
-  res.json(filtered.map(({ flwCode: _f, ...p }) => p));
+  res.json(filtered.map(({ ckPlanId: _c, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -416,22 +415,25 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   }
   const { smartcardNumber, provider } = parsed.data;
 
-  if (!isFlutterwaveVtuConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
     return;
   }
 
+  const cableProvider = CABLE_PROVIDERS.find((p) => p.id === (provider ?? "dstv").toLowerCase());
+  const networkId = cableProvider?.ckNetworkId ?? "04";
+
   try {
-    const flwRes = await flutterwaveVerifySmartcard({ provider: provider ?? "dstv", smartcardNumber });
-    const ok = flwRes?.status === "success";
+    const ckRes = await clubkonnectVerifySmartcard({ smartcardNumber, networkId });
+    const ok = ckRes?.status === "success" || ckRes?.status === "1";
     res.json({
       smartcardNumber,
-      name: ok ? (flwRes.name ?? "Customer") : "Customer",
+      name: ok ? (ckRes.CustomerName ?? "Customer") : "Customer",
       currentPlan: "",
       dueDate: "",
     });
   } catch (err) {
-    req.log?.error({ err }, "Flutterwave smartcard verify error");
+    req.log?.error({ err }, "Clubkonnect smartcard verify error");
     res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
   }
 });
@@ -450,7 +452,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     return;
   }
 
-  if (!isFlutterwaveVtuConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -464,20 +466,23 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `CABLE-${Date.now()}`;
+  const cableProv = CABLE_PROVIDERS.find((p) => p.id === plan.provider.toLowerCase());
+  const networkId = cableProv?.ckNetworkId ?? "04";
 
   let delivered = false;
   try {
-    const flwRes = await flutterwaveCableSubscribe({
-      provider: plan.provider,
+    const ckRes = await clubkonnectCableSubscribe({
       smartcardNumber,
-      itemCode: plan.flwCode,
+      networkId,
+      planId: plan.ckPlanId,
       amount: plan.price,
-      reference,
+      phone: smartcardNumber,
+      requestId: reference,
     });
-    delivered = flwRes?.status === "success" || flwRes?.message?.toLowerCase().includes("successful");
-    req.log?.info({ flwRes }, "Flutterwave cable subscribe response");
+    delivered = ckRes?.status === "success" || ckRes?.status === "1" || ckRes?.message?.toLowerCase().includes("successful");
+    req.log?.info({ ckRes }, "Clubkonnect cable subscribe response");
   } catch (err) {
-    req.log?.error({ err }, "Flutterwave cable subscribe error");
+    req.log?.error({ err }, "Clubkonnect cable subscribe error");
   }
 
   if (!delivered) {

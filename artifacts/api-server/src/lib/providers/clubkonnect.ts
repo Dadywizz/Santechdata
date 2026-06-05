@@ -82,6 +82,28 @@ export async function clubkonnectPurchaseData(opts: {
   }
 }
 
+// ─── Airtime ─────────────────────────────────────────────────────────────────
+
+export async function clubkonnectPurchaseAirtime(opts: {
+  network: string; phone: string; amount: number; requestId: string;
+}): Promise<{ status: string; message: string }> {
+  const networkId = NETWORK_ID[opts.network.toUpperCase()] ?? opts.network;
+  const body = new URLSearchParams({
+    ...authApiKey(),
+    NetworkID: networkId,
+    MobileNumber: opts.phone,
+    Amount: opts.amount.toString(),
+    RequestID: opts.requestId,
+  });
+  const res = await fetch(`${BASE}/APIAirtimeV1.asp`, { method: "POST", body });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Clubkonnect non-JSON response: ${text.slice(0, 300)}`);
+  }
+}
+
 // ─── Electricity ─────────────────────────────────────────────────────────────
 
 export async function clubkonnectVerifyMeter(opts: {
@@ -116,6 +138,47 @@ export async function clubkonnectPayElectricity(opts: {
     RequestID: opts.requestId,
   });
   const res = await fetch(`${BASE}/APIElectricityV1.asp`, { method: "POST", body });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Clubkonnect non-JSON response: ${text.slice(0, 300)}`);
+  }
+}
+
+// ─── Cable TV ────────────────────────────────────────────────────────────────
+
+export async function clubkonnectVerifySmartcard(opts: {
+  smartcardNumber: string; networkId: string;
+}): Promise<{ status: string; message: string; CustomerName?: string }> {
+  const body = new URLSearchParams({
+    ...authApiKey(),
+    SmartCardNumber: opts.smartcardNumber,
+    NetworkID: opts.networkId,
+  });
+  const res = await fetch(`${BASE}/APIVerifySmartCardV1.asp`, { method: "POST", body });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Clubkonnect non-JSON response: ${text.slice(0, 300)}`);
+  }
+}
+
+export async function clubkonnectCableSubscribe(opts: {
+  smartcardNumber: string; networkId: string; planId: string;
+  amount: number; phone: string; requestId: string;
+}): Promise<{ status: string; message: string }> {
+  const body = new URLSearchParams({
+    ...authApiKey(),
+    SmartCardNumber: opts.smartcardNumber,
+    NetworkID: opts.networkId,
+    DataPlan: opts.planId,
+    Amount: opts.amount.toString(),
+    PhoneNumber: opts.phone,
+    RequestID: opts.requestId,
+  });
+  const res = await fetch(`${BASE}/APICableV1.asp`, { method: "POST", body });
   const text = await res.text();
   try {
     return JSON.parse(text);

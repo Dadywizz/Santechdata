@@ -1,0 +1,1 @@
+- [Clubkonnect API Endpoints](clubkonnect-endpoints.md) — which endpoints exist (vs 404), auth rules, server IP whitelist requirement
