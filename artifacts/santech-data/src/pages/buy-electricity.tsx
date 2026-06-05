@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useGetElectricityProviders, useVerifyMeter, usePurchaseElectricity } from "@workspace/api-client-react";
 import { Zap, CheckCircle2 } from "lucide-react";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const AMOUNTS = [1000, 2000, 3000, 5000, 10000, 20000];
 
@@ -21,6 +22,7 @@ export default function BuyElectricity() {
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [verified, setVerified] = useState<{ name: string; address?: string } | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
   const { data: providers = [] } = useGetElectricityProviders();
 
@@ -36,8 +38,18 @@ export default function BuyElectricity() {
 
   const purchaseMutation = usePurchaseElectricity({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Token Generated!", description: "Check your meter for the token" });
+      onSuccess: (tx: any) => {
+        setReceipt({
+          reference: tx.reference,
+          description: tx.description,
+          amount: tx.amount,
+          provider: (tx.metadata as any)?.provider,
+          meterNumber: (tx.metadata as any)?.meterNumber,
+          phone: (tx.metadata as any)?.phone,
+          token: (tx.metadata as any)?.token,
+          createdAt: tx.createdAt,
+          type: "electricity",
+        });
         setMeterNumber(""); setAmount(null); setCustomAmount(""); setVerified(null); setPhone("");
       },
       onError: (error: any) => {
@@ -178,6 +190,8 @@ export default function BuyElectricity() {
           </Card>
         )}
       </div>
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }

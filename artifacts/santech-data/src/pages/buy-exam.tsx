@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGetExamTypes, usePurchaseExamToken } from "@workspace/api-client-react";
 import { BookOpen, Check } from "lucide-react";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const EXAM_COLORS: Record<string, string> = {
   WAEC: "bg-blue-600",
@@ -21,13 +22,24 @@ export default function BuyExam() {
   const [selectedExam, setSelectedExam] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
   const [phone, setPhone] = useState("");
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
   const { data: examTypes = [] } = useGetExamTypes();
 
   const mutation = usePurchaseExamToken({
     mutation: {
-      onSuccess: (data: any) => {
-        toast({ title: "Token Generated!", description: `Your ${selectedExam} token has been generated. Check your email.` });
+      onSuccess: (tx: any) => {
+        setReceipt({
+          reference: tx.reference,
+          description: tx.description,
+          amount: tx.amount,
+          examType: (tx.metadata as any)?.examType,
+          quantity: (tx.metadata as any)?.quantity,
+          phone: (tx.metadata as any)?.phone,
+          tokens: (tx.metadata as any)?.tokens,
+          createdAt: tx.createdAt,
+          type: "exam",
+        });
         setSelectedExam(""); setQuantity(1);
       },
       onError: (error: any) => {
@@ -132,6 +144,8 @@ export default function BuyExam() {
           </Card>
         )}
       </div>
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }

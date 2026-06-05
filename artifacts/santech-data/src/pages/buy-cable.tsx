@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useGetCableProviders, useGetCablePlans, useVerifySmartcard, useSubscribeCable } from "@workspace/api-client-react";
 import { Tv, CheckCircle2 } from "lucide-react";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 type CableProvider = "DSTV" | "GOTV" | "STARTIMES";
 
@@ -17,6 +18,7 @@ export default function BuyCable() {
   const [smartcardNumber, setSmartcardNumber] = useState("");
   const [planId, setPlanId] = useState<string>("");
   const [verified, setVerified] = useState<{ name: string } | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
   const { data: providers = [] } = useGetCableProviders();
   const { data: plans = [] } = useGetCablePlans(
@@ -36,8 +38,17 @@ export default function BuyCable() {
 
   const subscribeMutation = useSubscribeCable({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Subscription Successful!", description: "Your cable TV has been renewed" });
+      onSuccess: (tx: any) => {
+        setReceipt({
+          reference: tx.reference,
+          description: tx.description,
+          amount: tx.amount,
+          provider: (tx.metadata as any)?.provider,
+          plan: (tx.metadata as any)?.plan,
+          meterNumber: (tx.metadata as any)?.smartcardNumber,
+          createdAt: tx.createdAt,
+          type: "cable",
+        });
         setSmartcardNumber(""); setPlanId(""); setVerified(null);
       },
       onError: (error: any) => {
@@ -157,6 +168,8 @@ export default function BuyCable() {
           </Card>
         )}
       </div>
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }
