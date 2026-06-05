@@ -156,11 +156,42 @@ router.post("/admin/users/:id/fund", authenticate, requireAdmin, async (req: Aut
 // GET /admin/transactions
 router.get("/admin/transactions", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = AdminGetTransactionsQueryParams.safeParse(req.query);
+  const page = params.success ? (params.data.page ?? 1) : 1;
+  const limit = params.success ? (params.data.limit ?? 25) : 25;
+  const typeFilter = params.success ? params.data.type : undefined;
+  const statusFilter = params.success ? (params.data as any).status : undefined;
+
   const txList = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt));
-  const filtered = params.success && params.data.type && params.data.type !== "all"
-    ? txList.filter((tx) => tx.type === params.data.type)
-    : txList;
-  res.json(filtered.map(txToJson));
+  let filtered = txList;
+  if (typeFilter && typeFilter !== "all") filtered = filtered.filter((tx) => tx.type === typeFilter);
+  if (statusFilter && statusFilter !== "all") filtered = filtered.filter((tx) => tx.status === statusFilter);
+
+  const total = filtered.length;
+  const paginated = filtered.slice((page - 1) * limit, page * limit);
+  res.json({ data: paginated.map(txToJson), total, page, limit });
+});
+
+// GET /admin/failed-payments — failed or pending wallet_fund transactions with user info
+router.get("/admin/failed-payments", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const txList = await db.select().from(transactionsTable)
+    .where(eq(transactionsTable.type, "wallet_fund"))
+    .orderBy(desc(transactionsTable.createdAt));
+
+  const problematic = txList.filter((tx) => tx.status === "failed" || tx.status === "pending");
+
+  const withUsers = await Promise.all(
+    problematic.map(async (tx) => {
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, tx.userId));
+      const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, tx.userId));
+      return {
+        ...txToJson(tx),
+        user: user ? { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone } : null,
+        currentBalance: wallet ? parseFloat(wallet.balance) : 0,
+      };
+    })
+  );
+
+  res.json(withUsers);
 });
 
 // GET /admin/data-plans
