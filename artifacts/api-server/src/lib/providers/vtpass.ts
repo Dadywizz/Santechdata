@@ -2,18 +2,18 @@
  * VTpass Integration Layer
  * Docs: https://vtpass.com.ng/documentation
  * Set env vars: VTPASS_API_KEY, VTPASS_PUBLIC_KEY, VTPASS_SECRET_KEY
- * Base URL (sandbox): https://sandbox.vtpass.com.ng
- * Base URL (live):    https://api-service.vtpass.com.ng
+ * Base URL (sandbox): https://sandbox.vtpass.com
+ * Base URL (live):    https://api-service.vtpass.com
  *
- * Uses customFetch (https.request + Google DNS) because Replit's production
- * resolver fails to look up .ng TLD domains via the default OS getaddrinfo.
+ * Uses customFetch (https.request + DoH) because Replit's production OS
+ * resolver can fail for some domains; DoH via 1.1.1.1 is always reliable.
  */
 
 import { customFetch } from "../custom-fetch";
 
 const BASE_URL = process.env.VTPASS_SANDBOX === "true"
-  ? "https://sandbox.vtpass.com.ng/api"
-  : "https://api-service.vtpass.com.ng/api";
+  ? "https://sandbox.vtpass.com/api"
+  : "https://api-service.vtpass.com/api";
 
 const headers = () => ({
   "Content-Type": "application/json",
