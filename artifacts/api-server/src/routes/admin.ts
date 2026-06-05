@@ -74,22 +74,36 @@ router.get("/admin/stats", authenticate, requireAdmin, async (_req, res): Promis
 // GET /admin/users
 router.get("/admin/users", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = AdminGetUsersQueryParams.safeParse(req.query);
+  const page = params.success ? params.data.page : 1;
+  const limit = params.success ? params.data.limit : 20;
+  const search = params.success ? params.data.search : undefined;
+  const statusFilter = params.success ? params.data.status : undefined;
+
   const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
-  const filtered = params.success && params.data.search
-    ? users.filter((u) =>
-        u.email.toLowerCase().includes(params.data.search!.toLowerCase()) ||
-        u.fullName.toLowerCase().includes(params.data.search!.toLowerCase())
-      )
-    : users;
+  let filtered = users;
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter((u) =>
+      u.email.toLowerCase().includes(q) ||
+      u.fullName.toLowerCase().includes(q) ||
+      (u.phone || "").toLowerCase().includes(q)
+    );
+  }
+  if (statusFilter && statusFilter !== "all") {
+    filtered = filtered.filter((u) => u.status === statusFilter);
+  }
+
+  const total = filtered.length;
+  const paginated = filtered.slice((page - 1) * limit, page * limit);
 
   const withBalances = await Promise.all(
-    filtered.map(async (u) => {
+    paginated.map(async (u) => {
       const [w] = await db.select().from(walletsTable).where(eq(walletsTable.userId, u.id));
       return { ...userToJson(u), balance: w ? parseFloat(w.balance) : 0 };
     })
   );
 
-  res.json(withBalances);
+  res.json({ data: withBalances, total, page, limit });
 });
 
 // GET /admin/users/:id
