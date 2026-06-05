@@ -223,8 +223,12 @@ router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: 
   ];
 
   function parseSize(name: string): string {
-    const m = name.match(/(\d+(?:\.\d+)?)\s*(MB|GB|TB)/i);
-    return m ? `${m[1]}${m[2].toUpperCase()}` : "";
+    // Match e.g. "1.5GB", "500MB", "6.2G", "10TB"
+    const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
+    if (!m) return name.slice(0, 20); // fallback: truncate to varchar(20) limit
+    const unit = m[2].toUpperCase();
+    const normalised = unit === "G" ? "GB" : unit === "M" ? "MB" : unit;
+    return `${m[1]}${normalised}`.slice(0, 20);
   }
 
   function parseValidity(name: string): string {
@@ -263,13 +267,13 @@ router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: 
         const amount = parseFloat(v.variation_amount);
         if (!amount || amount <= 0) continue;
 
-        const size = parseSize(v.name) || v.name;
+        const size = parseSize(v.name);
         const validity = parseValidity(v.name);
         const costPrice = (amount * 0.97).toFixed(2);
 
         await db.insert(dataPlansTable).values({
           network: svc.network,
-          name: v.name,
+          name: v.name.slice(0, 100),
           size,
           validity,
           price: amount.toString(),
