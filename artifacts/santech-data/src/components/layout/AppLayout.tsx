@@ -4,6 +4,7 @@ import { useLocation, Link } from "wouter";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, History, Users, Bell, MessageSquare, User, LogOut } from "lucide-react";
+import { useGetNotifications } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+  const { data: notifications = [] } = useGetNotifications({ isRead: false } as any);
 
   useEffect(() => {
     if (!user) {
@@ -45,16 +47,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarGroupLabel>Services</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {NAV_ITEMS.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={location === item.href} tooltip={item.label}>
-                        <Link href={item.href} className="flex items-center gap-3 w-full">
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {NAV_ITEMS.map((item) => {
+                    const unreadCount = item.href === "/notifications" ? (notifications as any[]).length : 0;
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton asChild isActive={location === item.href} tooltip={item.label}>
+                          <Link href={item.href} className="flex items-center gap-3 w-full">
+                            <div className="relative">
+                              <item.icon className="h-4 w-4" />
+                              {unreadCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center leading-none">
+                                  {unreadCount > 9 ? "9+" : unreadCount}
+                                </span>
+                              )}
+                            </div>
+                            <span>{item.label}</span>
+                            {unreadCount > 0 && (
+                              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                              </span>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

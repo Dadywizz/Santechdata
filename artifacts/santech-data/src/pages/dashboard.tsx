@@ -1,11 +1,12 @@
-import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useGetNotifications, useMarkAllNotificationsRead } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { WalletCard } from "@/components/WalletCard";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Wifi, Phone, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight } from "lucide-react";
+import { Wifi, Phone, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, Bell, X } from "lucide-react";
 import { format } from "date-fns";
 
 const QUICK_ACTIONS = [
@@ -21,9 +22,37 @@ export default function Dashboard() {
   const { data: summary, isLoading } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey() }
   });
+  const { data: unreadNotifications = [] } = useGetNotifications({ isRead: false } as any);
+  const markAllRead = useMarkAllNotificationsRead();
+  const [dismissed, setDismissed] = useState(false);
+
+  const latestNotification = (unreadNotifications as any[])[0];
+  const showBanner = !dismissed && !!latestNotification;
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    markAllRead.mutate();
+  };
 
   return (
     <AppLayout>
+      {showBanner && (
+        <div className="mb-4 flex items-start gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20 text-foreground">
+          <Bell className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-primary">{latestNotification.title}</p>
+            <p className="text-sm mt-0.5 text-muted-foreground">{latestNotification.message}</p>
+            {(unreadNotifications as any[]).length > 1 && (
+              <Link href="/notifications" className="text-xs text-primary font-medium hover:underline mt-1 inline-block">
+                View {(unreadNotifications as any[]).length - 1} more notification{(unreadNotifications as any[]).length > 2 ? "s" : ""} →
+              </Link>
+            )}
+          </div>
+          <button onClick={handleDismiss} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <PageHeader title="Dashboard" description="Welcome to SanTech Data" />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
