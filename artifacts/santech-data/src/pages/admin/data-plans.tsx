@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAdminGetDataPlans, getAdminGetDataPlansQueryKey, useAdminCreateDataPlan, useAdminUpdateDataPlan, useAdminDeleteDataPlan } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, Search, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, Search, Loader2, RefreshCw } from "lucide-react";
 
 const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"];
 const NETWORK_COLORS: Record<string, string> = {
@@ -233,14 +233,54 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
   );
 }
 
+async function syncVtpassPlans(): Promise<{ added: number; skipped: number; errors: string[] }> {
+  const token = localStorage.getItem("santech_token");
+  const res = await fetch("/api/admin/sync-vtpass-plans", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token ?? ""}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error ?? "Sync failed");
+  }
+  return res.json();
+}
+
 export default function AdminDataPlans() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editPlan, setEditPlan] = useState<any>(null);
   const [filterNetwork, setFilterNetwork] = useState("all");
+  const [syncing, setSyncing] = useState(false);
 
   const { data = [], isLoading } = useAdminGetDataPlans({ query: { queryKey: getAdminGetDataPlansQueryKey() } });
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncVtpassPlans();
+      queryClient.invalidateQueries({ queryKey: getAdminGetDataPlansQueryKey() });
+      if (result.errors?.length) {
+        toast({
+          title: `Synced — ${result.added} added, ${result.skipped} skipped`,
+          description: `Some networks had errors: ${result.errors.join("; ")}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: result.added > 0 ? `✓ ${result.added} plans imported from VTpass!` : "Already up to date",
+          description: result.added > 0
+            ? `${result.skipped} already existed and were skipped.`
+            : "All VTpass plans are already in your list.",
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const deleteMutation = useAdminDeleteDataPlan({
     mutation: {
@@ -262,11 +302,17 @@ export default function AdminDataPlans() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <PageHeader title="Data Plans" description="Manage available data plans" />
-        <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Plan
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSync} disabled={syncing}>
+            {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            {syncing ? "Syncing…" : "Sync from VTpass"}
+          </Button>
+          <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Plan
+          </Button>
+        </div>
       </div>
 
       {configuredCount < (data as any[]).length && (

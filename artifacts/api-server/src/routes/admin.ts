@@ -204,6 +204,91 @@ router.delete("/admin/data-plans/:id", authenticate, requireAdmin, async (req: A
   res.json({ message: "Data plan deleted" });
 });
 
+// POST /admin/sync-vtpass-plans — auto-import all VTpass data bundle plans into the DB
+router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const BASE = process.env.VTPASS_SANDBOX === "true"
+    ? "https://sandbox.vtpass.com.ng/api"
+    : "https://vtpass.com.ng/api";
+  const vtHeaders = {
+    "api-key": process.env.VTPASS_API_KEY ?? "",
+    "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
+  };
+
+  const SERVICES: Array<{ serviceID: string; network: "MTN" | "AIRTEL" | "GLO" | "9MOBILE" }> = [
+    { serviceID: "mtn-data", network: "MTN" },
+    { serviceID: "airtel-data", network: "AIRTEL" },
+    { serviceID: "glo-data", network: "GLO" },
+    { serviceID: "etisalat-data", network: "9MOBILE" },
+  ];
+
+  function parseSize(name: string): string {
+    const m = name.match(/(\d+(?:\.\d+)?)\s*(MB|GB|TB)/i);
+    return m ? `${m[1]}${m[2].toUpperCase()}` : "";
+  }
+
+  function parseValidity(name: string): string {
+    const m = name.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
+    if (!m) return "30 Days";
+    const n = parseInt(m[1]);
+    const u = m[2].toLowerCase();
+    if (u.startsWith("day")) return `${n} Day${n > 1 ? "s" : ""}`;
+    if (u.startsWith("week")) return `${n * 7} Days`;
+    if (u.startsWith("month")) return `${n} Month${n > 1 ? "s" : ""}`;
+    return "30 Days";
+  }
+
+  const existing = await db.select({ providerCode: dataPlansTable.providerCode }).from(dataPlansTable);
+  const existingCodes = new Set(existing.map((e) => e.providerCode));
+
+  let added = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const svc of SERVICES) {
+    try {
+      const r = await fetch(`${BASE}/service-variations?serviceID=${svc.serviceID}`, {
+        headers: vtHeaders,
+        signal: AbortSignal.timeout(12000),
+      });
+      const data = await r.json() as {
+        content?: { varations?: Array<{ variation_code: string; name: string; variation_amount: string }> };
+      };
+      const variations = data?.content?.varations ?? [];
+
+      for (const v of variations) {
+        if (!v.variation_code || existingCodes.has(v.variation_code)) {
+          skipped++;
+          continue;
+        }
+        const amount = parseFloat(v.variation_amount);
+        if (!amount || amount <= 0) continue;
+
+        const size = parseSize(v.name) || v.name;
+        const validity = parseValidity(v.name);
+        const costPrice = (amount * 0.97).toFixed(2);
+
+        await db.insert(dataPlansTable).values({
+          network: svc.network,
+          name: v.name,
+          size,
+          validity,
+          price: amount.toString(),
+          costPrice,
+          providerCode: v.variation_code,
+          isActive: true,
+        });
+        existingCodes.add(v.variation_code);
+        added++;
+      }
+    } catch (err: any) {
+      errors.push(`${svc.serviceID}: ${err?.message ?? String(err)}`);
+      req.log?.error({ err, serviceID: svc.serviceID }, "VTpass sync error");
+    }
+  }
+
+  res.json({ added, skipped, errors });
+});
+
 // GET /admin/analytics/revenue
 router.get("/admin/analytics/revenue", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const period = (req.query.period as string) || "daily";
