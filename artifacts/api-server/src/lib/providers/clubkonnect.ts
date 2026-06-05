@@ -13,12 +13,12 @@
 const BASE = "https://www.clubkonnect.com";
 
 const authParams = () => ({
-  UserID: process.env.CLUBKONNECT_USERID ?? process.env.CLUBKONNECT_PHONE ?? "",
+  UserID: process.env.CLUBKONNECT_PHONE ?? process.env.CLUBKONNECT_USERID ?? "",
   APIKey: process.env.CLUBKONNECT_APIKEY ?? "",
 });
 
 export function isClubkonnectConfigured(): boolean {
-  return !!((process.env.CLUBKONNECT_USERID ?? process.env.CLUBKONNECT_PHONE) && process.env.CLUBKONNECT_APIKEY);
+  return !!((process.env.CLUBKONNECT_PHONE ?? process.env.CLUBKONNECT_USERID) && process.env.CLUBKONNECT_APIKEY);
 }
 
 // ─── Network helpers ────────────────────────────────────────────────────────
