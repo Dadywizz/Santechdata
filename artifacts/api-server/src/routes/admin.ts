@@ -360,8 +360,8 @@ router.patch("/admin/tickets/:id", authenticate, requireAdmin, async (req: AuthR
   res.json(ticket);
 });
 
-// POST /admin/broadcast
-router.post("/admin/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+// POST /admin/notifications/broadcast
+router.post("/admin/notifications/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = BroadcastNotificationBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { title, message } = parsed.data;
