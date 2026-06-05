@@ -39,9 +39,8 @@ export default function AdminSettings() {
   const [whatsapp, setWhatsapp] = useState("09026329296");
   const [announcement, setAnnouncement] = useState("");
   const [announcementActive, setAnnouncementActive] = useState(false);
-  const [paystackActive, setPaystackActive] = useState(false);
-  const [flutterwaveActive, setFlutterwaveActive] = useState(true);
-  const [monnifyActive, setMonnifyActive] = useState(false);
+  const [paystackActive, setPaystackActive] = useState(true);
+  const [monnifyActive, setMonnifyActive] = useState(true);
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
@@ -53,7 +52,6 @@ export default function AdminSettings() {
       if (s.announcement) setAnnouncement(s.announcement);
       if (s.announcementActive !== undefined) setAnnouncementActive(s.announcementActive === "true");
       if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
-      if (s.flutterwaveActive !== undefined) setFlutterwaveActive(s.flutterwaveActive === "true");
       if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
@@ -68,7 +66,6 @@ export default function AdminSettings() {
         supportEmail, supportPhone, whatsapp, announcement,
         announcementActive: String(announcementActive),
         paystackActive: String(paystackActive),
-        flutterwaveActive: String(flutterwaveActive),
         monnifyActive: String(monnifyActive),
         referralBonus, minFunding,
       });
@@ -192,7 +189,6 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Enable or disable which gateways customers can use to fund their wallets.</p>
             {[
               { label: "Paystack", desc: "Cards, Bank Transfer, USSD", value: paystackActive, set: setPaystackActive },
-              { label: "Flutterwave", desc: "Cards, Mobile Money, Bank Transfer", value: flutterwaveActive, set: setFlutterwaveActive },
               { label: "Monnify", desc: "Bank Transfer, Cards, USSD", value: monnifyActive, set: setMonnifyActive },
             ].map((gw) => (
               <div key={gw.label} className="flex items-center justify-between p-3 rounded-lg border border-border">

@@ -10,9 +10,8 @@ import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-rea
 import { CreditCard, ArrowRightLeft, ExternalLink } from "lucide-react";
 
 const PROVIDERS = [
-  { id: "flutterwave", name: "Flutterwave", desc: "Cards, Mobile Money, Bank Transfer", active: true },
-  { id: "monnify", name: "Monnify", desc: "Bank Transfer, Cards, USSD", active: true },
-  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD", active: true },
+  { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD" },
+  { id: "monnify", name: "Monnify", desc: "Bank Transfer, Cards, USSD" },
 ];
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
@@ -22,7 +21,7 @@ type Tab = "fund" | "transfer";
 export default function FundWallet() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("fund");
-  const [provider, setProvider] = useState("flutterwave");
+  const [provider, setProvider] = useState("paystack");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [transferPhone, setTransferPhone] = useState("");
@@ -97,12 +96,9 @@ export default function FundWallet() {
                   {PROVIDERS.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => p.active && setProvider(p.id)}
-                      disabled={!p.active}
+                      onClick={() => setProvider(p.id)}
                       className={`flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
-                        !p.active
-                          ? "border-border opacity-40 cursor-not-allowed"
-                          : provider === p.id
+                        provider === p.id
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/30"
                       }`}

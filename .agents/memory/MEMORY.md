@@ -1,1 +1,3 @@
-- [Clubkonnect API Endpoints](clubkonnect-endpoints.md) — which endpoints exist (vs 404), auth rules, server IP whitelist requirement
+- [VTpass provider](vtpass-provider.md) — purchases fail: VTPASS_API_KEY = "null" string; public-key/secret-key work for read-only only
+- [Payment gateways](payment-gateways.md) — Paystack ✅ Monnify ✅ Flutterwave ❌ (wrong key stored, removed from UI)
+- [Clubkonnect](clubkonnect-dead.md) — all VTU endpoints broken (404/INVALID_CREDENTIALS); do not use
