@@ -59,19 +59,34 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <WalletCard />
         </div>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Spend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold">₦{(summary?.monthlySpend || 0).toLocaleString()}</div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">This month's total transactions</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Spend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-2xl font-bold">₦{(summary?.monthlySpend || 0).toLocaleString()}</div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">This month's total spend</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{(summary as any)?.totalTransactions ?? (summary?.recentTransactions?.length ?? 0)}</div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">All time</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <h2 className="text-xl font-bold tracking-tight mb-4">Quick Actions</h2>
