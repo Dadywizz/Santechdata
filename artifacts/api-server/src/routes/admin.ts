@@ -250,6 +250,130 @@ router.delete("/admin/data-plans/:id", authenticate, requireAdmin, async (req: A
   res.json({ message: "Data plan deleted" });
 });
 
+// POST /admin/sync-ea-plans — fetch all plans from EasyAccess and upsert into DB
+router.post("/admin/sync-ea-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  if (!process.env.EASYACCESS_API_TOKEN) {
+    res.status(503).json({ error: "EasyAccess not configured" });
+    return;
+  }
+
+  const BASE_URL = "https://easyaccess.com.ng/api/live/v1";
+  const reqHeaders = {
+    "Authorization": `Bearer ${process.env.EASYACCESS_API_TOKEN}`,
+    "Cache-Control": "no-cache",
+    "Content-Type": "application/json",
+  };
+
+  const NETWORKS: Array<{ network: "MTN" | "AIRTEL" | "GLO" | "9MOBILE"; productType: string }> = [
+    { network: "MTN", productType: "mtn_sme" },
+    { network: "GLO", productType: "glo_gifting" },
+    { network: "AIRTEL", productType: "airtel_gifting" },
+    { network: "9MOBILE", productType: "9mobile_sme" },
+  ];
+
+  // EasyAccess returns: { code: 200, MTN: [{plan_id, name, price, validity}] }
+  function extractPlans(raw: unknown, network: string): Array<{ id: string; name: string; price: number; validity: string }> {
+    if (!raw || typeof raw !== "object") return [];
+    const d = raw as Record<string, unknown>;
+    // Plans live under the network name key (e.g. d["MTN"])
+    const list: unknown[] =
+      Array.isArray(d[network]) ? (d[network] as unknown[]) :
+      Array.isArray(d[network.toLowerCase()]) ? (d[network.toLowerCase()] as unknown[]) :
+      (Object.values(d).find((v): v is unknown[] => Array.isArray(v)) ?? []);
+    return list
+      .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
+      .map((p) => ({
+        id: String(p.plan_id ?? p.id ?? ""),
+        name: String(p.name ?? p.plan_name ?? ""),
+        price: Number(p.price ?? p.amount ?? 0),
+        validity: String(p.validity ?? ""),
+      }))
+      .filter((p) => p.id !== "" && p.price > 0);
+  }
+
+  function parseValidity(v: string): string {
+    if (!v || v === "undefined") return "30 Days";
+    const m = v.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
+    if (!m) return v.slice(0, 30) || "30 Days";
+    const n = parseInt(m[1]);
+    const u = m[2].toLowerCase();
+    if (u.startsWith("week")) return `${n * 7} Days`;
+    if (u.startsWith("month")) return `${n} Month${n > 1 ? "s" : ""}`;
+    return `${n} Day${n > 1 ? "s" : ""}`;
+  }
+
+  function parseSize(name: string): string {
+    const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
+    if (!m) return "?";
+    const unit = m[2].toUpperCase().replace(/^G$/, "GB").replace(/^M$/, "MB");
+    return `${m[1]}${unit}`.slice(0, 20);
+  }
+
+  let added = 0;
+  let updated = 0;
+  const errors: string[] = [];
+
+  for (const { network, productType } of NETWORKS) {
+    try {
+      const r = await customFetch(`${BASE_URL}/get-plans?product_type=${productType}`, { headers: reqHeaders });
+      const raw = await r.json() as Record<string, unknown>;
+      const plans = extractPlans(raw, network);
+
+      req.log?.info({ network, planCount: plans.length }, "EasyAccess sync fetched plans");
+
+      for (const p of plans) {
+        const size = parseSize(p.name);
+        const validity = parseValidity(p.validity);
+        const costPrice = (p.price * 0.97).toFixed(2);
+
+        const existing = await db.select({ id: dataPlansTable.id })
+          .from(dataPlansTable)
+          .where(eq(dataPlansTable.providerCode, p.id));
+
+        if (existing.length > 0) {
+          await db.update(dataPlansTable)
+            .set({ name: p.name.slice(0, 100), size, validity, price: p.price.toString(), costPrice, updatedAt: new Date() })
+            .where(eq(dataPlansTable.providerCode, p.id));
+          updated++;
+        } else {
+          await db.insert(dataPlansTable).values({
+            network,
+            name: p.name.slice(0, 100),
+            size, validity,
+            price: p.price.toString(),
+            costPrice,
+            providerCode: p.id,
+            isActive: true,
+          });
+          added++;
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${network}: ${msg}`);
+      req.log?.error({ err, network }, "EasyAccess sync error");
+    }
+  }
+
+  // Deactivate any plans with non-numeric providerCodes (old VTpass/legacy text codes)
+  // so customers only see working EasyAccess plans
+  let deactivated = 0;
+  try {
+    const legacyPlans = await db.select({ id: dataPlansTable.id, providerCode: dataPlansTable.providerCode })
+      .from(dataPlansTable)
+      .where(eq(dataPlansTable.isActive, true));
+    const nonNumeric = legacyPlans.filter((p) => !/^\d+$/.test(p.providerCode ?? ""));
+    for (const p of nonNumeric) {
+      await db.update(dataPlansTable).set({ isActive: false, updatedAt: new Date() }).where(eq(dataPlansTable.id, p.id));
+      deactivated++;
+    }
+  } catch (err) {
+    req.log?.error({ err }, "Error deactivating legacy plans");
+  }
+
+  res.json({ added, updated, deactivated, errors });
+});
+
 
 // GET /admin/analytics/revenue
 router.get("/admin/analytics/revenue", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {

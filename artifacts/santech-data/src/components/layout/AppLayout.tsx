@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarTrigger } from "@/components/ui/sidebar";
@@ -23,6 +23,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { data: notifications = [] } = useGetNotifications({ isRead: false } as any);
+  const [announcement, setAnnouncement] = useState<{ message: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/public")
+      .then((r) => r.json())
+      .then((d: { announcementActive: boolean; announcement: string }) => {
+        if (d.announcementActive && d.announcement) {
+          setAnnouncement({ message: d.announcement });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -100,6 +112,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
             <div className="ml-4 font-semibold">SanTech Data</div>
           </header>
+          {announcement && (
+            <div className="bg-primary/10 border-b border-primary/20 px-4 py-2.5 text-sm text-center text-primary font-medium flex items-center justify-center gap-2">
+              <span>📢</span>
+              <span>{announcement.message}</span>
+              <button onClick={() => setAnnouncement(null)} className="ml-2 text-primary/60 hover:text-primary text-xs">✕</button>
+            </div>
+          )}
           <div className="p-4 md:p-8 overflow-auto flex-1">
             {children}
           </div>

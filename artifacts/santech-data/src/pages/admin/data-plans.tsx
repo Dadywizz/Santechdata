@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAdminGetDataPlans, getAdminGetDataPlansQueryKey, useAdminCreateDataPlan, useAdminUpdateDataPlan, useAdminDeleteDataPlan } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 
 const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"];
 const NETWORK_COLORS: Record<string, string> = {
@@ -150,6 +150,32 @@ export default function AdminDataPlans() {
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editPlan, setEditPlan] = useState<any>(null);
   const [filterNetwork, setFilterNetwork] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncPlans = async () => {
+    setSyncing(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch("/api/admin/sync-ea-plans", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json() as { added?: number; updated?: number; errors?: string[] };
+      if (!res.ok) {
+        toast({ title: "Sync failed", description: (data as any).error ?? "Unknown error", variant: "destructive" });
+      } else {
+        toast({
+          title: "Plans synced from EasyAccess",
+          description: `${data.added ?? 0} added, ${data.updated ?? 0} updated${data.errors?.length ? ` (${data.errors.length} errors)` : ""}`,
+        });
+        queryClient.invalidateQueries({ queryKey: getAdminGetDataPlansQueryKey() });
+      }
+    } catch {
+      toast({ title: "Sync failed", description: "Network error. Please try again.", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const { data = [], isLoading } = useAdminGetDataPlans({ query: { queryKey: getAdminGetDataPlansQueryKey() } });
 
@@ -175,9 +201,15 @@ export default function AdminDataPlans() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <PageHeader title="Data Plans" description="Manage available data plans" />
-        <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Plan
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSyncPlans} disabled={syncing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync from EasyAccess"}
+          </Button>
+          <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Plan
+          </Button>
+        </div>
       </div>
 
       {configuredCount < (data as any[]).length && (

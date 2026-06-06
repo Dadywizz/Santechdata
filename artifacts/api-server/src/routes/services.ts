@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   dataPlansTable, transactionsTable, walletsTable, notificationsTable,
-  examTypesTable,
+  examTypesTable, settingsTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
@@ -27,6 +27,17 @@ import {
 } from "../lib/providers/easyaccess";
 
 const router: IRouter = Router();
+
+// ── PUBLIC SETTINGS ───────────────────────────────────────────────────────────
+router.get("/settings/public", async (_req, res): Promise<void> => {
+  const settings = await db.select().from(settingsTable);
+  const obj: Record<string, string> = {};
+  for (const s of settings) obj[s.key] = s.value;
+  res.json({
+    announcement: obj.announcement ?? "",
+    announcementActive: obj.announcementActive === "true",
+  });
+});
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
 router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
