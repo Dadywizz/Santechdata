@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarTrigger } from "@/components/ui/sidebar";
-import { LayoutDashboard, Users, History, Wifi, MessageSquare, PieChart, Bell, Settings, LogOut, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Users, History, Wifi, MessageSquare, PieChart, Bell, Settings, LogOut, AlertTriangle, ArrowRightLeft } from "lucide-react";
 
 const ADMIN_NAV_ITEMS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/admin/transactions", label: "Transactions", icon: History },
   { href: "/admin/failed-payments", label: "Failed Payments", icon: AlertTriangle },
   { href: "/admin/data-plans", label: "Data Plans", icon: Wifi },
+  { href: "/admin/airtime-to-cash", label: "Airtime to Cash", icon: ArrowRightLeft },
   { href: "/admin/tickets", label: "Support Tickets", icon: MessageSquare },
   { href: "/admin/analytics", label: "Analytics", icon: PieChart },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },

@@ -591,6 +591,64 @@ export interface ServiceStat {
   percentage: number;
 }
 
+export type AirtimeToCashRequestNetwork = typeof AirtimeToCashRequestNetwork[keyof typeof AirtimeToCashRequestNetwork];
+
+
+export const AirtimeToCashRequestNetwork = {
+  MTN: 'MTN',
+  AIRTEL: 'AIRTEL',
+  GLO: 'GLO',
+  '9MOBILE': '9MOBILE',
+} as const;
+
+export interface AirtimeToCashRequest {
+  network: AirtimeToCashRequestNetwork;
+  airtimeAmount: number;
+  senderPhone: string;
+}
+
+export type AirtimeToCashItemStatus = typeof AirtimeToCashItemStatus[keyof typeof AirtimeToCashItemStatus];
+
+
+export const AirtimeToCashItemStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export type AirtimeToCashItemUser = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+} | null;
+
+export interface AirtimeToCashItem {
+  id: string;
+  userId: string;
+  network: string;
+  airtimeAmount: number;
+  payoutAmount: number;
+  rate: number;
+  senderPhone: string;
+  status: AirtimeToCashItemStatus;
+  adminNote?: string | null;
+  createdAt: string;
+  user?: AirtimeToCashItemUser;
+}
+
+export type AirtimeToCashReviewAction = typeof AirtimeToCashReviewAction[keyof typeof AirtimeToCashReviewAction];
+
+
+export const AirtimeToCashReviewAction = {
+  approve: 'approve',
+  reject: 'reject',
+} as const;
+
+export interface AirtimeToCashReview {
+  action: AirtimeToCashReviewAction;
+  adminNote?: string;
+}
+
 export type GetDataPlansParams = {
 network?: GetDataPlansNetwork;
 };

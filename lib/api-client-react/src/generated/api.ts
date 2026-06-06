@@ -26,6 +26,9 @@ import type {
   AdminGetUsersParams,
   AdminStats,
   AirtimePurchaseInput,
+  AirtimeToCashItem,
+  AirtimeToCashRequest,
+  AirtimeToCashReview,
   AuthResponse,
   BroadcastInput,
   CablePlan,
@@ -2541,6 +2544,303 @@ export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getMarkAllNotificationsReadMutationOptions(options));
+    }
+
+export const getGetAirtimeToCashRequestsUrl = () => {
+
+
+
+
+  return `/api/airtime-to-cash`
+}
+
+/**
+ * @summary Get user's airtime-to-cash requests
+ */
+export const getAirtimeToCashRequests = async ( options?: RequestInit): Promise<AirtimeToCashItem[]> => {
+
+  return customFetch<AirtimeToCashItem[]>(getGetAirtimeToCashRequestsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAirtimeToCashRequestsQueryKey = () => {
+    return [
+    `/api/airtime-to-cash`
+    ] as const;
+    }
+
+
+export const getGetAirtimeToCashRequestsQueryOptions = <TData = Awaited<ReturnType<typeof getAirtimeToCashRequests>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAirtimeToCashRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAirtimeToCashRequestsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAirtimeToCashRequests>>> = ({ signal }) => getAirtimeToCashRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAirtimeToCashRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAirtimeToCashRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof getAirtimeToCashRequests>>>
+export type GetAirtimeToCashRequestsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get user's airtime-to-cash requests
+ */
+
+export function useGetAirtimeToCashRequests<TData = Awaited<ReturnType<typeof getAirtimeToCashRequests>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAirtimeToCashRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAirtimeToCashRequestsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitAirtimeToCashUrl = () => {
+
+
+
+
+  return `/api/airtime-to-cash`
+}
+
+/**
+ * @summary Submit an airtime-to-cash request
+ */
+export const submitAirtimeToCash = async (airtimeToCashRequest: AirtimeToCashRequest, options?: RequestInit): Promise<AirtimeToCashItem> => {
+
+  return customFetch<AirtimeToCashItem>(getSubmitAirtimeToCashUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      airtimeToCashRequest,)
+  }
+);}
+
+
+
+
+export const getSubmitAirtimeToCashMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAirtimeToCash>>, TError,{data: BodyType<AirtimeToCashRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitAirtimeToCash>>, TError,{data: BodyType<AirtimeToCashRequest>}, TContext> => {
+
+const mutationKey = ['submitAirtimeToCash'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAirtimeToCash>>, {data: BodyType<AirtimeToCashRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitAirtimeToCash(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitAirtimeToCashMutationResult = NonNullable<Awaited<ReturnType<typeof submitAirtimeToCash>>>
+    export type SubmitAirtimeToCashMutationBody = BodyType<AirtimeToCashRequest>
+    export type SubmitAirtimeToCashMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Submit an airtime-to-cash request
+ */
+export const useSubmitAirtimeToCash = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAirtimeToCash>>, TError,{data: BodyType<AirtimeToCashRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitAirtimeToCash>>,
+        TError,
+        {data: BodyType<AirtimeToCashRequest>},
+        TContext
+      > => {
+      return useMutation(getSubmitAirtimeToCashMutationOptions(options));
+    }
+
+export const getAdminGetAirtimeToCashUrl = () => {
+
+
+
+
+  return `/api/admin/airtime-to-cash`
+}
+
+/**
+ * @summary List all airtime-to-cash requests
+ */
+export const adminGetAirtimeToCash = async ( options?: RequestInit): Promise<AirtimeToCashItem[]> => {
+
+  return customFetch<AirtimeToCashItem[]>(getAdminGetAirtimeToCashUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAdminGetAirtimeToCashQueryKey = () => {
+    return [
+    `/api/admin/airtime-to-cash`
+    ] as const;
+    }
+
+
+export const getAdminGetAirtimeToCashQueryOptions = <TData = Awaited<ReturnType<typeof adminGetAirtimeToCash>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetAirtimeToCash>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetAirtimeToCashQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetAirtimeToCash>>> = ({ signal }) => adminGetAirtimeToCash({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetAirtimeToCash>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AdminGetAirtimeToCashQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetAirtimeToCash>>>
+export type AdminGetAirtimeToCashQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all airtime-to-cash requests
+ */
+
+export function useAdminGetAirtimeToCash<TData = Awaited<ReturnType<typeof adminGetAirtimeToCash>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetAirtimeToCash>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAdminGetAirtimeToCashQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAdminReviewAirtimeToCashUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/airtime-to-cash/${id}/review`
+}
+
+/**
+ * @summary Approve or reject an airtime-to-cash request
+ */
+export const adminReviewAirtimeToCash = async (id: string,
+    airtimeToCashReview: AirtimeToCashReview, options?: RequestInit): Promise<AirtimeToCashItem> => {
+
+  return customFetch<AirtimeToCashItem>(getAdminReviewAirtimeToCashUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      airtimeToCashReview,)
+  }
+);}
+
+
+
+
+export const getAdminReviewAirtimeToCashMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminReviewAirtimeToCash>>, TError,{id: string;data: BodyType<AirtimeToCashReview>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminReviewAirtimeToCash>>, TError,{id: string;data: BodyType<AirtimeToCashReview>}, TContext> => {
+
+const mutationKey = ['adminReviewAirtimeToCash'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminReviewAirtimeToCash>>, {id: string;data: BodyType<AirtimeToCashReview>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminReviewAirtimeToCash(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminReviewAirtimeToCashMutationResult = NonNullable<Awaited<ReturnType<typeof adminReviewAirtimeToCash>>>
+    export type AdminReviewAirtimeToCashMutationBody = BodyType<AirtimeToCashReview>
+    export type AdminReviewAirtimeToCashMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Approve or reject an airtime-to-cash request
+ */
+export const useAdminReviewAirtimeToCash = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminReviewAirtimeToCash>>, TError,{id: string;data: BodyType<AirtimeToCashReview>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminReviewAirtimeToCash>>,
+        TError,
+        {id: string;data: BodyType<AirtimeToCashReview>},
+        TContext
+      > => {
+      return useMutation(getAdminReviewAirtimeToCashMutationOptions(options));
     }
 
 export const getGetTicketsUrl = () => {

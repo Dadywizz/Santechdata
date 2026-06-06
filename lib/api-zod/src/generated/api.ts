@@ -557,6 +557,93 @@ export const MarkAllNotificationsReadResponse = zod.object({
 
 
 /**
+ * @summary Get user's airtime-to-cash requests
+ */
+export const GetAirtimeToCashRequestsResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "network": zod.string(),
+  "airtimeAmount": zod.number(),
+  "payoutAmount": zod.number(),
+  "rate": zod.number(),
+  "senderPhone": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "user": zod.object({
+  "fullName": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
+}).nullish()
+})
+export const GetAirtimeToCashRequestsResponse = zod.array(GetAirtimeToCashRequestsResponseItem)
+
+
+/**
+ * @summary Submit an airtime-to-cash request
+ */
+export const SubmitAirtimeToCashBody = zod.object({
+  "network": zod.enum(['MTN', 'AIRTEL', 'GLO', '9MOBILE']),
+  "airtimeAmount": zod.number(),
+  "senderPhone": zod.string()
+})
+
+
+/**
+ * @summary List all airtime-to-cash requests
+ */
+export const AdminGetAirtimeToCashResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "network": zod.string(),
+  "airtimeAmount": zod.number(),
+  "payoutAmount": zod.number(),
+  "rate": zod.number(),
+  "senderPhone": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "user": zod.object({
+  "fullName": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
+}).nullish()
+})
+export const AdminGetAirtimeToCashResponse = zod.array(AdminGetAirtimeToCashResponseItem)
+
+
+/**
+ * @summary Approve or reject an airtime-to-cash request
+ */
+export const AdminReviewAirtimeToCashParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminReviewAirtimeToCashBody = zod.object({
+  "action": zod.enum(['approve', 'reject']),
+  "adminNote": zod.string().optional()
+})
+
+export const AdminReviewAirtimeToCashResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "network": zod.string(),
+  "airtimeAmount": zod.number(),
+  "payoutAmount": zod.number(),
+  "rate": zod.number(),
+  "senderPhone": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "user": zod.object({
+  "fullName": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
+}).nullish()
+})
+
+
+/**
  * @summary Get user's support tickets
  */
 export const GetTicketsResponseItem = zod.object({

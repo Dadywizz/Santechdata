@@ -706,6 +706,99 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  # ─── AIRTIME TO CASH ─────────────────────────────────────────────────────────
+  /airtime-to-cash:
+    get:
+      operationId: getAirtimeToCashRequests
+      tags: [airtime]
+      summary: Get user's airtime-to-cash requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AirtimeToCashItem"
+    post:
+      operationId: submitAirtimeToCash
+      tags: [airtime]
+      summary: Submit an airtime-to-cash request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AirtimeToCashRequest"
+      responses:
+        "201":
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirtimeToCashItem"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/airtime-to-cash:
+    get:
+      operationId: adminGetAirtimeToCash
+      tags: [admin]
+      summary: List all airtime-to-cash requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AirtimeToCashItem"
+
+  /admin/airtime-to-cash/{id}/review:
+    patch:
+      operationId: adminReviewAirtimeToCash
+      tags: [admin]
+      summary: Approve or reject an airtime-to-cash request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AirtimeToCashReview"
+      responses:
+        "200":
+          description: Updated request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirtimeToCashItem"
+        "400":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   # ─── SUPPORT / TICKETS ───────────────────────────────────────────────────────
   /support/tickets:
     get:
@@ -1937,3 +2030,63 @@ components:
           type: number
         percentage:
           type: number
+
+    # ─── AIRTIME TO CASH SCHEMAS ───────────────────────────────────────────────
+    AirtimeToCashRequest:
+      type: object
+      required: [network, airtimeAmount, senderPhone]
+      properties:
+        network:
+          type: string
+          enum: [MTN, AIRTEL, GLO, 9MOBILE]
+        airtimeAmount:
+          type: number
+        senderPhone:
+          type: string
+
+    AirtimeToCashItem:
+      type: object
+      required: [id, userId, network, airtimeAmount, payoutAmount, rate, senderPhone, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        network:
+          type: string
+        airtimeAmount:
+          type: number
+        payoutAmount:
+          type: number
+        rate:
+          type: integer
+        senderPhone:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        adminNote:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        user:
+          type: object
+          nullable: true
+          properties:
+            fullName:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+
+    AirtimeToCashReview:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [approve, reject]
+        adminNote:
+          type: string
