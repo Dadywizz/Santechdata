@@ -1,14 +1,17 @@
 import { useGetWallet, getGetWalletQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Eye, EyeOff, Copy, CheckCircle2, Landmark, Loader2 } from "lucide-react";
+import { CreditCard, Eye, EyeOff, Copy, CheckCircle2, Landmark, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function WalletCard() {
   const [showBalance, setShowBalance] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const queryClient = useQueryClient();
   const { data: wallet, isLoading } = useGetWallet({
     query: { queryKey: getGetWalletQueryKey() }
   });
@@ -22,6 +25,22 @@ export function WalletCard() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch("/api/wallet/generate-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() });
+      }
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -87,7 +106,7 @@ export function WalletCard() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono font-bold text-2xl tracking-widest text-foreground">{virtualAccountNumber}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{virtualAccountBank} · No charge · Transfer any amount</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{virtualAccountBank} · No charge · Auto-credited</p>
               </div>
               <Button
                 variant="outline"
@@ -100,9 +119,18 @@ export function WalletCard() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Loader2 size={14} className="animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Your dedicated account is being generated…</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted-foreground">No account assigned yet.</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleGenerate}
+                disabled={generating}
+                className="shrink-0 gap-1 border-primary/30 text-primary hover:bg-primary/10"
+              >
+                {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                {generating ? "Generating..." : "Generate Account"}
+              </Button>
             </div>
           )}
         </CardContent>

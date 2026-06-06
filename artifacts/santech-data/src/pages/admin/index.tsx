@@ -1,9 +1,11 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useGetAdminStats, getGetAdminStatsQueryKey } from "@workspace/api-client-react";
-import { Users, TrendingUp, CreditCard, MessageSquare, Activity, Wallet } from "lucide-react";
+import { Users, TrendingUp, CreditCard, MessageSquare, Activity, Wallet, ShieldX, ShieldCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Link } from "wouter";
 
 function StatCard({ title, value, sub, icon: Icon, iconClass }: { title: string; value: string | number; sub?: string; icon: any; iconClass: string }) {
   return (
@@ -56,6 +58,41 @@ export default function AdminDashboard() {
           </>
         )}
       </div>
+
+      {/* Suspended users alert — quick action to manage */}
+      {!isLoading && (s?.suspendedUsers ?? 0) > 0 && (
+        <Card className="border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/30 mb-6">
+          <CardContent className="p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600">
+                <ShieldX size={20} />
+              </div>
+              <div>
+                <p className="font-semibold text-red-800 dark:text-red-300">
+                  {s.suspendedUsers} Suspended User{s.suspendedUsers > 1 ? "s" : ""}
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400">Click to view and reactivate suspended accounts</p>
+              </div>
+            </div>
+            <Button asChild size="sm" variant="outline" className="shrink-0 border-red-300 text-red-700 hover:bg-red-100 gap-1">
+              <Link href="/admin/users?status=suspended">
+                <ShieldCheck size={14} /> Manage
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && (s?.suspendedUsers ?? 0) === 0 && (
+        <Card className="border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900/30 mb-6">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600">
+              <ShieldCheck size={20} />
+            </div>
+            <p className="text-sm font-medium text-green-800 dark:text-green-300">All user accounts are active — no suspensions.</p>
+          </CardContent>
+        </Card>
+      )}
     </AdminLayout>
   );
 }

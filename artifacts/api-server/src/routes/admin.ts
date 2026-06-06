@@ -61,10 +61,22 @@ router.get("/admin/stats", authenticate, requireAdmin, async (_req, res): Promis
 
   const pendingTickets = await db.select().from(ticketsTable).where(eq(ticketsTable.status, "open"));
 
+  const suspendedUsers = allUsers.filter((u) => u.status === "suspended").length;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTx = allTx.filter((tx) => new Date(tx.createdAt) >= today);
+  const todayRevenue = todayTx
+    .filter((tx) => ["data", "airtime", "electricity", "cable", "exam"].includes(tx.type))
+    .reduce((s, tx) => s + parseFloat(tx.amount), 0);
+
   res.json({
     totalUsers: allUsers.length,
     activeUsers,
+    suspendedUsers,
     totalRevenue,
+    todayRevenue,
+    todayTransactions: todayTx.length,
     totalWalletBalance,
     totalTransactions: allTx.length,
     pendingTickets: pendingTickets.length,

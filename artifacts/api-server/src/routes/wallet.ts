@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyInitTransaction, monnifyVerifyTransaction, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -25,6 +25,38 @@ router.get("/wallet", authenticate, async (req: AuthRequest, res): Promise<void>
     virtualAccountBank: wallet.virtualAccountBank ?? null,
     updatedAt: wallet.updatedAt,
   });
+});
+
+// POST /wallet/generate-account — request/retry dedicated virtual account generation
+router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
+  if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+
+  if (wallet.virtualAccountNumber) {
+    res.json({ virtualAccountNumber: wallet.virtualAccountNumber, virtualAccountBank: wallet.virtualAccountBank });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const acct = await monnifyCreateReservedAccount({
+    accountReference: user.id,
+    accountName: user.fullName,
+    customerEmail: user.email,
+    customerName: user.fullName,
+  });
+
+  if (!acct) {
+    res.status(503).json({ error: "Could not generate account at this time. Please try again shortly." });
+    return;
+  }
+
+  await db.update(walletsTable)
+    .set({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName })
+    .where(eq(walletsTable.id, wallet.id));
+
+  res.json({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName });
 });
 
 // POST /wallet/fund/initiate
