@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAdminGetDataPlans, getAdminGetDataPlansQueryKey, useAdminCreateDataPlan, useAdminUpdateDataPlan, useAdminDeleteDataPlan } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, Search, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Wifi, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"];
 const NETWORK_COLORS: Record<string, string> = {
@@ -21,90 +21,6 @@ const NETWORK_COLORS: Record<string, string> = {
   "9MOBILE": "bg-[#006633] text-white",
 };
 
-// VTpass serviceID per network
-const VTPASS_SERVICE: Record<string, string> = {
-  MTN: "mtn-data",
-  AIRTEL: "airtel-data",
-  GLO: "glo-data",
-  "9MOBILE": "etisalat-data",
-};
-
-async function fetchVtpassVariations(serviceID: string) {
-  const token = localStorage.getItem("santech_token");
-  const res = await fetch(`/api/admin/vtpass-variations?serviceID=${encodeURIComponent(serviceID)}`, {
-    headers: { Authorization: `Bearer ${token ?? ""}` },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error ?? "Failed to fetch VTpass variations");
-  }
-  return res.json() as Promise<{
-    content?: {
-      varations?: Array<{ variation_code: string; name: string; variation_amount: string; fixedPrice: string }>;
-    };
-  }>;
-}
-
-function VtpassPlanBrowser({ network, onSelect }: { network: string; onSelect: (code: string) => void }) {
-  const [loading, setLoading] = useState(false);
-  const [variations, setVariations] = useState<Array<{ variation_code: string; name: string; variation_amount: string }> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    const serviceID = VTPASS_SERVICE[network] ?? "mtn-data";
-    try {
-      const data = await fetchVtpassVariations(serviceID);
-      const vars = data?.content?.varations ?? [];
-      setVariations(vars);
-      if (!vars.length) setError(`No plans found for ${network}. Check your VTpass credentials or try the sandbox.`);
-    } catch (e: any) {
-      setError(e.message ?? "Error");
-      setVariations(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Browse {network} Plans on VTpass
-        </p>
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={load} disabled={loading}>
-          {loading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-          {loading ? "Loading…" : variations ? "Refresh" : "Fetch Plans"}
-        </Button>
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      {variations && variations.length > 0 && (
-        <div className="divide-y rounded border bg-background max-h-52 overflow-y-auto text-xs">
-          {variations.map((v) => (
-            <div key={v.variation_code} className="flex items-center justify-between px-3 py-2 gap-2 hover:bg-muted/50 transition-colors">
-              <div className="flex-1 min-w-0">
-                <span className="font-mono font-bold text-primary mr-2">{v.variation_code}</span>
-                <span className="text-muted-foreground truncate">{v.name}</span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="font-semibold">₦{parseFloat(v.variation_amount).toLocaleString()}</span>
-                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => onSelect(v.variation_code)}>
-                  Use
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {!variations && !loading && (
-        <p className="text-xs text-muted-foreground">
-          Click "Fetch Plans" to load live variation codes from VTpass (e.g. <code className="font-mono">mtn1gb</code>, <code className="font-mono">airtel500mb</code>).
-        </p>
-      )}
-    </div>
-  );
-}
 
 function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
   const { toast } = useToast();
@@ -209,22 +125,17 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
         </div>
       </div>
       <div>
-        <Label className="font-semibold mb-2 block">VTpass Variation Code</Label>
+        <Label className="font-semibold mb-2 block">EasyAccess Plan ID</Label>
         <Input
-          placeholder="e.g. mtn1gb"
+          placeholder="e.g. 104"
           value={form.providerCode}
           onChange={(e) => setForm(f => ({ ...f, providerCode: e.target.value }))}
           className="h-12 font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          This is the VTpass <code className="font-mono">variation_code</code> for the data bundle. Use the browser below to fetch live codes.
+          The numeric plan ID from EasyAccess (easyaccess.com.ng). Required for delivery to work.
         </p>
       </div>
-
-      <VtpassPlanBrowser
-        network={plan?.network || form.network}
-        onSelect={(code) => setForm(f => ({ ...f, providerCode: code }))}
-      />
 
       <Button className="w-full" onClick={handleSubmit} disabled={isPending}>
         {isPending ? "Saving..." : plan ? "Update Plan" : "Create Plan"}
@@ -233,54 +144,14 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
   );
 }
 
-async function syncVtpassPlans(): Promise<{ added: number; skipped: number; errors: string[] }> {
-  const token = localStorage.getItem("santech_token");
-  const res = await fetch("/api/admin/sync-vtpass-plans", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token ?? ""}` },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error ?? "Sync failed");
-  }
-  return res.json();
-}
-
 export default function AdminDataPlans() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | null>(null);
   const [editPlan, setEditPlan] = useState<any>(null);
   const [filterNetwork, setFilterNetwork] = useState("all");
-  const [syncing, setSyncing] = useState(false);
 
   const { data = [], isLoading } = useAdminGetDataPlans({ query: { queryKey: getAdminGetDataPlansQueryKey() } });
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const result = await syncVtpassPlans();
-      queryClient.invalidateQueries({ queryKey: getAdminGetDataPlansQueryKey() });
-      if (result.errors?.length) {
-        toast({
-          title: `Synced — ${result.added} added, ${result.skipped} skipped`,
-          description: `Some networks had errors: ${result.errors.join("; ")}`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: result.added > 0 ? `✓ ${result.added} plans imported from VTpass!` : "Already up to date",
-          description: result.added > 0
-            ? `${result.skipped} already existed and were skipped.`
-            : "All VTpass plans are already in your list.",
-        });
-      }
-    } catch (e: any) {
-      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const deleteMutation = useAdminDeleteDataPlan({
     mutation: {
@@ -304,23 +175,17 @@ export default function AdminDataPlans() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <PageHeader title="Data Plans" description="Manage available data plans" />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSync} disabled={syncing}>
-            {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            {syncing ? "Syncing…" : "Sync from VTpass"}
-          </Button>
-          <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
-            <Plus className="mr-2 h-4 w-4" /> Add Plan
-          </Button>
-        </div>
+        <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
+          <Plus className="mr-2 h-4 w-4" /> Add Plan
+        </Button>
       </div>
 
       {configuredCount < (data as any[]).length && (
         <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>
-            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing a VTpass variation code — customers can't buy them yet.
-            Edit each plan and set the <strong>VTpass variation code</strong> (e.g. <code className="font-mono text-xs">mtn1gb</code>). Use "Fetch Plans" inside the edit dialog to get live codes.
+            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing an EasyAccess Plan ID — customers can't buy them yet.
+            Edit each plan and set the <strong>EasyAccess Plan ID</strong> (numeric, e.g. <code className="font-mono text-xs">104</code>).
           </span>
         </div>
       )}

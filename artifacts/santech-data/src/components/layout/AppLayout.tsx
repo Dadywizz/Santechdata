@@ -3,13 +3,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, History, Users, Bell, MessageSquare, User, LogOut } from "lucide-react";
+import { LayoutDashboard, Wifi, Zap, Tv, BookOpen, CreditCard, History, Users, Bell, MessageSquare, User, LogOut } from "lucide-react";
 import { useGetNotifications } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/buy-data", label: "Buy Data", icon: Wifi },
-  { href: "/buy-airtime", label: "Buy Airtime", icon: Phone },
   { href: "/buy-electricity", label: "Electricity", icon: Zap },
   { href: "/buy-cable", label: "Cable TV", icon: Tv },
   { href: "/buy-exam", label: "Exam Tokens", icon: BookOpen },

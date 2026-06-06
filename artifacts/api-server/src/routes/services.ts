@@ -25,10 +25,6 @@ import {
   eaPayTV,
   eaPurchaseExam,
 } from "../lib/providers/easyaccess";
-import {
-  vtpassPurchaseAirtime,
-  isVtpassConfigured,
-} from "../lib/providers/vtpass";
 
 const router: IRouter = Router();
 
@@ -151,91 +147,9 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 });
 
 // ── AIRTIME ───────────────────────────────────────────────────────────────────
-// EasyAccess does not support airtime; we fall back to VTpass for airtime only.
-router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
-  const parsed = PurchaseAirtimeBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const { network, phone, amount } = parsed.data;
-
-  if (amount < 50) {
-    res.status(400).json({ error: "Minimum airtime amount is ₦50" });
-    return;
-  }
-
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support on 09026329296." });
-    return;
-  }
-
-  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
-  if (parseFloat(wallet.balance) < amount) {
-    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
-    return;
-  }
-
-  await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
-
-  const reference = `AIR-${Date.now()}`;
-  let delivered = false;
-
-  try {
-    const vtRes = await vtpassPurchaseAirtime({ network, phone, amount });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass airtime purchase response");
-  } catch (err) {
-    req.log?.error({ err }, "VTpass airtime purchase error");
-  }
-
-  if (!delivered) {
-    await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
-
-    await db.insert(transactionsTable).values({
-      userId: req.userId!,
-      type: "airtime",
-      status: "failed",
-      amount: amount.toString(),
-      description: `${network} ₦${amount} airtime for ${phone} — delivery failed`,
-      reference,
-      metadata: { network, phone },
-    });
-
-    await db.insert(notificationsTable).values({
-      userId: req.userId!,
-      title: "Airtime Purchase Failed",
-      message: `Your ₦${amount} airtime purchase failed. Your wallet has been refunded.`,
-      type: "airtime",
-    });
-
-    res.status(502).json({ error: "Airtime delivery failed. Your wallet has been refunded. Please try again or contact support." });
-    return;
-  }
-
-  const [tx] = await db.insert(transactionsTable).values({
-    userId: req.userId!,
-    type: "airtime",
-    status: "success",
-    amount: amount.toString(),
-    description: `${network} airtime for ${phone}`,
-    reference,
-    metadata: { network, phone },
-  }).returning();
-
-  await db.insert(notificationsTable).values({
-    userId: req.userId!,
-    title: "Airtime Purchase Successful",
-    message: `₦${amount} ${network} airtime sent to ${phone}.`,
-    type: "airtime",
-  });
-
-  res.json({
-    id: tx.id, type: tx.type, status: tx.status,
-    amount: parseFloat(tx.amount), description: tx.description,
-    reference: tx.reference, metadata: tx.metadata, userId: tx.userId,
-    createdAt: tx.createdAt,
-  });
+// Airtime is not currently available. Route kept so the API contract remains valid.
+router.post("/airtime/purchase", authenticate, async (_req: AuthRequest, res): Promise<void> => {
+  res.status(503).json({ error: "Airtime is not currently available. Please check back later or contact support on 09026329296." });
 });
 
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────

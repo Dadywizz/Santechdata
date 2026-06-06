@@ -110,15 +110,15 @@ export default function AdminSettings() {
           <CardContent>
             <div className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800">
               <div>
-                <p className="font-semibold text-sm text-green-800 dark:text-green-300">VTpass — Live Mode</p>
+                <p className="font-semibold text-sm text-green-800 dark:text-green-300">EasyAccess — Live Mode</p>
                 <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
-                  Handles data, airtime, electricity, cable TV and exam tokens. No IP whitelisting required.
+                  Handles data, electricity, cable TV and exam tokens. Powered by easyaccess.com.ng.
                 </p>
               </div>
               <span className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-full font-semibold shrink-0">Active ✓</span>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              To manage data plan variation codes, go to <strong>Admin → Data Plans</strong> and edit each plan.
+              To manage data plan IDs, go to <strong>Admin → Data Plans</strong> and edit each plan's EasyAccess Plan ID.
             </p>
           </CardContent>
         </Card>

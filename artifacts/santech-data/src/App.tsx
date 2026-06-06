@@ -13,7 +13,6 @@ import VerifyEmail from "@/pages/verify-email";
 
 import Dashboard from "@/pages/dashboard";
 import BuyData from "@/pages/buy-data";
-import BuyAirtime from "@/pages/buy-airtime";
 import BuyElectricity from "@/pages/buy-electricity";
 import BuyCable from "@/pages/buy-cable";
 import BuyExam from "@/pages/buy-exam";
@@ -60,7 +59,6 @@ function Router() {
 
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/buy-data" component={BuyData} />
-      <Route path="/buy-airtime" component={BuyAirtime} />
       <Route path="/buy-electricity" component={BuyElectricity} />
       <Route path="/buy-cable" component={BuyCable} />
       <Route path="/buy-exam" component={BuyExam} />
