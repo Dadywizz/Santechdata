@@ -250,93 +250,6 @@ router.delete("/admin/data-plans/:id", authenticate, requireAdmin, async (req: A
   res.json({ message: "Data plan deleted" });
 });
 
-// POST /admin/sync-vtpass-plans — auto-import all VTpass data bundle plans into the DB
-router.post("/admin/sync-vtpass-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const BASE = process.env.VTPASS_SANDBOX === "true"
-    ? "https://sandbox.vtpass.com/api"
-    : "https://api-service.vtpass.com/api";
-  const vtHeaders = {
-    "api-key": process.env.VTPASS_API_KEY ?? "",
-    "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
-  };
-
-  const SERVICES: Array<{ serviceID: string; network: "MTN" | "AIRTEL" | "GLO" | "9MOBILE" }> = [
-    { serviceID: "mtn-data", network: "MTN" },
-    { serviceID: "airtel-data", network: "AIRTEL" },
-    { serviceID: "glo-data", network: "GLO" },
-    { serviceID: "etisalat-data", network: "9MOBILE" },
-  ];
-
-  function parseSize(name: string): string {
-    // Match e.g. "1.5GB", "500MB", "6.2G", "10TB"
-    const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
-    if (!m) return name.slice(0, 20); // fallback: truncate to varchar(20) limit
-    const unit = m[2].toUpperCase();
-    const normalised = unit === "G" ? "GB" : unit === "M" ? "MB" : unit;
-    return `${m[1]}${normalised}`.slice(0, 20);
-  }
-
-  function parseValidity(name: string): string {
-    const m = name.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
-    if (!m) return "30 Days";
-    const n = parseInt(m[1]);
-    const u = m[2].toLowerCase();
-    if (u.startsWith("day")) return `${n} Day${n > 1 ? "s" : ""}`;
-    if (u.startsWith("week")) return `${n * 7} Days`;
-    if (u.startsWith("month")) return `${n} Month${n > 1 ? "s" : ""}`;
-    return "30 Days";
-  }
-
-  const existing = await db.select({ providerCode: dataPlansTable.providerCode }).from(dataPlansTable);
-  const existingCodes = new Set(existing.map((e) => e.providerCode));
-
-  let added = 0;
-  let skipped = 0;
-  const errors: string[] = [];
-
-  for (const svc of SERVICES) {
-    try {
-      const r = await customFetch(`${BASE}/service-variations?serviceID=${svc.serviceID}`, {
-        headers: vtHeaders,
-      });
-      const data = await r.json() as {
-        content?: { varations?: Array<{ variation_code: string; name: string; variation_amount: string }> };
-      };
-      const variations = data?.content?.varations ?? [];
-
-      for (const v of variations) {
-        if (!v.variation_code || existingCodes.has(v.variation_code)) {
-          skipped++;
-          continue;
-        }
-        const amount = parseFloat(v.variation_amount);
-        if (!amount || amount <= 0) continue;
-
-        const size = parseSize(v.name);
-        const validity = parseValidity(v.name);
-        const costPrice = (amount * 0.97).toFixed(2);
-
-        await db.insert(dataPlansTable).values({
-          network: svc.network,
-          name: v.name.slice(0, 100),
-          size,
-          validity,
-          price: amount.toString(),
-          costPrice,
-          providerCode: v.variation_code,
-          isActive: true,
-        });
-        existingCodes.add(v.variation_code);
-        added++;
-      }
-    } catch (err: any) {
-      errors.push(`${svc.serviceID}: ${err?.message ?? String(err)}`);
-      req.log?.error({ err, serviceID: svc.serviceID }, "VTpass sync error");
-    }
-  }
-
-  res.json({ added, skipped, errors });
-});
 
 // GET /admin/analytics/revenue
 router.get("/admin/analytics/revenue", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
@@ -409,107 +322,24 @@ router.patch("/admin/tickets/:id", authenticate, requireAdmin, async (req: AuthR
 router.post("/admin/notifications/broadcast", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const parsed = BroadcastNotificationBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  const { title, message } = parsed.data;
-  const users = await db.select({ id: usersTable.id }).from(usersTable);
-  await Promise.all(
-    users.map((u) =>
-      db.insert(notificationsTable).values({ userId: u.id, title, message, type: "general" })
-    )
-  );
-  res.json({ sent: users.length });
-});
+  const { title, message, targetUserId } = parsed.data;
 
-// GET /admin/clubkonnect-test — ping Clubkonnect from production to verify IP whitelist
-router.get("/admin/clubkonnect-test", authenticate, requireAdmin, async (_req, res): Promise<void> => {
-  const userId = process.env.CLUBKONNECT_USERID ?? "";
-  const apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
-  if (!userId || !apiKey) { res.status(503).json({ error: "Clubkonnect credentials not configured" }); return; }
-  try {
-    const body = new URLSearchParams({
-      UserID: userId, APIKey: apiKey, NetworkID: "MTN",
-      MobileNumber: "08000000000", DataPlan: "1", RequestID: `IPTEST${Date.now()}`,
-    });
-    const r = await fetch("https://www.clubkonnect.com/APIEPINDatabundleV1.asp", {
-      method: "POST", body, signal: AbortSignal.timeout(10000),
-    });
-    const text = await r.text();
-    let data: any;
-    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 300) }; }
-    res.json({ httpStatus: r.status, response: data });
-  } catch (err: any) {
-    const cause = err?.cause as any;
-    res.status(502).json({ error: "Failed to reach Clubkonnect", detail: err?.message, cause: cause?.message ?? cause?.code });
+  if (targetUserId) {
+    const [target] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, targetUserId));
+    if (!target) { res.status(404).json({ error: "User not found" }); return; }
+    await db.insert(notificationsTable).values({ userId: target.id, title, message, type: "general" });
+    res.json({ sent: 1 });
+  } else {
+    const users = await db.select({ id: usersTable.id }).from(usersTable);
+    await Promise.all(
+      users.map((u) =>
+        db.insert(notificationsTable).values({ userId: u.id, title, message, type: "general" })
+      )
+    );
+    res.json({ sent: users.length });
   }
 });
 
-// GET /admin/clubkonnect-plans?network=MTN
-router.get("/admin/clubkonnect-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const network = req.query.network as string;
-  if (!network) { res.status(400).json({ error: "network required (MTN, AIRTEL, GLO, 9MOBILE)" }); return; }
-  const userId = process.env.CLUBKONNECT_USERID ?? "";
-  const apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
-  if (!userId || !apiKey) {
-    res.status(503).json({ error: "Clubkonnect credentials not configured (CLUBKONNECT_USERID, CLUBKONNECT_APIKEY)" });
-    return;
-  }
-  try {
-    const body = new URLSearchParams({ UserID: userId, APIKey: apiKey, NetworkID: network });
-    const r = await fetch("https://www.clubkonnect.com/APIEPINDatabundleV1.asp", { method: "POST", body, signal: AbortSignal.timeout(10000) });
-    const text = await r.text();
-    let data: any;
-    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
-    res.json(data);
-  } catch (err: any) {
-    const cause = err?.cause as any;
-    res.status(502).json({
-      error: "Failed to reach Clubkonnect",
-      detail: err?.message ?? String(err),
-      cause: cause?.message ?? cause?.code ?? String(cause ?? ""),
-    });
-  }
-});
-
-// GET /admin/flutterwave-plans?network=MTN — list Flutterwave data bundle plans for a network
-router.get("/admin/flutterwave-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const network = (req.query.network as string ?? "MTN").toUpperCase();
-  try {
-    const { flutterwaveGetDataPlans } = await import("../lib/providers/flutterwave-vtu");
-    const plans = await flutterwaveGetDataPlans(network);
-    res.json({ network, plans });
-  } catch (err: any) {
-    res.status(502).json({ error: "Failed to fetch Flutterwave plans", detail: err?.message });
-  }
-});
-
-// GET /admin/vtpass-variations — proxy VTpass variation codes for a service
-router.get("/admin/vtpass-variations", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
-  const serviceID = req.query.serviceID as string;
-  if (!serviceID) { res.status(400).json({ error: "serviceID required" }); return; }
-  const BASE = process.env.VTPASS_SANDBOX === "true"
-    ? "https://sandbox.vtpass.com/api"
-    : "https://api-service.vtpass.com/api";
-  try {
-    const r = await fetch(`${BASE}/service-variations?serviceID=${encodeURIComponent(serviceID)}`, {
-      headers: {
-        "api-key": process.env.VTPASS_API_KEY ?? "",
-        "public-key": process.env.VTPASS_PUBLIC_KEY ?? "",
-      },
-    });
-    const text = await r.text();
-    let data: any;
-    try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 500) }; }
-    res.json(data);
-  } catch (err: any) {
-    const cause = err?.cause as any;
-    res.status(502).json({
-      error: "Failed to reach VTpass",
-      detail: err?.message ?? String(err),
-      cause: cause?.message ?? cause?.code ?? String(cause ?? ""),
-      base: BASE,
-      hasKey: !!(process.env.VTPASS_API_KEY),
-    });
-  }
-});
 
 // GET /admin/server-ip — returns this server's outbound IP (for Clubkonnect whitelisting)
 router.get("/admin/server-ip", authenticate, requireAdmin, async (_req, res): Promise<void> => {
@@ -530,8 +360,8 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   res.json(obj);
 });
 
-// PUT /admin/settings
-router.put("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+// PATCH /admin/settings
+router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const entries = Object.entries(req.body as Record<string, string>);
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
