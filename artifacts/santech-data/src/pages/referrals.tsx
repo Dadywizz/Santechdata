@@ -26,7 +26,7 @@ export default function Referrals() {
   };
 
   const referrals = (data as any)?.referrals ?? [];
-  const totalEarned = (data as any)?.totalEarned ?? 0;
+  const totalEarned = (data as any)?.totalEarnings ?? 0;
 
   return (
     <AppLayout>
@@ -129,11 +129,11 @@ export default function Referrals() {
               {referrals.map((ref: any) => (
                 <div key={ref.id} className="p-4 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
-                    {ref.fullName?.[0] || "U"}
+                    {ref.name?.[0] || "U"}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium">{ref.fullName}</p>
-                    <p className="text-xs text-muted-foreground">Joined {format(new Date(ref.createdAt), "MMM d, yyyy")}</p>
+                    <p className="font-medium">{ref.name}</p>
+                    <p className="text-xs text-muted-foreground">Joined {format(new Date(ref.date), "MMM d, yyyy")}</p>
                   </div>
                   <span className="text-sm font-semibold text-green-600">+₦100</span>
                 </div>
