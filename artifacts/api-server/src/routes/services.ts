@@ -36,6 +36,10 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
   res.json({
     announcement: obj.announcement ?? "",
     announcementActive: obj.announcementActive === "true",
+    bankTransferActive: obj.bankTransferActive === "true",
+    bankAccountNumber: obj.bankAccountNumber ?? "",
+    bankAccountName: obj.bankAccountName ?? "",
+    bankName: obj.bankName ?? "",
   });
 });
 

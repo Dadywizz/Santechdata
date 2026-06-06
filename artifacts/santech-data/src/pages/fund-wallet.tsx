@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-react";
-import { CreditCard, ArrowRightLeft, ExternalLink } from "lucide-react";
+import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall } from "lucide-react";
 
 const PROVIDERS = [
   { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD" },
@@ -15,8 +15,16 @@ const PROVIDERS = [
 ];
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
+const SUPPORT_PHONE = "09026329296";
 
-type Tab = "fund" | "transfer";
+type Tab = "fund" | "transfer" | "bank";
+
+type PublicSettings = {
+  bankTransferActive: boolean;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  bankName: string;
+};
 
 export default function FundWallet() {
   const { toast } = useToast();
@@ -27,6 +35,15 @@ export default function FundWallet() {
   const [transferPhone, setTransferPhone] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
   const [transferNote, setTransferNote] = useState("");
+  const [bankSettings, setBankSettings] = useState<PublicSettings | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/public")
+      .then((r) => r.json())
+      .then((d: PublicSettings) => setBankSettings(d))
+      .catch(() => {});
+  }, []);
 
   const fundMutation = useInitiateFunding({
     mutation: {
@@ -68,21 +85,36 @@ export default function FundWallet() {
     transferMutation.mutate({ data: { recipientPhone: transferPhone, amount: parseFloat(transferAmount), note: transferNote } });
   };
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const showBankTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
+
+  const TABS = [
+    { id: "fund" as Tab, label: "Add Money" },
+    { id: "transfer" as Tab, label: "Transfer" },
+    ...(showBankTab ? [{ id: "bank" as Tab, label: "Bank Transfer" }] : []),
+  ];
+
   return (
     <AppLayout>
       <PageHeader title="Fund Wallet" description="Add money to your SanTech wallet" />
 
       <div className="max-w-2xl">
         <div className="flex gap-2 mb-6 bg-muted p-1 rounded-xl w-fit">
-          {(["fund", "transfer"] as const).map((t) => (
+          {TABS.map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               className={`px-5 py-2 rounded-lg font-medium text-sm transition-all ${
-                tab === t ? "bg-background shadow text-foreground" : "text-muted-foreground"
+                tab === t.id ? "bg-background shadow text-foreground" : "text-muted-foreground"
               }`}
             >
-              {t === "fund" ? "Add Money" : "Transfer"}
+              {t.label}
             </button>
           ))}
         </div>
@@ -174,6 +206,69 @@ export default function FundWallet() {
                 <CreditCard className="mr-2 h-4 w-4" />
                 {transferMutation.isPending ? "Transferring..." : "Transfer Funds"}
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "bank" && bankSettings && (
+          <Card>
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                <Building2 className="text-green-600 shrink-0" size={18} />
+                <p className="text-sm text-green-800 font-medium">Transfer directly to our bank account. Contact admin after sending.</p>
+              </div>
+
+              <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-5 space-y-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Account Details</p>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Bank</p>
+                      <p className="font-bold text-lg">{bankSettings.bankName}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Account Number</p>
+                      <p className="font-bold text-2xl tracking-widest font-mono">{bankSettings.bankAccountNumber}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(bankSettings.bankAccountNumber)}
+                      className="shrink-0"
+                    >
+                      {copied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Name</p>
+                    <p className="font-semibold">{bankSettings.bankAccountName}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
+                <p className="text-sm font-semibold text-amber-900">After transferring:</p>
+                <ol className="text-xs text-amber-800 space-y-1 list-decimal list-inside">
+                  <li>Transfer your desired amount to the account above</li>
+                  <li>Take a screenshot of the transfer receipt</li>
+                  <li>Contact admin on <strong>{SUPPORT_PHONE}</strong> with your name and screenshot</li>
+                  <li>Your wallet will be credited within minutes</li>
+                </ol>
+              </div>
+
+              <a
+                href={`tel:${SUPPORT_PHONE}`}
+                className="flex items-center justify-center gap-2 w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
+              >
+                <PhoneCall size={16} />
+                Call Admin — {SUPPORT_PHONE}
+              </a>
             </CardContent>
           </Card>
         )}

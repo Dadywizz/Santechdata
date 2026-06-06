@@ -5,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, CheckCircle2, XCircle, ArrowRightLeft, Search } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, ArrowRightLeft, Search, PowerOff, Power } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -47,6 +48,8 @@ export default function AdminAirtimeToCash() {
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [serviceActive, setServiceActive] = useState(true);
+  const [savingToggle, setSavingToggle] = useState(false);
 
   useState(() => {
     const token = localStorage.getItem("santech_token");
@@ -54,7 +57,26 @@ export default function AdminAirtimeToCash() {
       .then((r) => r.json())
       .then((d) => { setRequests(d); setLoading(false); })
       .catch(() => setLoading(false));
+    fetch("/api/admin/settings", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((s: Record<string, string>) => {
+        if (s.airtimeToCashActive !== undefined) setServiceActive(s.airtimeToCashActive !== "false");
+      })
+      .catch(() => {});
   });
+
+  const handleToggle = async (val: boolean) => {
+    setSavingToggle(true);
+    const token = localStorage.getItem("santech_token");
+    await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ airtimeToCashActive: String(val) }),
+    });
+    setServiceActive(val);
+    setSavingToggle(false);
+    toast({ title: val ? "Service activated" : "Service frozen", description: val ? "Customers can now submit requests" : "No new requests will be accepted" });
+  };
 
   const handleReview = async () => {
     if (!selected || !action) return;
@@ -96,11 +118,24 @@ export default function AdminAirtimeToCash() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+      <div className="flex items-start justify-between mb-6 gap-3 flex-wrap">
         <PageHeader
           title="Airtime to Cash"
           description={pendingCount > 0 ? `${pendingCount} pending request${pendingCount > 1 ? "s" : ""} awaiting review` : "Manage airtime-to-cash requests"}
         />
+        <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 ${serviceActive ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+          {serviceActive
+            ? <Power size={16} className="text-green-600" />
+            : <PowerOff size={16} className="text-red-500" />}
+          <span className={`text-sm font-semibold ${serviceActive ? "text-green-700" : "text-red-600"}`}>
+            {serviceActive ? "Service Active" : "Service Frozen"}
+          </span>
+          <Switch
+            checked={serviceActive}
+            onCheckedChange={handleToggle}
+            disabled={savingToggle}
+          />
+        </div>
       </div>
 
       <div className="flex gap-3 mb-5 flex-wrap">

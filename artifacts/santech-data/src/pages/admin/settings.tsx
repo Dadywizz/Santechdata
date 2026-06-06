@@ -42,6 +42,10 @@ export default function AdminSettings() {
   const [paystackActive, setPaystackActive] = useState(true);
   const [monnifyActive, setMonnifyActive] = useState(true);
   const [airtimeToCashActive, setAirtimeToCashActive] = useState(true);
+  const [bankTransferActive, setBankTransferActive] = useState(false);
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
@@ -55,6 +59,10 @@ export default function AdminSettings() {
       if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
       if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
       if (s.airtimeToCashActive !== undefined) setAirtimeToCashActive(s.airtimeToCashActive === "true");
+      if (s.bankTransferActive !== undefined) setBankTransferActive(s.bankTransferActive === "true");
+      if (s.bankAccountNumber) setBankAccountNumber(s.bankAccountNumber);
+      if (s.bankAccountName) setBankAccountName(s.bankAccountName);
+      if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
       setLoading(false);
@@ -70,6 +78,8 @@ export default function AdminSettings() {
         paystackActive: String(paystackActive),
         monnifyActive: String(monnifyActive),
         airtimeToCashActive: String(airtimeToCashActive),
+        bankTransferActive: String(bankTransferActive),
+        bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
       });
       toast({ title: "Settings saved!", description: "All changes have been applied" });
@@ -177,6 +187,42 @@ export default function AdminSettings() {
                 className="resize-none min-h-[80px]"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Bank Transfer */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <CreditCard className="text-primary" size={18} />
+              <CardTitle className="text-base">Bank Transfer (EasyAccess Account)</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div>
+                <p className="font-semibold text-sm">Show bank transfer option to customers</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Customers will see your account number and transfer directly to fund their wallet (manual approval).
+                </p>
+              </div>
+              <Switch checked={bankTransferActive} onCheckedChange={setBankTransferActive} />
+            </div>
+            <div>
+              <Label className="font-semibold mb-2 block">Bank Name</Label>
+              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Opay, Moniepoint, GTBank" className="h-12" />
+            </div>
+            <div>
+              <Label className="font-semibold mb-2 block">Account Number</Label>
+              <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="e.g. 8012345678" className="h-12 font-mono" />
+            </div>
+            <div>
+              <Label className="font-semibold mb-2 block">Account Name</Label>
+              <Input value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} placeholder="e.g. SanTech Data / Your Name" className="h-12" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Customers will be instructed to transfer and then contact you to get their wallet credited.
+            </p>
           </CardContent>
         </Card>
 
