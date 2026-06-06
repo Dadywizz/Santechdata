@@ -1,8 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { airtimeToCashTable, walletsTable, notificationsTable, usersTable } from "@workspace/db";
+import { airtimeToCashTable, walletsTable, notificationsTable, usersTable, settingsTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
+
+async function isAirtimeToCashActive(): Promise<boolean> {
+  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "airtimeToCashActive"));
+  if (!row) return true;
+  return row.value !== "false";
+}
 
 const router: IRouter = Router();
 
@@ -27,6 +33,12 @@ function itemToJson(r: typeof airtimeToCashTable.$inferSelect, user?: { fullName
   };
 }
 
+// GET /airtime-to-cash/status — is the service currently active?
+router.get("/airtime-to-cash/status", authenticate, async (_req, res): Promise<void> => {
+  const active = await isAirtimeToCashActive();
+  res.json({ active });
+});
+
 // GET /airtime-to-cash — user's own requests
 router.get("/airtime-to-cash", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const rows = await db.select().from(airtimeToCashTable)
@@ -37,6 +49,12 @@ router.get("/airtime-to-cash", authenticate, async (req: AuthRequest, res): Prom
 
 // POST /airtime-to-cash — submit request
 router.post("/airtime-to-cash", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const active = await isAirtimeToCashActive();
+  if (!active) {
+    res.status(503).json({ error: "Airtime to Cash is temporarily unavailable. Please contact admin." });
+    return;
+  }
+
   const { network, airtimeAmount, senderPhone } = req.body as {
     network: string; airtimeAmount: number; senderPhone: string;
   };

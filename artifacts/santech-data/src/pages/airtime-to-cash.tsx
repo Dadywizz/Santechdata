@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCircle2, XCircle, PhoneCall, ArrowRightLeft, Info } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, PhoneCall, ArrowRightLeft, Info, AlertTriangle, MessageCircle } from "lucide-react";
 
 const NETWORKS = [
   { id: "MTN", name: "MTN", color: "bg-[#FFCB00] text-black", rate: 75 },
@@ -38,6 +38,8 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><Clock size={11} className="mr-1" />Pending</Badge>;
 }
 
+const SUPPORT_PHONE = "09026329296";
+
 export default function AirtimeToCash() {
   const { toast } = useToast();
   const [network, setNetwork] = useState<string | null>(null);
@@ -46,6 +48,7 @@ export default function AirtimeToCash() {
   const [loading, setLoading] = useState(false);
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [serviceActive, setServiceActive] = useState(true);
 
   const selectedNetwork = NETWORKS.find((n) => n.id === network);
   const airtimeAmt = parseFloat(amount) || 0;
@@ -55,6 +58,10 @@ export default function AirtimeToCash() {
 
   useState(() => {
     const token = localStorage.getItem("santech_token");
+    fetch("/api/airtime-to-cash/status", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d: { active: boolean }) => setServiceActive(d.active))
+      .catch(() => {});
     fetch("/api/airtime-to-cash", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => { setRequests(d); setLoadingHistory(false); })
@@ -97,16 +104,46 @@ export default function AirtimeToCash() {
     <AppLayout>
       <PageHeader title="Airtime to Cash" description="Convert your airtime to wallet credit" />
 
+      {!serviceActive && (
+        <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex gap-3 items-start">
+          <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
+          <div>
+            <p className="font-semibold text-red-800">Service Temporarily Unavailable</p>
+            <p className="text-sm text-red-700 mt-0.5">
+              Airtime to Cash is currently frozen by the admin. Please contact us to inquire when it will resume.
+            </p>
+            <a href={`tel:${SUPPORT_PHONE}`} className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold text-red-800 underline underline-offset-2">
+              <MessageCircle size={14} /> Call {SUPPORT_PHONE}
+            </a>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2 mt-6">
         <div className="space-y-5">
           <Card>
             <CardContent className="p-5 space-y-5">
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-2 text-sm text-amber-900">
+                <MessageCircle size={16} className="shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold mb-0.5">⚠️ Contact Admin Before Sending Airtime</p>
+                  <p className="text-xs leading-relaxed">
+                    You <strong>must</strong> submit this form first, then contact admin to confirm before sending any airtime.
+                    Airtime sent without prior confirmation will <strong>not</strong> be credited.
+                  </p>
+                  <a href={`tel:${SUPPORT_PHONE}`} className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-amber-800 underline underline-offset-2">
+                    <PhoneCall size={12} /> {SUPPORT_PHONE}
+                  </a>
+                </div>
+              </div>
+
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 flex gap-2 text-sm text-blue-800">
                 <Info size={16} className="shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold mb-0.5">How it works</p>
                   <ol className="list-decimal list-inside space-y-0.5 text-xs">
-                    <li>Fill in the form below</li>
+                    <li>Fill in the form below and submit</li>
+                    <li>Contact admin on <strong>{SUPPORT_PHONE}</strong> to confirm</li>
                     <li>Send the airtime to <strong>{RECEIVE_PHONE}</strong></li>
                     <li>Admin verifies and credits your wallet within minutes</li>
                   </ol>
@@ -182,9 +219,9 @@ export default function AirtimeToCash() {
                 </div>
               )}
 
-              <Button className="w-full h-12 text-base" onClick={handleSubmit} disabled={loading}>
+              <Button className="w-full h-12 text-base" onClick={handleSubmit} disabled={loading || !serviceActive}>
                 <ArrowRightLeft className="mr-2 h-4 w-4" />
-                {loading ? "Submitting..." : "Submit Request"}
+                {loading ? "Submitting..." : !serviceActive ? "Service Unavailable" : "Submit Request"}
               </Button>
             </CardContent>
           </Card>

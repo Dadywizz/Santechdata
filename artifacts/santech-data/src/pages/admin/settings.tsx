@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -41,6 +41,7 @@ export default function AdminSettings() {
   const [announcementActive, setAnnouncementActive] = useState(false);
   const [paystackActive, setPaystackActive] = useState(true);
   const [monnifyActive, setMonnifyActive] = useState(true);
+  const [airtimeToCashActive, setAirtimeToCashActive] = useState(true);
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
@@ -53,6 +54,7 @@ export default function AdminSettings() {
       if (s.announcementActive !== undefined) setAnnouncementActive(s.announcementActive === "true");
       if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
       if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
+      if (s.airtimeToCashActive !== undefined) setAirtimeToCashActive(s.airtimeToCashActive === "true");
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
       setLoading(false);
@@ -67,6 +69,7 @@ export default function AdminSettings() {
         announcementActive: String(announcementActive),
         paystackActive: String(paystackActive),
         monnifyActive: String(monnifyActive),
+        airtimeToCashActive: String(airtimeToCashActive),
         referralBonus, minFunding,
       });
       toast({ title: "Settings saved!", description: "All changes have been applied" });
@@ -174,6 +177,36 @@ export default function AdminSettings() {
                 className="resize-none min-h-[80px]"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Airtime to Cash */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="text-primary" size={18} />
+              <CardTitle className="text-base">Airtime to Cash</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+              <div>
+                <p className="font-semibold text-sm">Allow customers to submit requests</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When frozen, customers will see an unavailability notice and the API will block new submissions.
+                </p>
+              </div>
+              <Switch
+                checked={airtimeToCashActive}
+                onCheckedChange={setAirtimeToCashActive}
+                className={!airtimeToCashActive ? "data-[state=unchecked]:bg-red-400" : ""}
+              />
+            </div>
+            {!airtimeToCashActive && (
+              <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
+                ⚠️ Service is currently <strong>frozen</strong> — customers cannot submit new requests.
+              </p>
+            )}
           </CardContent>
         </Card>
 
