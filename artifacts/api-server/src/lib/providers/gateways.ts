@@ -126,6 +126,40 @@ export async function monnifyInitTransaction(opts: {
   return data.responseBody;
 }
 
+export async function monnifyCreateReservedAccount(opts: {
+  accountReference: string;
+  accountName: string;
+  customerEmail: string;
+  customerName: string;
+}): Promise<{ accountNumber: string; bankName: string } | null> {
+  if (!process.env.MONNIFY_API_KEY || !process.env.MONNIFY_SECRET_KEY || !process.env.MONNIFY_CONTRACT_CODE) return null;
+  try {
+    const token = await monnifyGetAccessToken();
+    const res = await fetch(`${monnifyBaseUrl()}/api/v2/bank-transfer/reserved-accounts`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountReference: opts.accountReference,
+        accountName: opts.accountName,
+        currencyCode: "NGN",
+        contractCode: process.env.MONNIFY_CONTRACT_CODE,
+        customerEmail: opts.customerEmail,
+        customerName: opts.customerName,
+        getAllAvailableBanks: false,
+      }),
+    });
+    const data = await res.json() as {
+      requestSuccessful: boolean;
+      responseBody: { accounts: Array<{ bankName: string; accountNumber: string }> };
+    };
+    if (!data.requestSuccessful || !data.responseBody?.accounts?.length) return null;
+    const acct = data.responseBody.accounts[0];
+    return { accountNumber: acct.accountNumber, bankName: acct.bankName };
+  } catch {
+    return null;
+  }
+}
+
 export async function monnifyVerifyTransaction(reference: string) {
   const token = await monnifyGetAccessToken();
   const encodedRef = encodeURIComponent(reference);

@@ -19,6 +19,7 @@ import {
   ChangePasswordBody,
   UpdateProfileBody,
 } from "@workspace/api-zod";
+import { monnifyCreateReservedAccount } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -69,7 +70,21 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     referredBy: referredById,
   }).returning();
 
-  await db.insert(walletsTable).values({ userId: user.id });
+  const [newWallet] = await db.insert(walletsTable).values({ userId: user.id }).returning();
+
+  // Fire-and-forget: create Monnify dedicated virtual account for instant bank funding
+  monnifyCreateReservedAccount({
+    accountReference: user.id,
+    accountName: user.fullName,
+    customerEmail: user.email,
+    customerName: user.fullName,
+  }).then(async (acct) => {
+    if (acct && newWallet) {
+      await db.update(walletsTable)
+        .set({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName })
+        .where(eq(walletsTable.id, newWallet.id));
+    }
+  }).catch(() => {});
 
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);

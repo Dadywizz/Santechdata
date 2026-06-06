@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, Bell, X } from "lucide-react";
+import { Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, Bell, X, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 
 const QUICK_ACTIONS = [
@@ -14,6 +14,7 @@ const QUICK_ACTIONS = [
   { href: "/buy-electricity", label: "Electricity", icon: Zap, color: "text-yellow-500", bg: "bg-yellow-500/10" },
   { href: "/buy-cable", label: "Cable TV", icon: Tv, color: "text-purple-500", bg: "bg-purple-500/10" },
   { href: "/buy-exam", label: "Exam Pins", icon: BookOpen, color: "text-red-500", bg: "bg-red-500/10" },
+  { href: "/airtime-to-cash", label: "Airtime → Cash", icon: ArrowRightLeft, color: "text-orange-500", bg: "bg-orange-500/10" },
   { href: "/fund-wallet", label: "Fund Wallet", icon: CreditCard, color: "text-primary", bg: "bg-primary/10" },
 ];
 

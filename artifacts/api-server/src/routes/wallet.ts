@@ -21,6 +21,8 @@ router.get("/wallet", authenticate, async (req: AuthRequest, res): Promise<void>
     userId: wallet.userId,
     balance: parseFloat(wallet.balance),
     currency: wallet.currency,
+    virtualAccountNumber: wallet.virtualAccountNumber ?? null,
+    virtualAccountBank: wallet.virtualAccountBank ?? null,
     updatedAt: wallet.updatedAt,
   });
 });
@@ -195,6 +197,66 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   res.json({ id: wallet.id, userId: wallet.userId, balance: parseFloat(wallet.balance), currency: wallet.currency, updatedAt: wallet.updatedAt });
+});
+
+// POST /wallet/webhook/monnify-dva — Monnify reserved account payment notification
+router.post("/wallet/webhook/monnify-dva", async (req: Request, res: Response): Promise<void> => {
+  const secret = process.env.MONNIFY_SECRET_KEY;
+  if (!secret) { res.sendStatus(200); return; }
+
+  const sig = req.headers["monnify-signature"] as string | undefined;
+  const rawBody = (req as AuthRequest & { rawBody?: Buffer }).rawBody;
+  if (sig && rawBody) {
+    const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
+    if (sig !== expected) { res.sendStatus(401); return; }
+  }
+
+  const event = req.body as {
+    eventType?: string;
+    eventData?: {
+      product?: { reference: string; type: string };
+      amountPaid?: number;
+      paymentStatus?: string;
+      transactionReference?: string;
+    };
+  };
+
+  if (
+    event.eventType === "SUCCESSFUL_TRANSACTION" &&
+    event.eventData?.product?.type === "RESERVED_ACCOUNT" &&
+    event.eventData?.paymentStatus === "PAID" &&
+    event.eventData?.amountPaid
+  ) {
+    const userId = event.eventData.product.reference;
+    const amountPaid = event.eventData.amountPaid;
+    const txRef = event.eventData.transactionReference ?? `DVA-${Date.now()}`;
+
+    const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
+    if (!existing.length) {
+      await db.update(walletsTable)
+        .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
+        .where(eq(walletsTable.userId, userId));
+
+      await db.insert(transactionsTable).values({
+        userId,
+        type: "wallet_fund",
+        status: "success",
+        amount: amountPaid.toString(),
+        description: "Wallet funded via dedicated bank account",
+        reference: txRef,
+        metadata: { gateway: "monnify_dva", amount: amountPaid },
+      });
+
+      await db.insert(notificationsTable).values({
+        userId,
+        title: "Wallet Funded",
+        message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
+        type: "wallet",
+      });
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 // POST /wallet/webhook/paystack — no auth, verified by HMAC signature

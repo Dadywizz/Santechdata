@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-react";
-import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall } from "lucide-react";
+import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall, Landmark, Loader2 } from "lucide-react";
 
 const PROVIDERS = [
   { id: "paystack", name: "Paystack", desc: "Cards, Bank Transfer, USSD" },
@@ -17,13 +18,18 @@ const PROVIDERS = [
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 const SUPPORT_PHONE = "09026329296";
 
-type Tab = "fund" | "transfer" | "bank";
+type Tab = "fund" | "transfer" | "dedicated" | "bank";
 
 type PublicSettings = {
   bankTransferActive: boolean;
   bankAccountNumber: string;
   bankAccountName: string;
   bankName: string;
+};
+
+type VirtualAccount = {
+  virtualAccountNumber: string | null;
+  virtualAccountBank: string | null;
 };
 
 export default function FundWallet() {
@@ -36,6 +42,7 @@ export default function FundWallet() {
   const [transferAmount, setTransferAmount] = useState("");
   const [transferNote, setTransferNote] = useState("");
   const [bankSettings, setBankSettings] = useState<PublicSettings | null>(null);
+  const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -43,6 +50,14 @@ export default function FundWallet() {
       .then((r) => r.json())
       .then((d: PublicSettings) => setBankSettings(d))
       .catch(() => {});
+
+    const token = localStorage.getItem("santech_token");
+    if (token) {
+      fetch("/api/wallet", { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((d: VirtualAccount) => setVirtualAccount(d))
+        .catch(() => {});
+    }
   }, []);
 
   const fundMutation = useInitiateFunding({
@@ -93,9 +108,11 @@ export default function FundWallet() {
   };
 
   const showBankTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
+  const showDedicatedTab = !!(virtualAccount?.virtualAccountNumber);
 
   const TABS = [
     { id: "fund" as Tab, label: "Add Money" },
+    ...(showDedicatedTab ? [{ id: "dedicated" as Tab, label: "My Account" }] : []),
     { id: "transfer" as Tab, label: "Transfer" },
     ...(showBankTab ? [{ id: "bank" as Tab, label: "Bank Transfer" }] : []),
   ];
@@ -177,6 +194,61 @@ export default function FundWallet() {
                 <ExternalLink className="mr-2 h-4 w-4" />
                 {fundMutation.isPending ? "Opening payment..." : `Fund ₦${finalAmount ? finalAmount.toLocaleString() : "0"} via ${PROVIDERS.find(p => p.id === provider)?.name}`}
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "dedicated" && virtualAccount?.virtualAccountNumber && (
+          <Card>
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <Landmark className="text-green-600 shrink-0" size={18} />
+                <p className="text-sm text-green-800 dark:text-green-200 font-medium">This account is yours alone. Transfer any amount and your wallet is credited automatically — no need to notify anyone.</p>
+              </div>
+
+              <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Dedicated Account</p>
+                  <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Auto-credited</Badge>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bank</p>
+                    <p className="font-bold text-lg">{virtualAccount.virtualAccountBank}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Account Number</p>
+                      <p className="font-bold text-2xl tracking-widest font-mono">{virtualAccount.virtualAccountNumber}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopy(virtualAccount.virtualAccountNumber!)}
+                      className="shrink-0"
+                    >
+                      {copied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Name</p>
+                    <p className="font-semibold">{JSON.parse(localStorage.getItem("santech_user") || "{}").fullName ?? "SanTech Customer"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-1">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">How it works</p>
+                <ol className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                  <li>Open your bank app and do a transfer to the account above</li>
+                  <li>Your SanTech wallet is credited <strong>automatically within seconds</strong></li>
+                  <li>You will receive a notification when it reflects</li>
+                </ol>
+              </div>
             </CardContent>
           </Card>
         )}
