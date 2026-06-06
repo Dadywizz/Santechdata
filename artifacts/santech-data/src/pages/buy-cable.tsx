@@ -82,10 +82,10 @@ export default function BuyCable() {
               <div className="grid grid-cols-3 gap-3">
                 {(providers as any[]).map((p: any) => (
                   <button
-                    key={p.code}
-                    onClick={() => { setProvider(p.code as CableProvider); setPlanId(""); setVerified(null); }}
+                    key={p.id}
+                    onClick={() => { setProvider(p.id as CableProvider); setPlanId(""); setVerified(null); }}
                     className={`rounded-xl p-4 border-2 font-semibold text-sm transition-all ${
-                      provider === p.code ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                      provider === p.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
                     }`}
                   >
                     {p.name}

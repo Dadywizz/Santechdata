@@ -18,13 +18,15 @@ import {
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
 import {
-  vtpassPurchaseData,
+  isEasyAccessConfigured,
+  eaPurchaseData,
+  eaVerifyMeter,
+  eaPayElectricity,
+  eaPayTV,
+  eaPurchaseExam,
+} from "../lib/providers/easyaccess";
+import {
   vtpassPurchaseAirtime,
-  vtpassVerifyMeter,
-  vtpassPayElectricity,
-  vtpassVerifySmartcard,
-  vtpassCableSubscribe,
-  vtpassPurchaseExam,
   isVtpassConfigured,
 } from "../lib/providers/vtpass";
 
@@ -65,8 +67,8 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "VTU service is temporarily unavailable. Please contact support." });
+  if (!isEasyAccessConfigured()) {
+    res.status(503).json({ error: "Data service is temporarily unavailable. Please contact support." });
     return;
   }
 
@@ -88,16 +90,15 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const vtRes = await vtpassPurchaseData({
+    const eaRes = await eaPurchaseData({
       network: plan.network,
+      planId: plan.providerCode,
       phone,
-      variationCode: plan.providerCode,
-      amount: price,
     });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass data purchase response");
+    delivered = eaRes.success;
+    req.log?.info({ eaRes }, "EasyAccess data purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass data purchase error");
+    req.log?.error({ err }, "EasyAccess data purchase error");
   }
 
   if (!delivered) {
@@ -150,6 +151,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 });
 
 // ── AIRTIME ───────────────────────────────────────────────────────────────────
+// EasyAccess does not support airtime; we fall back to VTpass for airtime only.
 router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const parsed = PurchaseAirtimeBody.safeParse(req.body);
   if (!parsed.success) {
@@ -164,7 +166,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   }
 
   if (!isVtpassConfigured()) {
-    res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support." });
+    res.status(503).json({ error: "Airtime service is temporarily unavailable. Please contact support on 09026329296." });
     return;
   }
 
@@ -237,20 +239,20 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 });
 
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────
-// VTpass electricity service IDs
+// EasyAccess company codes: 1=Ikeja 2=Eko 3=Abuja 4=Kaduna 5=PHC 6=Ibadan 7=Enugu 8=Jos 9=Benin 10=Kano 11=Yola 12=Aba
 const ELECTRICITY_PROVIDERS = [
-  { id: "ikeja-electric",         name: "Ikeja Electric (IKEDC)"         },
-  { id: "eko-electric",           name: "Eko Electric (EKEDC)"           },
-  { id: "abuja-electric",         name: "Abuja Electric (AEDC)"          },
-  { id: "kano-electric",          name: "Kano Electric (KEDCO)"          },
-  { id: "portharcourt-electric",  name: "Port Harcourt Electric (PHED)"  },
-  { id: "jos-electric",           name: "Jos Electric (JED)"             },
-  { id: "kaduna-electric",        name: "Kaduna Electric (KAEDCO)"       },
-  { id: "enugu-electric",         name: "Enugu Electric (EEDC)"          },
-  { id: "ibadan-electric",        name: "Ibadan Electric (IBEDC)"        },
-  { id: "benin-electric",         name: "Benin Electric (BEDC)"          },
-  { id: "aba-electric",           name: "Aba Electric (APLE)"            },
-  { id: "yola-electric",          name: "Yola Electric (YEDC)"           },
+  { id: "ikeja-electric",        name: "Ikeja Electric (IKEDC)"         },
+  { id: "eko-electric",          name: "Eko Electric (EKEDC)"           },
+  { id: "abuja-electric",        name: "Abuja Electric (AEDC)"          },
+  { id: "kaduna-electric",       name: "Kaduna Electric (KAEDCO)"       },
+  { id: "portharcourt-electric", name: "Port Harcourt Electric (PHED)"  },
+  { id: "ibadan-electric",       name: "Ibadan Electric (IBEDC)"        },
+  { id: "enugu-electric",        name: "Enugu Electric (EEDC)"          },
+  { id: "jos-electric",          name: "Jos Electric (JED)"             },
+  { id: "benin-electric",        name: "Benin Electric (BEDC)"          },
+  { id: "kano-electric",         name: "Kano Electric (KEDCO)"          },
+  { id: "yola-electric",         name: "Yola Electric (YEDC)"           },
+  { id: "aba-electric",          name: "Aba Electric (APLE)"            },
 ];
 
 router.get("/electricity/providers", authenticate, async (_req, res): Promise<void> => {
@@ -265,24 +267,24 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   }
   const { meterNumber, providerCode, meterType } = parsed.data;
 
-  if (!isVtpassConfigured()) {
+  if (!isEasyAccessConfigured()) {
     res.json({ meterNumber, name: "Customer", address: "" });
     return;
   }
 
-  // providerCode from frontend is the VTpass serviceID (e.g. "abuja-electric")
-  const serviceID = providerCode.toLowerCase();
-
   try {
-    const vtRes = await vtpassVerifyMeter({ serviceID, meterNumber, meterType });
-    const ok = vtRes?.code === "000" && vtRes?.content?.Customer_Name;
+    const result = await eaVerifyMeter({
+      companyCode: providerCode.toLowerCase(),
+      meterType: meterType ?? "prepaid",
+      meterNo: meterNumber,
+    });
     res.json({
       meterNumber,
-      name: ok ? (vtRes.content!.Customer_Name ?? "Customer") : "Customer",
-      address: ok ? (vtRes.content!.Address ?? "") : "",
+      name: result.name || "Customer",
+      address: result.address || "",
     });
   } catch (err) {
-    req.log?.error({ err }, "VTpass meter verify error");
+    req.log?.error({ err }, "EasyAccess meter verify error");
     res.json({ meterNumber, name: "Customer", address: "" });
   }
 });
@@ -300,7 +302,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     return;
   }
 
-  if (!isVtpassConfigured()) {
+  if (!isEasyAccessConfigured()) {
     res.status(503).json({ error: "Electricity service is temporarily unavailable. Please contact support." });
     return;
   }
@@ -314,18 +316,21 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
 
   const reference = `ELEC-${Date.now()}`;
-  const serviceID = providerCode.toLowerCase();
-
-  let token = "";
+  let elecToken = "";
   let delivered = false;
+
   try {
-    const vtRes = await vtpassPayElectricity({ serviceID, meterNumber, meterType, amount, phone });
-    delivered = vtRes?.code === "000";
-    const txns = vtRes?.content as { transactions?: { token?: string } } | undefined;
-    token = txns?.transactions?.token ?? "";
-    req.log?.info({ vtRes }, "VTpass electricity purchase response");
+    const eaRes = await eaPayElectricity({
+      companyCode: providerCode.toLowerCase(),
+      meterType: meterType ?? "prepaid",
+      meterNo: meterNumber,
+      amount,
+    });
+    delivered = eaRes.success;
+    elecToken = eaRes.token;
+    req.log?.info({ eaRes }, "EasyAccess electricity purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass electricity purchase error");
+    req.log?.error({ err }, "EasyAccess electricity purchase error");
   }
 
   if (!delivered) {
@@ -359,50 +364,51 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     amount: amount.toString(),
     description: `Electricity token for meter ${meterNumber}`,
     reference,
-    metadata: { meterNumber, providerCode, meterType, token, phone },
+    metadata: { meterNumber, providerCode, meterType, token: elecToken, phone },
   }).returning();
 
   await db.insert(notificationsTable).values({
     userId: req.userId!,
     title: "Electricity Token Purchased",
-    message: `Token: ${token} for meter ${meterNumber}`,
+    message: `Token: ${elecToken} for meter ${meterNumber}`,
     type: "electricity",
   });
 
-  res.json({ id: tx.id, status: "success", token, amount, meterNumber, createdAt: tx.createdAt });
+  res.json({ id: tx.id, status: "success", token: elecToken, amount, meterNumber, createdAt: tx.createdAt });
 });
 
 // ── CABLE TV ──────────────────────────────────────────────────────────────────
-// VTpass cable service IDs and plans
-// DStv / GOtv are NOT available on this VTpass account — only StarTimes works.
+// EasyAccess plan_ids from GET /get-plans?product_type=dstv|gotv|startimes
 const CABLE_PROVIDERS = [
-  { id: "startimes", name: "StarTimes" },
-  { id: "dstv",      name: "DStv"      },
-  { id: "gotv",      name: "GOtv"      },
+  { id: "dstv",       name: "DStv"      },
+  { id: "gotv",       name: "GOtv"      },
+  { id: "startimes",  name: "StarTimes" },
 ];
 
-// StarTimes plans use VTpass variation codes. DStv/GOtv prices shown for info but won't deliver.
 const CABLE_PLANS = [
-  // StarTimes (vtpass serviceID: startimes)
-  { id: "st-nova-m",    provider: "startimes", name: "StarTimes Nova (Monthly)",    price: 2100,  validity: "Monthly", vtCode: "nova"    },
-  { id: "st-basic-m",   provider: "startimes", name: "StarTimes Basic (Monthly)",   price: 4000,  validity: "Monthly", vtCode: "basic"   },
-  { id: "st-smart-m",   provider: "startimes", name: "StarTimes Smart (Monthly)",   price: 5100,  validity: "Monthly", vtCode: "smart"   },
-  { id: "st-classic-m", provider: "startimes", name: "StarTimes Classic (Monthly)", price: 6000,  validity: "Monthly", vtCode: "classic" },
-  { id: "st-super-m",   provider: "startimes", name: "StarTimes Super (Monthly)",   price: 9800,  validity: "Monthly", vtCode: "super"   },
-  { id: "st-nova-w",    provider: "startimes", name: "StarTimes Nova (Weekly)",     price: 700,   validity: "Weekly",  vtCode: "nova-weekly"    },
-  { id: "st-basic-w",   provider: "startimes", name: "StarTimes Basic (Weekly)",    price: 1400,  validity: "Weekly",  vtCode: "basic-weekly"   },
-  { id: "st-classic-w", provider: "startimes", name: "StarTimes Classic (Weekly)",  price: 2000,  validity: "Weekly",  vtCode: "classic-weekly" },
-  { id: "st-super-w",   provider: "startimes", name: "StarTimes Super (Weekly)",    price: 3300,  validity: "Weekly",  vtCode: "super-weekly"   },
-  // DStv — prices for display only; require DStv-enabled VTpass account
-  { id: "dstv-access",       provider: "dstv", name: "DStv Access",       price: 5000,  validity: "Monthly", vtCode: "dstv-access"       },
-  { id: "dstv-compact",      provider: "dstv", name: "DStv Compact",      price: 15700, validity: "Monthly", vtCode: "dstv-compact"      },
-  { id: "dstv-compact-plus", provider: "dstv", name: "DStv Compact Plus", price: 25000, validity: "Monthly", vtCode: "dstv-compact-plus" },
-  { id: "dstv-premium",      provider: "dstv", name: "DStv Premium",      price: 37000, validity: "Monthly", vtCode: "dstv-premium"      },
-  // GOtv
-  { id: "gotv-lite",  provider: "gotv", name: "GOtv Lite",  price: 1575, validity: "Monthly", vtCode: "gotv-lite"  },
-  { id: "gotv-jolli", provider: "gotv", name: "GOtv Jolli", price: 2460, validity: "Monthly", vtCode: "gotv-jolli" },
-  { id: "gotv-max",   provider: "gotv", name: "GOtv Max",   price: 4150, validity: "Monthly", vtCode: "gotv-max"   },
-  { id: "gotv-supa",  provider: "gotv", name: "GOtv Supa",  price: 6400, validity: "Monthly", vtCode: "gotv-supa"  },
+  // DStv (EasyAccess company=1)
+  { id: "dstv-90",  provider: "dstv",      name: "DStv Padi",              price: 4399,  validity: "Monthly", eaPlanId: 90  },
+  { id: "dstv-91",  provider: "dstv",      name: "DStv Yanga",             price: 5999,  validity: "Monthly", eaPlanId: 91  },
+  { id: "dstv-92",  provider: "dstv",      name: "DStv Confam",            price: 10999, validity: "Monthly", eaPlanId: 92  },
+  { id: "dstv-93",  provider: "dstv",      name: "DStv Compact",           price: 18999, validity: "Monthly", eaPlanId: 93  },
+  { id: "dstv-105", provider: "dstv",      name: "DStv Compact Plus",      price: 29999, validity: "Monthly", eaPlanId: 105 },
+  { id: "dstv-106", provider: "dstv",      name: "DStv Premium",           price: 44499, validity: "Monthly", eaPlanId: 106 },
+  // GOtv (EasyAccess company=2)
+  { id: "gotv-94",  provider: "gotv",      name: "GOtv Smallie",           price: 1899,  validity: "Monthly", eaPlanId: 94  },
+  { id: "gotv-97",  provider: "gotv",      name: "GOtv Jinja",             price: 3899,  validity: "Monthly", eaPlanId: 97  },
+  { id: "gotv-96",  provider: "gotv",      name: "GOtv Jolli",             price: 5799,  validity: "Monthly", eaPlanId: 96  },
+  { id: "gotv-95",  provider: "gotv",      name: "GOtv Max",               price: 8499,  validity: "Monthly", eaPlanId: 95  },
+  { id: "gotv-112", provider: "gotv",      name: "GOtv Supa",              price: 11399, validity: "Monthly", eaPlanId: 112 },
+  { id: "gotv-113", provider: "gotv",      name: "GOtv Supa Plus",         price: 16799, validity: "Monthly", eaPlanId: 113 },
+  // StarTimes (EasyAccess company=3)
+  { id: "st-100",   provider: "startimes", name: "StarTimes Nova (Antenna) Monthly",   price: 2099,  validity: "Monthly", eaPlanId: 100 },
+  { id: "st-139",   provider: "startimes", name: "StarTimes Nova (Dish) Monthly",      price: 2099,  validity: "Monthly", eaPlanId: 139 },
+  { id: "st-101",   provider: "startimes", name: "StarTimes Basic (Antenna) Monthly",  price: 3999,  validity: "Monthly", eaPlanId: 101 },
+  { id: "st-102",   provider: "startimes", name: "StarTimes Basic (Dish) Monthly",     price: 5099,  validity: "Monthly", eaPlanId: 102 },
+  { id: "st-103",   provider: "startimes", name: "StarTimes Classic (Antenna) Monthly",price: 5999,  validity: "Monthly", eaPlanId: 103 },
+  { id: "st-140",   provider: "startimes", name: "StarTimes Classic (Dish) Monthly",   price: 7399,  validity: "Monthly", eaPlanId: 140 },
+  { id: "st-104",   provider: "startimes", name: "StarTimes Super (Antenna) Monthly",  price: 9499,  validity: "Monthly", eaPlanId: 104 },
+  { id: "st-141",   provider: "startimes", name: "StarTimes Super (Dish) Monthly",     price: 9799,  validity: "Monthly", eaPlanId: 141 },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
@@ -414,7 +420,7 @@ router.get("/cable/plans", authenticate, async (req: AuthRequest, res): Promise<
   const filtered = params.success && params.data.provider
     ? CABLE_PLANS.filter((p) => p.provider === (params.data.provider ?? "").toLowerCase())
     : CABLE_PLANS;
-  res.json(filtered.map(({ vtCode: _v, ...p }) => p));
+  res.json(filtered.map(({ eaPlanId: _e, ...p }) => p));
 });
 
 router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -423,28 +429,9 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { smartcardNumber, provider } = parsed.data;
-
-  if (!isVtpassConfigured()) {
-    res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
-    return;
-  }
-
-  const serviceID = (provider ?? "startimes").toLowerCase();
-
-  try {
-    const vtRes = await vtpassVerifySmartcard({ serviceID, smartcardNumber });
-    const ok = vtRes?.code === "000" && vtRes?.content?.Customer_Name;
-    res.json({
-      smartcardNumber,
-      name: ok ? (vtRes.content!.Customer_Name ?? "Customer") : "Customer",
-      currentPlan: "",
-      dueDate: "",
-    });
-  } catch (err) {
-    req.log?.error({ err }, "VTpass smartcard verify error");
-    res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
-  }
+  const { smartcardNumber } = parsed.data;
+  // EasyAccess does not have a smartcard verify endpoint — return minimal info
+  res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
 });
 
 router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -461,17 +448,8 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     return;
   }
 
-  if (!isVtpassConfigured()) {
+  if (!isEasyAccessConfigured()) {
     res.status(503).json({ error: "Cable TV service is temporarily unavailable. Please contact support." });
-    return;
-  }
-
-  const serviceID = plan.provider.toLowerCase();
-
-  if (serviceID !== "startimes") {
-    res.status(503).json({
-      error: `${plan.provider === "dstv" ? "DStv" : "GOtv"} subscriptions are not yet available on this platform. Please use StarTimes or contact support.`,
-    });
     return;
   }
 
@@ -487,17 +465,15 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   let delivered = false;
 
   try {
-    const vtRes = await vtpassCableSubscribe({
-      serviceID,
-      smartcardNumber,
-      variationCode: plan.vtCode,
-      amount: plan.price,
-      phone: smartcardNumber,
+    const eaRes = await eaPayTV({
+      provider: plan.provider,
+      packageId: plan.eaPlanId,
+      iucNo: smartcardNumber,
     });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass cable subscribe response");
+    delivered = eaRes.success;
+    req.log?.info({ eaRes }, "EasyAccess cable subscribe response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass cable subscribe error");
+    req.log?.error({ err }, "EasyAccess cable subscribe error");
   }
 
   if (!delivered) {
@@ -550,6 +526,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
 });
 
 // ── EXAM TOKENS ───────────────────────────────────────────────────────────────
+// EasyAccess exam plan_ids: WAEC=1 (₦5069), NECO=2 (₦2099), NABTEB=3 (₦867)
 router.get("/exam/types", authenticate, async (_req, res): Promise<void> => {
   const types = await db.select().from(examTypesTable);
   res.json(types.map((t) => ({
@@ -573,15 +550,16 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
     return;
   }
 
-  if (!isVtpassConfigured()) {
+  if (!isEasyAccessConfigured()) {
     res.status(503).json({ error: "Exam token service is temporarily unavailable. Please contact support." });
     return;
   }
 
-  const code = examType.code.toUpperCase();
-  if (!code.includes("WAEC")) {
+  const code = examType.code.toLowerCase();
+  const supportedBoards = ["waec", "neco", "nabteb"];
+  if (!supportedBoards.some((b) => code.includes(b))) {
     res.status(503).json({
-      error: `${examType.name} tokens are not yet available on this platform. Please contact support on 09026329296.`,
+      error: `${examType.name} tokens are not yet available. Please contact support on 09026329296.`,
     });
     return;
   }
@@ -599,17 +577,18 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let pins: Array<{ pin: string; serial: string }> = [];
   let delivered = false;
 
-  try {
-    const vtRes = await vtpassPurchaseExam({ examCode: examType.code, quantity, phone, amount: totalCost });
-    delivered = vtRes?.code === "000";
-    req.log?.info({ vtRes }, "VTpass exam purchase response");
+  // Determine exam board key for EasyAccess
+  let examBoard = "waec";
+  if (code.includes("neco")) examBoard = "neco";
+  else if (code.includes("nabteb")) examBoard = "nabteb";
 
-    const rawOut = (vtRes?.content as Record<string, unknown> | undefined)?.rawOutput as string | undefined;
-    if (delivered && rawOut) {
-      pins = [{ pin: rawOut, serial: `${examType.code}${Date.now()}` }];
-    }
+  try {
+    const eaRes = await eaPurchaseExam({ examBoard, count: quantity });
+    delivered = eaRes.success;
+    pins = eaRes.pins;
+    req.log?.info({ eaRes }, "EasyAccess exam purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass exam purchase error");
+    req.log?.error({ err }, "EasyAccess exam purchase error");
   }
 
   if (!delivered) {
