@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Phone } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -34,6 +34,52 @@ async function callAdminAction(path: string): Promise<any> {
   const token = localStorage.getItem("santech_token");
   const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
   return res.json();
+}
+
+type Provider = "easyaccess" | "clubkonnect";
+
+const PROVIDER_LABELS: Record<Provider, string> = {
+  easyaccess: "EasyAccess",
+  clubkonnect: "Clubkonnect",
+};
+
+function ProviderToggle({
+  label, icon: Icon, current, onChange, options,
+}: {
+  label: string;
+  icon: React.ElementType;
+  current: Provider;
+  onChange: (v: Provider) => void;
+  options: Provider[];
+}) {
+  return (
+    <div className="flex items-center justify-between p-4 rounded-lg border border-border">
+      <div className="flex items-center gap-3">
+        <Icon size={16} className="text-primary" />
+        <div>
+          <p className="font-semibold text-sm">{label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Active: <span className="font-medium text-foreground">{PROVIDER_LABELS[current]}</span>
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            onClick={() => onChange(opt)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+              current === opt
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted text-muted-foreground border-border hover:border-primary/40"
+            }`}
+          >
+            {PROVIDER_LABELS[opt]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function AdminSettings() {
@@ -62,6 +108,12 @@ export default function AdminSettings() {
   const [easyAccessToken, setEasyAccessToken] = useState("");
   const [showEaToken, setShowEaToken] = useState(false);
 
+  // Per-service provider selection
+  const [dataProvider, setDataProvider] = useState<Provider>("easyaccess");
+  const [electricityProvider, setElectricityProvider] = useState<Provider>("easyaccess");
+  const [cableProvider, setCableProvider] = useState<Provider>("easyaccess");
+  const [examProvider, setExamProvider] = useState<Provider>("easyaccess");
+
   useEffect(() => {
     fetchSettings().then((s) => {
       if (s.supportEmail) setSupportEmail(s.supportEmail);
@@ -79,6 +131,10 @@ export default function AdminSettings() {
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
       if (s.easyaccess_api_token) setEasyAccessToken(s.easyaccess_api_token);
+      if (s.dataProvider) setDataProvider(s.dataProvider as Provider);
+      if (s.electricityProvider) setElectricityProvider(s.electricityProvider as Provider);
+      if (s.cableProvider) setCableProvider(s.cableProvider as Provider);
+      if (s.examProvider) setExamProvider(s.examProvider as Provider);
       setLoading(false);
     });
   }, []);
@@ -95,10 +151,11 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
+        dataProvider, electricityProvider, cableProvider, examProvider,
       };
       if (easyAccessToken) payload.easyaccess_api_token = easyAccessToken;
       await saveSettings(payload);
-      toast({ title: "Settings saved!", description: "All changes applied — API tokens active immediately." });
+      toast({ title: "Settings saved!", description: "All changes applied — provider changes active immediately." });
     } catch {
       toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
     } finally {
@@ -166,7 +223,7 @@ export default function AdminSettings() {
           </CardHeader>
           <CardContent className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Paste your API token here to switch providers or update credentials. Saved values take effect immediately — no server restart needed.
+              Update your provider credentials here. Changes take effect immediately — no server restart needed.
             </p>
 
             {/* EasyAccess */}
@@ -189,25 +246,101 @@ export default function AdminSettings() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Token is stored securely in the database and overrides the environment variable. Leaving it blank uses the env var.
+                Stored securely in the database. Overrides the environment variable immediately on save.
               </p>
             </div>
 
-            {/* VTpass — read-only info */}
-            <div className="p-4 rounded-lg border border-border space-y-1">
+            {/* Clubkonnect */}
+            <div className="p-4 rounded-lg border border-border space-y-2">
               <div className="flex items-center gap-2">
-                <Zap size={15} className="text-blue-600" />
-                <p className="font-semibold text-sm">VTpass</p>
+                <Phone size={15} className="text-blue-600" />
+                <p className="font-semibold text-sm">Clubkonnect</p>
                 <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-0">Airtime</Badge>
-                <Badge variant="outline" className="text-[10px]">Env var set ✓</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                VTpass handles <strong>airtime purchases</strong>. Keys are configured via environment variables (VTPASS_PUBLIC_KEY, VTPASS_SECRET_KEY). Contact your platform admin to update them.
+                Clubkonnect handles <strong>airtime purchases</strong>. Credentials are set via environment variables:
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[
+                  { label: "CLUBKONNECT_PHONE", hint: "Your registered phone" },
+                  { label: "CLUBKONNECT_APIKEY", hint: "API key from dashboard" },
+                  { label: "CLUBKONNECT_PASSWORD", hint: "Login password" },
+                ].map((cred) => (
+                  <div key={cred.label} className="p-2 rounded bg-muted/60 text-center">
+                    <p className="text-[10px] font-mono font-bold text-foreground leading-tight">{cred.label}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">{cred.hint}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                To update Clubkonnect credentials, ask your platform admin to update the environment variables.
               </p>
             </div>
 
             <p className="text-xs text-muted-foreground">
               To manage data plan IDs, go to <strong>Admin → Data Plans</strong>.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Service Provider Selection */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Settings className="text-primary" size={18} />
+              <CardTitle className="text-base">Service Providers</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Choose which API provider handles each service. Click a provider name to switch — save when done.
+            </p>
+
+            {/* Airtime — fixed to Clubkonnect */}
+            <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Phone size={16} className="text-primary" />
+                <div>
+                  <p className="font-semibold text-sm">Airtime</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Active: <span className="font-medium text-foreground">Clubkonnect</span>
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[10px]">Clubkonnect only</Badge>
+            </div>
+
+            <ProviderToggle
+              label="Mobile Data"
+              icon={Zap}
+              current={dataProvider}
+              onChange={setDataProvider}
+              options={["easyaccess", "clubkonnect"]}
+            />
+            <ProviderToggle
+              label="Electricity"
+              icon={Zap}
+              current={electricityProvider}
+              onChange={setElectricityProvider}
+              options={["easyaccess", "clubkonnect"]}
+            />
+            <ProviderToggle
+              label="Cable TV"
+              icon={Zap}
+              current={cableProvider}
+              onChange={setCableProvider}
+              options={["easyaccess", "clubkonnect"]}
+            />
+            <ProviderToggle
+              label="Exam Tokens"
+              icon={BookOpen}
+              current={examProvider}
+              onChange={setExamProvider}
+              options={["easyaccess", "clubkonnect"]}
+            />
+
+            <p className="text-xs text-muted-foreground pt-1">
+              Both providers support all services above. Make sure you have valid credentials for whichever you choose.
             </p>
           </CardContent>
         </Card>
@@ -222,7 +355,7 @@ export default function AdminSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Ensure WAEC, NECO, JAMB and NABTEB exam types are available in the system. Click below to add any that are missing.
+              Ensure WAEC, NECO, JAMB and NABTEB exam types are available. Click below to add any that are missing.
             </p>
             <div className="grid grid-cols-4 gap-2 text-center">
               {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
@@ -249,7 +382,7 @@ export default function AdminSettings() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Test whether the Monnify API credentials are working. This helps diagnose why dedicated virtual accounts may not be generating.
+              Test whether Monnify credentials are working. Helps diagnose issues with virtual account generation.
             </p>
             <Button variant="outline" onClick={handleTestMonnify} disabled={testingMonnify} className="gap-2">
               {testingMonnify ? <Loader2 size={14} className="animate-spin" /> : <Bug size={14} />}
@@ -317,7 +450,7 @@ export default function AdminSettings() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <CreditCard className="text-primary" size={18} />
-              <CardTitle className="text-base">Bank Transfer (EasyAccess Account)</CardTitle>
+              <CardTitle className="text-base">Bank Transfer (Manual Funding)</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

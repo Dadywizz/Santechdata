@@ -25,7 +25,28 @@ import {
   eaPayTV,
   eaPurchaseExam,
 } from "../lib/providers/easyaccess";
-import { isVtpassConfigured, vtpassPurchaseAirtime } from "../lib/providers/vtpass";
+import {
+  isClubkonnectConfigured,
+  clubkonnectPurchaseAirtime,
+  clubkonnectVerifyMeter,
+  clubkonnectPayElectricity,
+  clubkonnectGetExamPins,
+} from "../lib/providers/clubkonnect";
+
+// ── PROVIDER HELPER ────────────────────────────────────────────────────────────
+// Read a single settings key from the DB. Returns undefined if not set.
+async function getSetting(key: string): Promise<string | undefined> {
+  const [s] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+  return s?.value;
+}
+
+// Clubkonnect electricity network IDs (matches EasyAccess company codes 1-12)
+const CK_ELEC_NETWORK_ID: Record<string, string> = {
+  "ikeja-electric": "1", "eko-electric": "2", "abuja-electric": "3",
+  "kaduna-electric": "4", "portharcourt-electric": "5", "ibadan-electric": "6",
+  "enugu-electric": "7", "jos-electric": "8", "benin-electric": "9",
+  "kano-electric": "10", "yola-electric": "11", "aba-electric": "12",
+};
 
 const router: IRouter = Router();
 
@@ -168,7 +189,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { network, phone, amount } = parsed.data;
 
-  if (!isVtpassConfigured()) {
+  if (!isClubkonnectConfigured()) {
     res.status(503).json({ error: "Airtime service is not currently configured. Please contact support on 09026329296." });
     return;
   }
@@ -185,11 +206,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    const result = await vtpassPurchaseAirtime({ network, phone, amount });
-    delivered = result.code === "000";
-    req.log?.info({ result }, "VTpass airtime purchase response");
+    const result = await clubkonnectPurchaseAirtime({ network, phone, amount, requestId: reference });
+    delivered = result.status === "200";
+    req.log?.info({ result }, "Clubkonnect airtime purchase response");
   } catch (err) {
-    req.log?.error({ err }, "VTpass airtime purchase error");
+    req.log?.error({ err }, "Clubkonnect airtime purchase error");
   }
 
   if (!delivered) {
@@ -260,25 +281,27 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
     return;
   }
   const { meterNumber, providerCode, meterType } = parsed.data;
-
-  if (!isEasyAccessConfigured()) {
-    res.json({ meterNumber, name: "Customer", address: "" });
-    return;
-  }
+  const elecProvider = await getSetting("electricityProvider") ?? "easyaccess";
 
   try {
-    const result = await eaVerifyMeter({
-      companyCode: providerCode.toLowerCase(),
-      meterType: meterType ?? "prepaid",
-      meterNo: meterNumber,
-    });
-    res.json({
-      meterNumber,
-      name: result.name || "Customer",
-      address: result.address || "",
-    });
+    if (elecProvider === "clubkonnect" && isClubkonnectConfigured()) {
+      const networkId = CK_ELEC_NETWORK_ID[providerCode.toLowerCase()];
+      const meterTypeCode = (meterType ?? "prepaid").toLowerCase() === "postpaid" ? "2" : "1";
+      if (!networkId) { res.json({ meterNumber, name: "Customer", address: "" }); return; }
+      const result = await clubkonnectVerifyMeter({ meterNumber, networkId, meterType: meterTypeCode });
+      res.json({ meterNumber, name: result.CustomerName || "Customer", address: result.CustomerAddress || "" });
+    } else if (isEasyAccessConfigured()) {
+      const result = await eaVerifyMeter({
+        companyCode: providerCode.toLowerCase(),
+        meterType: meterType ?? "prepaid",
+        meterNo: meterNumber,
+      });
+      res.json({ meterNumber, name: result.name || "Customer", address: result.address || "" });
+    } else {
+      res.json({ meterNumber, name: "Customer", address: "" });
+    }
   } catch (err) {
-    req.log?.error({ err }, "EasyAccess meter verify error");
+    req.log?.error({ err }, "Meter verify error");
     res.json({ meterNumber, name: "Customer", address: "" });
   }
 });
@@ -312,19 +335,31 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const reference = `ELEC-${Date.now()}`;
   let elecToken = "";
   let delivered = false;
+  const elecProvider = await getSetting("electricityProvider") ?? "easyaccess";
 
   try {
-    const eaRes = await eaPayElectricity({
-      companyCode: providerCode.toLowerCase(),
-      meterType: meterType ?? "prepaid",
-      meterNo: meterNumber,
-      amount,
-    });
-    delivered = eaRes.success;
-    elecToken = eaRes.token;
-    req.log?.info({ eaRes }, "EasyAccess electricity purchase response");
+    if (elecProvider === "clubkonnect" && isClubkonnectConfigured()) {
+      const networkId = CK_ELEC_NETWORK_ID[providerCode.toLowerCase()];
+      const meterTypeCode = (meterType ?? "prepaid").toLowerCase() === "postpaid" ? "2" : "1";
+      if (networkId) {
+        const ckRes = await clubkonnectPayElectricity({ meterNumber, networkId, meterType: meterTypeCode, amount, phone: phone ?? "", requestId: reference });
+        delivered = ckRes.status === "200";
+        elecToken = ckRes.token ?? "";
+        req.log?.info({ ckRes }, "Clubkonnect electricity purchase response");
+      }
+    } else {
+      const eaRes = await eaPayElectricity({
+        companyCode: providerCode.toLowerCase(),
+        meterType: meterType ?? "prepaid",
+        meterNo: meterNumber,
+        amount,
+      });
+      delivered = eaRes.success;
+      elecToken = eaRes.token;
+      req.log?.info({ eaRes }, "EasyAccess electricity purchase response");
+    }
   } catch (err) {
-    req.log?.error({ err }, "EasyAccess electricity purchase error");
+    req.log?.error({ err }, "Electricity purchase error");
   }
 
   if (!delivered) {
@@ -571,19 +606,30 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let pins: Array<{ pin: string; serial: string }> = [];
   let delivered = false;
 
-  // Determine exam board key for EasyAccess
-  let examBoard = "waec";
-  if (code.includes("neco")) examBoard = "neco";
-  else if (code.includes("nabteb")) examBoard = "nabteb";
-  else if (code.includes("jamb")) examBoard = "jamb";
+  const examProvider = await getSetting("examProvider") ?? "easyaccess";
 
   try {
-    const eaRes = await eaPurchaseExam({ examBoard, count: quantity });
-    delivered = eaRes.success;
-    pins = eaRes.pins;
-    req.log?.info({ eaRes }, "EasyAccess exam purchase response");
+    if (examProvider === "clubkonnect" && isClubkonnectConfigured()) {
+      const examRef = `EXAM-CK-${Date.now()}`;
+      const ckRes = await clubkonnectGetExamPins({ examType: examType.code, quantity, requestId: examRef });
+      delivered = ckRes.status === "200";
+      if (delivered && Array.isArray(ckRes.Pins)) {
+        pins = ckRes.Pins.map((p: string) => ({ pin: p, serial: "" }));
+      }
+      req.log?.info({ ckRes }, "Clubkonnect exam purchase response");
+    } else {
+      // EasyAccess
+      let examBoard = "waec";
+      if (code.includes("neco")) examBoard = "neco";
+      else if (code.includes("nabteb")) examBoard = "nabteb";
+      else if (code.includes("jamb")) examBoard = "jamb";
+      const eaRes = await eaPurchaseExam({ examBoard, count: quantity });
+      delivered = eaRes.success;
+      pins = eaRes.pins;
+      req.log?.info({ eaRes }, "EasyAccess exam purchase response");
+    }
   } catch (err) {
-    req.log?.error({ err }, "EasyAccess exam purchase error");
+    req.log?.error({ err }, "Exam purchase error");
   }
 
   if (!delivered) {
