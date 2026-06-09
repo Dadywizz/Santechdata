@@ -89,9 +89,10 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   try {
     const r = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
     req.log?.info({ r }, "KYB Data purchase response");
-    const st = String(r.status ?? "").toLowerCase();
+    const success = (r as any).success === true;
+    const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
-    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+    delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Data purchase error"); }
 
@@ -141,9 +142,10 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   try {
     const r = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
     req.log?.info({ r }, "KYB Data airtime response");
-    const st = String(r.status ?? "").toLowerCase();
+    const success = (r as any).success === true;
+    const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
-    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+    delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Airtime purchase error"); }
 
@@ -229,11 +231,12 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
     const r = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
     req.log?.info({ r }, "KYB Data electricity response");
-    const st = String(r.status ?? "").toLowerCase();
+    const success = (r as any).success === true;
+    const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
-    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+    delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-    elecToken = r.token ?? "";
+    elecToken = r.token ?? (r as any).data?.token ?? "";
   } catch (err) { req.log?.error({ err }, "Electricity purchase error"); }
 
   if (!delivered) {
@@ -337,9 +340,10 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   try {
     const r = await kybdataPurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
     req.log?.info({ r }, "KYB Data cable response");
-    const st = String(r.status ?? "").toLowerCase();
+    const success = (r as any).success === true;
+    const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
-    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+    delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Cable subscribe error"); }
 
@@ -384,9 +388,11 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   if (!examType) { res.status(404).json({ error: "Exam type not found" }); return; }
   if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
-  const code = examType.code.toLowerCase();
-  if (!["waec", "neco", "nabteb", "jamb"].some((b) => code.includes(b))) {
-    res.status(503).json({ error: `${examType.name} tokens are not available. Please contact support on 09026329296.` }); return;
+  // KYB Data numeric IDs for exam types
+  const KYB_EXAM_IDS: Record<string, number> = { NECO: 19, WAEC: 34 };
+  const kybExamId = KYB_EXAM_IDS[examType.code.toUpperCase()];
+  if (!kybExamId) {
+    res.status(503).json({ error: `${examType.code} tokens are not currently available. Please contact support on 09026329296.` }); return;
   }
 
   const totalCost = parseFloat(examType.price) * quantity;
@@ -401,13 +407,17 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const r = await kybdataPurchaseExam({ examid: examType.code, quantity });
+    const r = await kybdataPurchaseExam({ examid: kybExamId, quantity });
     req.log?.info({ r }, "KYB Data exam response");
-    const st = String(r.status ?? "").toLowerCase();
+    // KYB returns { success: true/false, message, data }
+    const success = (r as any).success === true;
+    const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
-    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+    delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-    if (delivered && Array.isArray(r.pins)) pins = r.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
+    // Extract pins from response: may be in r.pins, r.data.pins, or r.data
+    const pinsRaw = r.pins ?? (r as any).data?.pins ?? (r as any).data ?? [];
+    if (delivered && Array.isArray(pinsRaw)) pins = pinsRaw.map((p: any) => ({ pin: String(p.pin ?? p.token ?? p), serial: String(p.serial ?? p.sn ?? "") }));
   } catch (err) { req.log?.error({ err }, "Exam purchase error"); }
 
   if (!delivered) {
