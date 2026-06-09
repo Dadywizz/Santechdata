@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchaseAirtime } from "@workspace/api-client-react";
-import { Check, X } from "lucide-react";
+import { Check, X, AlertTriangle } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const NETWORKS = [
@@ -64,7 +64,16 @@ export default function BuyAirtime() {
     <AppLayout>
       <PageHeader title="Buy Airtime" description="Instant airtime recharge for all networks" />
 
-      <div className="grid gap-8 md:grid-cols-3 max-w-4xl pb-28">
+      {/* Unavailability notice */}
+      <div className="max-w-4xl mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+        <div>
+          <p className="font-semibold">Airtime recharge is temporarily unavailable</p>
+          <p className="text-sm mt-0.5">We are working to restore this service. Please contact support on <strong>09026329296</strong> for urgent airtime needs.</p>
+        </div>
+      </div>
+
+      <div className="grid gap-8 md:grid-cols-3 max-w-4xl pb-28 opacity-50 pointer-events-none select-none">
         <div className="md:col-span-1 space-y-6">
           <div>
             <Label className="text-base font-semibold mb-3 block">Select Network</Label>
