@@ -394,6 +394,17 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
     return;
   }
 
+  // KYB Data returns: { success, data: [{ id, name, amount, category, available }] }
+  // category examples: "MTN GIFTING", "AIRTEL SME", "GLO SME ", "9MOBILE CG"
+  function extractNetwork(category: string): string | null {
+    const c = (category || "").trim().toUpperCase();
+    if (c.startsWith("MTN")) return "MTN";
+    if (c.startsWith("AIRTEL")) return "AIRTEL";
+    if (c.startsWith("GLO")) return "GLO";
+    if (c.startsWith("9MOBILE") || c.startsWith("ETISALAT")) return "9MOBILE";
+    return null;
+  }
+
   function parseSize(name: string): string {
     const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
     if (!m) return "?";
@@ -401,9 +412,8 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
     return `${m[1]}${unit}`.slice(0, 20);
   }
 
-  function parseValidity(name: string, raw?: string): string {
-    const src = raw || name;
-    const m = src.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
+  function parseValidity(name: string): string {
+    const m = name.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
     if (!m) return "30 Days";
     const n = parseInt(m[1]);
     const u = m[2].toLowerCase();
@@ -416,18 +426,25 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
   const errors: string[] = [];
 
   try {
-    const plans = await kybdataGetDataPlans();
-    req.log?.info({ count: plans.length }, "KYB Data sync: fetched plans");
+    // Fetch raw from KYB Data — their actual field names are: id, name, amount, category, available
+    const raw = await kybdataGetDataPlans() as unknown as Array<Record<string, unknown>>;
+    req.log?.info({ count: raw.length }, "KYB Data sync: fetched plans");
 
-    for (const p of plans) {
-      if (!p.id || !p.network) continue;
-      const providerCode = String(p.id);
-      const network = p.network.toUpperCase().replace("ETISALAT", "9MOBILE");
-      if (!["MTN", "AIRTEL", "GLO", "9MOBILE"].includes(network)) continue;
+    for (const p of raw) {
+      const id = p.id ?? p.plan_id;
+      const name = String(p.name ?? "").trim();
+      const category = String(p.category ?? p.network ?? "").trim();
+      const available = p.available !== false;
+      const price = Number(p.amount ?? p.price ?? 0);
 
-      const size = p.size ? String(p.size).slice(0, 20) : parseSize(p.name);
-      const validity = parseValidity(p.name, p.validity);
-      const price = Number(p.price) || 0;
+      if (!id || !name || price <= 0 || !available) continue;
+
+      const network = extractNetwork(category);
+      if (!network) continue;
+
+      const providerCode = String(id);
+      const size = parseSize(name);
+      const validity = parseValidity(name);
       const costPrice = (price * 0.97).toFixed(2);
 
       const existing = await db.select({ id: dataPlansTable.id })
@@ -436,13 +453,13 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
 
       if (existing.length > 0) {
         await db.update(dataPlansTable)
-          .set({ name: p.name.slice(0, 100), size, validity, price: price.toString(), costPrice, updatedAt: new Date() })
+          .set({ name: name.slice(0, 100), size, validity, price: price.toString(), costPrice, updatedAt: new Date() })
           .where(eq(dataPlansTable.providerCode, providerCode));
         updated++;
       } else {
         await db.insert(dataPlansTable).values({
           network,
-          name: p.name.slice(0, 100),
+          name: name.slice(0, 100),
           size, validity,
           price: price.toString(),
           costPrice,
