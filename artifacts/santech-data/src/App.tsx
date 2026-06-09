@@ -34,8 +34,6 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
 import BuyAirtime from "@/pages/buy-airtime";
-import AirtimeToCash from "@/pages/airtime-to-cash";
-import AdminAirtimeToCash from "@/pages/admin/airtime-to-cash";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,8 +81,6 @@ function Router() {
       <Route path="/admin/notifications" component={AdminNotifications} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/failed-payments" component={AdminFailedPayments} />
-      <Route path="/airtime-to-cash" component={AirtimeToCash} />
-      <Route path="/admin/airtime-to-cash" component={AdminAirtimeToCash} />
 
       <Route component={NotFound} />
     </Switch>
