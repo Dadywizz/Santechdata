@@ -167,7 +167,7 @@ export async function monnifyCreateReservedAccount(opts: {
       contractCode: process.env.MONNIFY_CONTRACT_CODE,
       customerEmail: opts.customerEmail,
       customerName: opts.customerName,
-      getAllAvailableBanks: false,
+      getAllAvailableBanks: true,
     }),
   });
   const data = await res.json() as {
