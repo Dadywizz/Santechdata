@@ -1,8 +1,8 @@
 import { useGetWallet, getGetWalletQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Eye, EyeOff, Copy, CheckCircle2, Landmark, Loader2, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { CreditCard, Eye, EyeOff, Copy, CheckCircle2, Landmark, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,8 @@ export function WalletCard() {
   const [showBalance, setShowBalance] = useState(true);
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const autoTriggered = useRef(false);
   const queryClient = useQueryClient();
   const { data: wallet, isLoading } = useGetWallet({
     query: { queryKey: getGetWalletQueryKey() }
@@ -26,8 +28,6 @@ export function WalletCard() {
       setTimeout(() => setCopied(false), 2000);
     });
   };
-
-  const [genError, setGenError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -50,6 +50,13 @@ export function WalletCard() {
       setGenerating(false);
     }
   };
+
+  useEffect(() => {
+    if (!isLoading && !virtualAccountNumber && !autoTriggered.current) {
+      autoTriggered.current = true;
+      handleGenerate();
+    }
+  }, [isLoading, virtualAccountNumber]);
 
   return (
     <div className="space-y-3">
@@ -96,19 +103,21 @@ export function WalletCard() {
         </CardContent>
       </Card>
 
-      {/* Dedicated Funding Account — always shown, reflects loading/empty/ready states */}
+      {/* Dedicated Funding Account */}
       <Card className="border-2 border-dashed border-primary/20 bg-primary/5">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <Landmark size={16} className="text-primary" />
             <p className="text-xs font-semibold text-primary uppercase tracking-wide">Auto Funding Account</p>
-            <span className="ml-auto text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">Auto-credited</span>
+            <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Auto-credited</span>
           </div>
 
-          {isLoading ? (
+          {isLoading || generating ? (
             <div className="flex items-center gap-2">
               <Loader2 size={16} className="animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Loading account...</span>
+              <span className="text-sm text-muted-foreground">
+                {generating ? "Setting up your account…" : "Loading account..."}
+              </span>
             </div>
           ) : virtualAccountNumber ? (
             <div className="flex items-center justify-between gap-3">
@@ -128,21 +137,21 @@ export function WalletCard() {
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">No account assigned yet.</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  className="shrink-0 gap-1 border-primary/30 text-primary hover:bg-primary/10"
-                >
-                  {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                  {generating ? "Generating..." : "Generate Account"}
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                {genError ? "Could not assign account automatically." : "No account assigned yet."}
+              </p>
               {genError && (
-                <p className="text-xs text-red-500">{genError}</p>
+                <>
+                  <p className="text-xs text-red-500">{genError}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerate}
+                    className="gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    Retry
+                  </Button>
+                </>
               )}
             </div>
           )}
