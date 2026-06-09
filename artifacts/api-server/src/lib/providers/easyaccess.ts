@@ -241,6 +241,32 @@ export async function eaPayTV({
   return { success: isSuccess(raw), message: String(raw.message ?? ""), raw };
 }
 
+// ── CABLE TV PLANS ────────────────────────────────────────────────────────────
+
+export interface EaCablePlan {
+  id: number;
+  name: string;
+  amount: number;
+  validity: string;
+}
+
+export async function eaGetCablePlans(provider: string): Promise<EaCablePlan[]> {
+  const providerKey = provider.toLowerCase();
+  try {
+    const raw = await get(`get-plans?product_type=${providerKey}`);
+    const data = (raw.data ?? raw.plans ?? []) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return [];
+    return data.map((p) => ({
+      id: Number(p.id ?? p.plan_id ?? 0),
+      name: String(p.name ?? p.plan_name ?? ""),
+      amount: Number(p.amount ?? p.price ?? 0),
+      validity: String(p.validity ?? "Monthly"),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // ── EXAM PINS ─────────────────────────────────────────────────────────────────
 
 export interface EaExamPin {

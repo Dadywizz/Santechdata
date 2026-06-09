@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import {
+  Settings, Mail, CreditCard, Megaphone, Save, Loader2,
+  ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle, AlertCircle,
+} from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -36,67 +38,29 @@ async function callAdminAction(path: string): Promise<any> {
   return res.json();
 }
 
-
-function CredentialField({
-  label, value, onChange, placeholder, hint,
-}: {
-  label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; hint?: string;
+function SectionCard({ icon: Icon, title, children }: {
+  icon: React.ElementType; title: string; children: React.ReactNode;
 }) {
-  const [show, setShow] = useState(false);
   return (
-    <div className="space-y-1">
-      <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
-      <div className="flex gap-2">
-        <Input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder ?? "Enter value"}
-          className="h-10 font-mono text-sm"
-        />
-        <Button variant="outline" size="sm" onClick={() => setShow((v) => !v)} className="shrink-0 px-2.5 h-10">
-          {show ? <EyeOff size={14} /> : <Eye size={14} />}
-        </Button>
-      </div>
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+            <Icon size={14} className="text-blue-600" />
+          </div>
+          <CardTitle className="text-sm font-bold text-slate-800">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 space-y-4">{children}</CardContent>
+    </Card>
   );
 }
 
-function ProviderCard({
-  name, icon: Icon, color, configured, badges, children,
-}: {
-  name: string; icon: React.ElementType; color: string; configured: boolean;
-  badges: string[]; children: React.ReactNode;
-}) {
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <div className="p-4 rounded-lg border border-border space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <Icon size={16} className={color} />
-          <p className="font-bold text-sm">{name}</p>
-          <div className="flex gap-1">
-            {badges.map((b) => (
-              <Badge key={b} variant="outline" className="text-[10px] h-4 px-1.5">{b}</Badge>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs">
-          {configured ? (
-            <>
-              <CheckCircle size={13} className="text-green-500" />
-              <span className="text-green-600 font-semibold">Configured</span>
-            </>
-          ) : (
-            <>
-              <AlertCircle size={13} className="text-amber-500" />
-              <span className="text-amber-600 font-semibold">Not set</span>
-            </>
-          )}
-        </div>
-      </div>
-      {children}
+    <div className={`flex items-center gap-1.5 text-xs font-semibold ${ok ? "text-green-600" : "text-amber-600"}`}>
+      {ok ? <CheckCircle size={13} className="text-green-500" /> : <AlertCircle size={13} className="text-amber-500" />}
+      {label}
     </div>
   );
 }
@@ -123,8 +87,9 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  // KYB Data credentials
-  const [kybToken, setKybToken] = useState("");
+  // Provider status (read from env, not editable here)
+  const [eaConfigured, setEaConfigured] = useState(false);
+  const [ckConfigured, setCkConfigured] = useState(false);
 
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -142,17 +107,16 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
-      if (s.kybdata_api_token) setKybToken(s.kybdata_api_token);
+      setEaConfigured(s.easyaccess_configured === "true");
+      setCkConfigured(s.clubkonnect_configured === "true");
       setLoading(false);
     });
   }, []);
 
-  const kybConfigured = !!kybToken;
-
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload: Record<string, string> = {
+      await saveSettings({
         supportEmail, supportPhone, whatsapp, announcement,
         announcementActive: String(announcementActive),
         paystackActive: String(paystackActive),
@@ -161,9 +125,7 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
-      };
-      if (kybToken) payload.kybdata_api_token = kybToken;
-      await saveSettings(payload);
+      });
       toast({ title: "Settings saved!", description: "All changes applied." });
     } catch {
       toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
@@ -204,7 +166,7 @@ export default function AdminSettings() {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
       </AdminLayout>
     );
@@ -213,259 +175,168 @@ export default function AdminSettings() {
   return (
     <AdminLayout>
       <div className="flex items-start justify-between mb-6">
-        <PageHeader title="App Settings" description="Configure your SanTech Data platform" />
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          {saving ? "Saving..." : "Save All Changes"}
+        <PageHeader title="Settings" description="Configure your SanTech Data platform" />
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-5 max-w-xl">
 
-        {/* KYB Data Credentials */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Key className="text-primary" size={18} />
-              <CardTitle className="text-base">KYB Data — Provider Credentials</CardTitle>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              KYB Data powers all services (airtime, data, electricity, cable, exam). Changes take effect immediately after saving.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ProviderCard
-              name="KYB Data"
-              icon={Key}
-              color="text-orange-500"
-              configured={kybConfigured}
-              badges={["Airtime", "Data", "Electricity", "Cable", "Exam"]}
-            >
-              <CredentialField
-                label="API Token"
-                value={kybToken}
-                onChange={setKybToken}
-                placeholder="Your KYB Data Bearer token"
-                hint="Generate via POST /api/v2/create-api-key on your KYB Data account. Paste the token here."
-              />
-            </ProviderCard>
-            <p className="text-xs text-muted-foreground">
-              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Exam Types Management */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <BookOpen className="text-primary" size={18} />
-              <CardTitle className="text-base">Exam Types</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Ensure WAEC, NECO, JAMB and NABTEB exam types are available. Click below to add any that are missing.
-            </p>
-            <div className="grid grid-cols-4 gap-2 text-center">
-              {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
-                <div key={code} className="p-3 rounded-lg border border-border bg-muted/40">
-                  <p className="font-bold text-sm">{code}</p>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" onClick={handleSeedExams} disabled={seedingExams} className="gap-2">
-              {seedingExams ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {seedingExams ? "Syncing..." : "Sync Exam Types"}
-            </Button>
-            <p className="text-xs text-muted-foreground">Safe to run multiple times — only adds missing types, never duplicates.</p>
-          </CardContent>
-        </Card>
-
-        {/* Monnify Debug */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Bug className="text-primary" size={18} />
-              <CardTitle className="text-base">Monnify Connection Test</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Test whether Monnify credentials are working. Helps diagnose issues with virtual account generation.
-            </p>
-            <Button variant="outline" onClick={handleTestMonnify} disabled={testingMonnify} className="gap-2">
-              {testingMonnify ? <Loader2 size={14} className="animate-spin" /> : <Bug size={14} />}
-              {testingMonnify ? "Testing..." : "Test Monnify Auth"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Contact & Support */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Mail className="text-primary" size={18} />
-              <CardTitle className="text-base">Contact & Support</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="font-semibold mb-2 block">Support Email</Label>
-              <Input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@yourdomain.com" className="h-12" />
-              <p className="text-xs text-muted-foreground mt-1">Shown to customers on the support page</p>
-            </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Support Phone Number</Label>
-              <Input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} placeholder="e.g. 09026329296" className="h-12" />
-            </div>
-            <div>
-              <Label className="font-semibold mb-2 block">WhatsApp Number</Label>
-              <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="e.g. 09026329296" className="h-12" />
-              <p className="text-xs text-muted-foreground mt-1">Used for WhatsApp support link</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Announcement Banner */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Megaphone className="text-primary" size={18} />
-              <CardTitle className="text-base">Announcement Banner</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+        {/* Provider Status */}
+        <SectionCard icon={Settings} title="Service Providers">
+          <p className="text-xs text-slate-500 -mt-1">
+            Providers are configured via environment variables on the server. Contact your developer to update them.
+          </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
               <div>
-                <p className="font-semibold text-sm">Show announcement to all customers</p>
-                <p className="text-xs text-muted-foreground">Displays a banner on the customer dashboard</p>
+                <p className="text-sm font-semibold text-slate-800">EasyAccess</p>
+                <p className="text-xs text-slate-500">Data · Electricity · Cable TV · Exam Pins</p>
               </div>
-              <Switch checked={announcementActive} onCheckedChange={setAnnouncementActive} />
+              <StatusBadge ok={eaConfigured} label={eaConfigured ? "Active" : "Token needed"} />
             </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Announcement Message</Label>
-              <Textarea
-                value={announcement}
-                onChange={(e) => setAnnouncement(e.target.value)}
-                placeholder="e.g. We are currently experiencing high demand. Orders may take longer than usual."
-                className="resize-none min-h-[80px]"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bank Transfer */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="text-primary" size={18} />
-              <CardTitle className="text-base">Bank Transfer (Manual Funding)</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
               <div>
-                <p className="font-semibold text-sm">Show bank transfer option to customers</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Customers will see your account number and transfer directly to fund their wallet (manual approval).
-                </p>
+                <p className="text-sm font-semibold text-slate-800">Clubkonnect</p>
+                <p className="text-xs text-slate-500">Airtime</p>
               </div>
-              <Switch checked={bankTransferActive} onCheckedChange={setBankTransferActive} />
+              <StatusBadge ok={ckConfigured} label={ckConfigured ? "Active" : "Credentials needed"} />
             </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Bank Name</Label>
-              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Opay, Moniepoint, GTBank" className="h-12" />
-            </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Account Number</Label>
-              <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="e.g. 8012345678" className="h-12 font-mono" />
-            </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Account Name</Label>
-              <Input value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} placeholder="e.g. SanTech Data / Your Name" className="h-12" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Customers will be instructed to transfer and then contact you to get their wallet credited.
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
 
-        {/* Airtime to Cash */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="text-primary" size={18} />
-              <CardTitle className="text-base">Airtime to Cash</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border">
-              <div>
-                <p className="font-semibold text-sm">Allow customers to submit requests</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  When frozen, customers will see an unavailability notice and the API will block new submissions.
-                </p>
-              </div>
-              <Switch
-                checked={airtimeToCashActive}
-                onCheckedChange={setAirtimeToCashActive}
-                className={!airtimeToCashActive ? "data-[state=unchecked]:bg-red-400" : ""}
-              />
-            </div>
-            {!airtimeToCashActive && (
-              <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
-                ⚠️ Service is currently <strong>frozen</strong> — customers cannot submit new requests.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Payment Gateways */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="text-primary" size={18} />
-              <CardTitle className="text-base">Payment Gateways</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Enable or disable which gateways customers can use to fund their wallets.</p>
-            {[
-              { label: "Paystack", desc: "Cards, Bank Transfer, USSD", value: paystackActive, set: setPaystackActive },
-              { label: "Monnify", desc: "Bank Transfer, USSD", value: monnifyActive, set: setMonnifyActive },
-            ].map(({ label, desc, value, set }) => (
-              <div key={label} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <p className="font-semibold text-sm">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </div>
-                <Switch checked={value} onCheckedChange={set} />
+        {/* Exam Types */}
+        <SectionCard icon={BookOpen} title="Exam Types">
+          <p className="text-xs text-slate-500 -mt-1">
+            Ensure WAEC, NECO, JAMB and NABTEB are available for customers.
+          </p>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
+              <div key={code} className="p-3 rounded-xl border border-slate-200 bg-slate-50">
+                <p className="font-bold text-xs text-slate-700">{code}</p>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleSeedExams} disabled={seedingExams} className="gap-2">
+            {seedingExams ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {seedingExams ? "Syncing..." : "Sync Exam Types"}
+          </Button>
+        </SectionCard>
+
+        {/* Payment Gateways */}
+        <SectionCard icon={CreditCard} title="Payment Gateways">
+          <p className="text-xs text-slate-500 -mt-1">Choose which gateways customers can use to fund their wallets.</p>
+          {[
+            { label: "Paystack", desc: "Cards, Bank Transfer, USSD", value: paystackActive, set: setPaystackActive },
+            { label: "Monnify",  desc: "Bank Transfer, USSD",        value: monnifyActive,  set: setMonnifyActive  },
+          ].map(({ label, desc, value, set }) => (
+            <div key={label} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">{label}</p>
+                <p className="text-xs text-slate-500">{desc}</p>
+              </div>
+              <Switch checked={value} onCheckedChange={set} />
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={handleTestMonnify} disabled={testingMonnify} className="gap-2">
+            {testingMonnify ? <Loader2 size={13} className="animate-spin" /> : <Bug size={13} />}
+            {testingMonnify ? "Testing..." : "Test Monnify"}
+          </Button>
+        </SectionCard>
+
+        {/* Bank Transfer */}
+        <SectionCard icon={CreditCard} title="Manual Bank Transfer">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Enable bank transfer option</p>
+              <p className="text-xs text-slate-500 mt-0.5">Customers will see your account number to transfer manually</p>
+            </div>
+            <Switch checked={bankTransferActive} onCheckedChange={setBankTransferActive} />
+          </div>
+          {bankTransferActive && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Bank Name</Label>
+                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Opay, GTBank" className="h-10" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Account Number</Label>
+                <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} placeholder="e.g. 8012345678" className="h-10 font-mono" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Account Name</Label>
+                <Input value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} placeholder="e.g. SanTech Data" className="h-10" />
+              </div>
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Airtime to Cash */}
+        <SectionCard icon={ArrowRightLeft} title="Airtime to Cash">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Allow customer submissions</p>
+              <p className="text-xs text-slate-500 mt-0.5">Turn off to temporarily stop new requests</p>
+            </div>
+            <Switch checked={airtimeToCashActive} onCheckedChange={setAirtimeToCashActive} />
+          </div>
+          {!airtimeToCashActive && (
+            <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+              ⚠️ Service is currently <strong>paused</strong> — customers cannot submit new requests.
+            </p>
+          )}
+        </SectionCard>
+
+        {/* Announcement */}
+        <SectionCard icon={Megaphone} title="Announcement Banner">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Show banner to all customers</p>
+              <p className="text-xs text-slate-500">Displays on the customer dashboard</p>
+            </div>
+            <Switch checked={announcementActive} onCheckedChange={setAnnouncementActive} />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Message</Label>
+            <Textarea
+              value={announcement}
+              onChange={(e) => setAnnouncement(e.target.value)}
+              placeholder="e.g. Service is running smoothly. Enjoy fast data delivery!"
+              className="resize-none min-h-[80px] text-sm"
+            />
+          </div>
+        </SectionCard>
+
+        {/* Contact */}
+        <SectionCard icon={Mail} title="Contact & Support">
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Support Email</Label>
+            <Input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@yourdomain.com" className="h-10" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Support Phone</Label>
+            <Input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} placeholder="e.g. 09026329296" className="h-10" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">WhatsApp Number</Label>
+            <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="e.g. 09026329296" className="h-10" />
+          </div>
+        </SectionCard>
 
         {/* Wallet Settings */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="text-primary" size={18} />
-              <CardTitle className="text-base">Wallet Settings</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="font-semibold mb-2 block">Minimum Funding Amount (₦)</Label>
-              <Input type="number" value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="e.g. 100" className="h-12" />
-            </div>
-            <div>
-              <Label className="font-semibold mb-2 block">Referral Bonus (₦)</Label>
-              <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} placeholder="e.g. 200" className="h-12" />
-              <p className="text-xs text-muted-foreground mt-1">Credited to both referrer and new user when a referred user funds their wallet for the first time.</p>
-            </div>
-          </CardContent>
-        </Card>
+        <SectionCard icon={CreditCard} title="Wallet Settings">
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Minimum Funding Amount (₦)</Label>
+            <Input type="number" value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="100" className="h-10" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Referral Bonus (₦)</Label>
+            <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} placeholder="200" className="h-10" />
+            <p className="text-xs text-slate-400 mt-1">Credited to both users when a referral funds their wallet for the first time.</p>
+          </div>
+        </SectionCard>
 
       </div>
     </AdminLayout>

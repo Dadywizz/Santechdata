@@ -53,7 +53,14 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - Contact number for support: 09026329296
 - Services: data, airtime, electricity, cable TV (DStv/GOtv/StarTimes), exam tokens (WAEC/NECO/JAMB/NABTEB)
 - Payment gateways: Paystack, Flutterwave, Monnify
-- VTU providers: VTpass, Clubkonnect, Reloadly
+- VTU providers: **EasyAccess** (data, electricity, cable, exam) + **Clubkonnect** (airtime only)
+- DO NOT use VTpass, KYB Data, or Nellobyte under any circumstances
+
+## Provider Setup
+
+- **EasyAccess** — token is `EASYACCESS_API_TOKEN` env var (already set). Handles data, electricity, cable TV, exam pins.
+- **Clubkonnect** — `CLUBKONNECT_PHONE`, `CLUBKONNECT_APIKEY`, `CLUBKONNECT_PASSWORD` env vars (already set). Handles airtime only.
+- Admin data plan sync: POST `/api/admin/sync-ea-plans` — syncs plans from EasyAccess into the DB
 
 ## Gotchas
 

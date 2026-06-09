@@ -11,7 +11,8 @@ import {
   settingsTable,
   examTypesTable,
 } from "@workspace/db";
-import { setKybdataToken } from "../lib/providers/kybdata";
+import { isEasyAccessConfigured } from "../lib/providers/easyaccess";
+import { isClubkonnectConfigured } from "../lib/providers/clubkonnect";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -495,6 +496,9 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const settings = await db.select().from(settingsTable);
   const obj: Record<string, string> = {};
   for (const s of settings) obj[s.key] = s.value;
+  // Inject live provider status (from env/memory, not DB)
+  obj.easyaccess_configured = String(isEasyAccessConfigured());
+  obj.clubkonnect_configured = String(isClubkonnectConfigured());
   res.json(obj);
 });
 
@@ -512,14 +516,9 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
     }
   }
 
-  let kybToken = "";
-
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    if (key === "kybdata_api_token") kybToken = value;
   }
-
-  if (kybToken) setKybdataToken(kybToken);
 
   res.json({ updated: entries.length });
 });
