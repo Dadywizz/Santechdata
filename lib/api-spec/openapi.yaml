@@ -317,8 +317,7 @@ paths:
       operationId: getDataPlans
       tags: [data]
       summary: Get available data plans
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: network
           in: query
@@ -527,8 +526,7 @@ paths:
       operationId: getExamTypes
       tags: [exam]
       summary: Get available exam types
-      security:
-        - bearerAuth: []
+      security: []
       responses:
         "200":
           description: Exam types
