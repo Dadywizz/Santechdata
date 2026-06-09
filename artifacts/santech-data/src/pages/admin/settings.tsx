@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Phone } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Phone, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -36,12 +36,18 @@ async function callAdminAction(path: string): Promise<any> {
   return res.json();
 }
 
-type Provider = "easyaccess" | "clubkonnect" | "vtpass";
+type Provider = "easyaccess" | "clubkonnect" | "nellobyte";
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   easyaccess: "EasyAccess",
   clubkonnect: "Clubkonnect",
-  vtpass: "VTpass",
+  nellobyte: "Nellobyte",
+};
+
+const PROVIDER_COLORS: Record<Provider, string> = {
+  easyaccess: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  clubkonnect: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  nellobyte: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
 };
 
 function ProviderToggle({
@@ -60,11 +66,11 @@ function ProviderToggle({
         <div>
           <p className="font-semibold text-sm">{label}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Active: <span className="font-medium text-foreground">{PROVIDER_LABELS[current]}</span>
+            Active: <span className={`font-semibold px-1.5 py-0.5 rounded text-[10px] ${PROVIDER_COLORS[current]}`}>{PROVIDER_LABELS[current]}</span>
           </p>
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {options.map((opt) => (
           <button
             key={opt}
@@ -79,6 +85,70 @@ function ProviderToggle({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CredentialField({
+  label, value, onChange, placeholder, hint,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; hint?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder ?? "Enter value"}
+          className="h-10 font-mono text-sm"
+        />
+        <Button variant="outline" size="sm" onClick={() => setShow((v) => !v)} className="shrink-0 px-2.5 h-10">
+          {show ? <EyeOff size={14} /> : <Eye size={14} />}
+        </Button>
+      </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function ProviderCard({
+  name, icon: Icon, color, configured, badges, children,
+}: {
+  name: string; icon: React.ElementType; color: string; configured: boolean;
+  badges: string[]; children: React.ReactNode;
+}) {
+  return (
+    <div className="p-4 rounded-lg border border-border space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Icon size={16} className={color} />
+          <p className="font-bold text-sm">{name}</p>
+          <div className="flex gap-1">
+            {badges.map((b) => (
+              <Badge key={b} variant="outline" className="text-[10px] h-4 px-1.5">{b}</Badge>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          {configured ? (
+            <>
+              <CheckCircle size={13} className="text-green-500" />
+              <span className="text-green-600 font-semibold">Configured</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle size={13} className="text-amber-500" />
+              <span className="text-amber-600 font-semibold">Not set</span>
+            </>
+          )}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -105,9 +175,17 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  // VTU provider API keys
+  // EasyAccess credentials
   const [easyAccessToken, setEasyAccessToken] = useState("");
-  const [showEaToken, setShowEaToken] = useState(false);
+
+  // Clubkonnect credentials
+  const [ckPhone, setCkPhone] = useState("");
+  const [ckApiKey, setCkApiKey] = useState("");
+  const [ckPassword, setCkPassword] = useState("");
+
+  // Nellobyte credentials
+  const [nbApiKey, setNbApiKey] = useState("");
+  const [nbUserId, setNbUserId] = useState("");
 
   // Per-service provider selection
   const [airtimeProvider, setAirtimeProvider] = useState<Provider>("clubkonnect");
@@ -132,7 +210,14 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
+      // Provider credentials
       if (s.easyaccess_api_token) setEasyAccessToken(s.easyaccess_api_token);
+      if (s.clubkonnect_phone) setCkPhone(s.clubkonnect_phone);
+      if (s.clubkonnect_apikey) setCkApiKey(s.clubkonnect_apikey);
+      if (s.clubkonnect_password) setCkPassword(s.clubkonnect_password);
+      if (s.nellobyte_apikey) setNbApiKey(s.nellobyte_apikey);
+      if (s.nellobyte_userid) setNbUserId(s.nellobyte_userid);
+      // Service providers
       if (s.airtimeProvider) setAirtimeProvider(s.airtimeProvider as Provider);
       if (s.dataProvider) setDataProvider(s.dataProvider as Provider);
       if (s.electricityProvider) setElectricityProvider(s.electricityProvider as Provider);
@@ -141,6 +226,10 @@ export default function AdminSettings() {
       setLoading(false);
     });
   }, []);
+
+  const eaConfigured = !!easyAccessToken;
+  const ckConfigured = !!(ckPhone && ckApiKey);
+  const nbConfigured = !!(nbApiKey && nbUserId);
 
   const handleSave = async () => {
     setSaving(true);
@@ -157,8 +246,13 @@ export default function AdminSettings() {
         airtimeProvider, dataProvider, electricityProvider, cableProvider, examProvider,
       };
       if (easyAccessToken) payload.easyaccess_api_token = easyAccessToken;
+      if (ckPhone) payload.clubkonnect_phone = ckPhone;
+      if (ckApiKey) payload.clubkonnect_apikey = ckApiKey;
+      if (ckPassword) payload.clubkonnect_password = ckPassword;
+      if (nbApiKey) payload.nellobyte_apikey = nbApiKey;
+      if (nbUserId) payload.nellobyte_userid = nbUserId;
       await saveSettings(payload);
-      toast({ title: "Settings saved!", description: "All changes applied — provider changes active immediately." });
+      toast({ title: "Settings saved!", description: "All changes applied — provider changes take effect immediately." });
     } catch {
       toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
     } finally {
@@ -216,72 +310,94 @@ export default function AdminSettings() {
 
       <div className="space-y-6 max-w-2xl">
 
-        {/* VTU Provider API Keys */}
+        {/* Provider Credentials */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Key className="text-primary" size={18} />
-              <CardTitle className="text-base">VTU Provider API Keys</CardTitle>
+              <CardTitle className="text-base">Provider Credentials</CardTitle>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Update your provider credentials here. Changes take effect immediately — no server restart needed.
+              Enter your API credentials for each provider. Changes take effect immediately after saving — no server restart needed.
             </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
 
-            {/* EasyAccess */}
-            <div className="p-4 rounded-lg border border-border space-y-3">
-              <div className="flex items-center gap-2">
-                <Zap size={15} className="text-primary" />
-                <p className="font-semibold text-sm">EasyAccess API Token</p>
-                <Badge variant="outline" className="text-[10px]">Data · Electricity · Cable · Exam</Badge>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type={showEaToken ? "text" : "password"}
-                  value={easyAccessToken}
-                  onChange={(e) => setEasyAccessToken(e.target.value)}
-                  placeholder="Paste your EasyAccess Bearer token"
-                  className="h-11 font-mono text-sm"
+            <ProviderCard
+              name="EasyAccess"
+              icon={Zap}
+              color="text-blue-500"
+              configured={eaConfigured}
+              badges={["Data", "Electricity", "Cable", "Exam"]}
+            >
+              <CredentialField
+                label="API Token"
+                value={easyAccessToken}
+                onChange={setEasyAccessToken}
+                placeholder="Paste your EasyAccess Bearer token"
+                hint="Stored securely in the database. Overrides the environment variable on save."
+              />
+            </ProviderCard>
+
+            <ProviderCard
+              name="Clubkonnect"
+              icon={Phone}
+              color="text-purple-500"
+              configured={ckConfigured}
+              badges={["Airtime", "Data", "Electricity", "Exam"]}
+            >
+              <div className="grid grid-cols-1 gap-3">
+                <CredentialField
+                  label="Registered Phone Number"
+                  value={ckPhone}
+                  onChange={setCkPhone}
+                  placeholder="e.g. 08012345678"
+                  hint="The phone number registered on your Clubkonnect account"
                 />
-                <Button variant="outline" size="sm" onClick={() => setShowEaToken((v) => !v)} className="shrink-0 px-3">
-                  {showEaToken ? "Hide" : "Show"}
-                </Button>
+                <CredentialField
+                  label="API Key"
+                  value={ckApiKey}
+                  onChange={setCkApiKey}
+                  placeholder="Your Clubkonnect API key"
+                  hint="Found in your Clubkonnect dashboard under API settings"
+                />
+                <CredentialField
+                  label="Account Password"
+                  value={ckPassword}
+                  onChange={setCkPassword}
+                  placeholder="Your Clubkonnect login password"
+                  hint="Required for data bundle purchases"
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Stored securely in the database. Overrides the environment variable immediately on save.
-              </p>
-            </div>
+            </ProviderCard>
 
-            {/* Clubkonnect */}
-            <div className="p-4 rounded-lg border border-border space-y-2">
-              <div className="flex items-center gap-2">
-                <Phone size={15} className="text-blue-600" />
-                <p className="font-semibold text-sm">Clubkonnect</p>
-                <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-0">Airtime</Badge>
+            <ProviderCard
+              name="Nellobyte"
+              icon={Settings}
+              color="text-green-500"
+              configured={nbConfigured}
+              badges={["Airtime", "Data", "Electricity", "Cable", "Exam"]}
+            >
+              <div className="grid grid-cols-1 gap-3">
+                <CredentialField
+                  label="API Key"
+                  value={nbApiKey}
+                  onChange={setNbApiKey}
+                  placeholder="Your Nellobyte API key"
+                  hint="Found in your Nellobytesystems dashboard"
+                />
+                <CredentialField
+                  label="User ID"
+                  value={nbUserId}
+                  onChange={setNbUserId}
+                  placeholder="Your Nellobyte User ID"
+                  hint="Your account User ID on Nellobytesystems"
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Clubkonnect handles <strong>airtime purchases</strong>. Credentials are set via environment variables:
-              </p>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {[
-                  { label: "CLUBKONNECT_PHONE", hint: "Your registered phone" },
-                  { label: "CLUBKONNECT_APIKEY", hint: "API key from dashboard" },
-                  { label: "CLUBKONNECT_PASSWORD", hint: "Login password" },
-                ].map((cred) => (
-                  <div key={cred.label} className="p-2 rounded bg-muted/60 text-center">
-                    <p className="text-[10px] font-mono font-bold text-foreground leading-tight">{cred.label}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">{cred.hint}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                To update Clubkonnect credentials, ask your platform admin to update the environment variables.
-              </p>
-            </div>
+            </ProviderCard>
 
             <p className="text-xs text-muted-foreground">
-              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>.
+              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>. Make sure your server IP is whitelisted on provider dashboards that require it.
             </p>
           </CardContent>
         </Card>
@@ -291,12 +407,12 @@ export default function AdminSettings() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Settings className="text-primary" size={18} />
-              <CardTitle className="text-base">Service Providers</CardTitle>
+              <CardTitle className="text-base">Service Routing</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Choose which API provider handles each service. Click a provider name to switch — save when done.
+              Choose which provider handles each service. Click a provider name to switch — save when done.
             </p>
 
             <ProviderToggle
@@ -304,39 +420,39 @@ export default function AdminSettings() {
               icon={Phone}
               current={airtimeProvider}
               onChange={setAirtimeProvider}
-              options={["clubkonnect", "vtpass"]}
+              options={["clubkonnect", "nellobyte"]}
             />
             <ProviderToggle
               label="Mobile Data"
               icon={Zap}
               current={dataProvider}
               onChange={setDataProvider}
-              options={["easyaccess", "clubkonnect", "vtpass"]}
+              options={["easyaccess", "clubkonnect", "nellobyte"]}
             />
             <ProviderToggle
               label="Electricity"
               icon={Zap}
               current={electricityProvider}
               onChange={setElectricityProvider}
-              options={["easyaccess", "clubkonnect", "vtpass"]}
+              options={["easyaccess", "clubkonnect", "nellobyte"]}
             />
             <ProviderToggle
               label="Cable TV"
               icon={Zap}
               current={cableProvider}
               onChange={setCableProvider}
-              options={["easyaccess", "clubkonnect", "vtpass"]}
+              options={["easyaccess", "nellobyte"]}
             />
             <ProviderToggle
               label="Exam Tokens"
               icon={BookOpen}
               current={examProvider}
               onChange={setExamProvider}
-              options={["easyaccess", "clubkonnect", "vtpass"]}
+              options={["easyaccess", "clubkonnect", "nellobyte"]}
             />
 
             <p className="text-xs text-muted-foreground pt-1">
-              Select any provider for each service. Changes take effect immediately on save. Make sure you have valid credentials for whichever provider you choose.
+              Note: EasyAccess does not support Airtime. Clubkonnect does not support Cable TV via the admin panel.
             </p>
           </CardContent>
         </Card>
@@ -519,49 +635,40 @@ export default function AdminSettings() {
             <p className="text-sm text-muted-foreground">Enable or disable which gateways customers can use to fund their wallets.</p>
             {[
               { label: "Paystack", desc: "Cards, Bank Transfer, USSD", value: paystackActive, set: setPaystackActive },
-              { label: "Monnify", desc: "Bank Transfer, Cards, USSD", value: monnifyActive, set: setMonnifyActive },
-            ].map((gw) => (
-              <div key={gw.label} className="flex items-center justify-between p-3 rounded-lg border border-border">
+              { label: "Monnify", desc: "Bank Transfer, USSD", value: monnifyActive, set: setMonnifyActive },
+            ].map(({ label, desc, value, set }) => (
+              <div key={label} className="flex items-center justify-between p-3 rounded-lg border border-border">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm">{gw.label}</p>
-                    <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">
-                      API key set ✓
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{gw.desc}</p>
+                  <p className="font-semibold text-sm">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
                 </div>
-                <Switch checked={gw.value} onCheckedChange={gw.set} />
+                <Switch checked={value} onCheckedChange={set} />
               </div>
             ))}
           </CardContent>
         </Card>
 
-        {/* Business Rules */}
+        {/* Wallet Settings */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <Settings className="text-primary" size={18} />
-              <CardTitle className="text-base">Business Rules</CardTitle>
+              <CreditCard className="text-primary" size={18} />
+              <CardTitle className="text-base">Wallet Settings</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="font-semibold mb-2 block">Referral Bonus (₦)</Label>
-              <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} className="h-12" />
-              <p className="text-xs text-muted-foreground mt-1">Amount credited when a referred user makes their first purchase</p>
+              <Label className="font-semibold mb-2 block">Minimum Funding Amount (₦)</Label>
+              <Input type="number" value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="e.g. 100" className="h-12" />
             </div>
             <div>
-              <Label className="font-semibold mb-2 block">Minimum Wallet Funding (₦)</Label>
-              <Input type="number" value={minFunding} onChange={(e) => setMinFunding(e.target.value)} className="h-12" />
+              <Label className="font-semibold mb-2 block">Referral Bonus (₦)</Label>
+              <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} placeholder="e.g. 200" className="h-12" />
+              <p className="text-xs text-muted-foreground mt-1">Credited to both referrer and new user when a referred user funds their wallet for the first time.</p>
             </div>
           </CardContent>
         </Card>
 
-        <Button size="lg" className="w-full" onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          {saving ? "Saving..." : "Save All Changes"}
-        </Button>
       </div>
     </AdminLayout>
   );

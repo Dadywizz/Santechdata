@@ -6,10 +6,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import { Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, Bell, X, ArrowRightLeft } from "lucide-react";
+import { Phone, Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, Bell, X, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 
 const QUICK_ACTIONS = [
+  { href: "/buy-airtime", label: "Buy Airtime", icon: Phone, color: "text-green-500", bg: "bg-green-500/10" },
   { href: "/buy-data", label: "Buy Data", icon: Wifi, color: "text-blue-500", bg: "bg-blue-500/10" },
   { href: "/buy-electricity", label: "Electricity", icon: Zap, color: "text-yellow-500", bg: "bg-yellow-500/10" },
   { href: "/buy-cable", label: "Cable TV", icon: Tv, color: "text-purple-500", bg: "bg-purple-500/10" },
@@ -90,7 +91,7 @@ export default function Dashboard() {
       </div>
 
       <h2 className="text-xl font-bold tracking-tight mb-4">Quick Actions</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
         {QUICK_ACTIONS.map((action) => (
           <Link key={action.href} href={action.href}>
             <Card className="hover:bg-accent/50 hover:border-primary/50 transition-colors cursor-pointer text-center h-full">

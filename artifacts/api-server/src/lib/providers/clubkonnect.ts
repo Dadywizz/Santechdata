@@ -16,18 +16,29 @@
 
 const BASE = "https://www.clubkonnect.com";
 
+// In-memory credentials — loaded from env at startup, overrideable from DB via admin settings
+let _phone = process.env.CLUBKONNECT_PHONE ?? "";
+let _apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
+let _password = process.env.CLUBKONNECT_PASSWORD ?? "";
+
+export function setClubkonnectCredentials(phone: string, apiKey: string, password: string): void {
+  if (phone) _phone = phone;
+  if (apiKey) _apiKey = apiKey;
+  if (password) _password = password;
+}
+
 const authApiKey = () => ({
-  UserID: process.env.CLUBKONNECT_PHONE ?? "",
-  APIKey: process.env.CLUBKONNECT_APIKEY ?? "",
+  UserID: _phone,
+  APIKey: _apiKey,
 });
 
 const authPassword = () => ({
-  UserID: process.env.CLUBKONNECT_PHONE ?? "",
-  Password: process.env.CLUBKONNECT_PASSWORD ?? "",
+  UserID: _phone,
+  Password: _password,
 });
 
 export function isClubkonnectConfigured(): boolean {
-  return !!(process.env.CLUBKONNECT_PHONE && process.env.CLUBKONNECT_APIKEY);
+  return !!(_phone && _apiKey);
 }
 
 // ─── Network helpers ────────────────────────────────────────────────────────
