@@ -44,6 +44,16 @@ import {
   nellobyteGetExamPins,
   NELLOBYTE_CABLE_ID,
 } from "../lib/providers/nellobyte";
+import {
+  isKybdataConfigured,
+  kybdataPurchaseAirtime,
+  kybdataPurchaseData,
+  kybdataVerifyMeter,
+  kybdataPurchaseElectricity,
+  kybdataPurchaseCable,
+  kybdataVerifySmartcard,
+  kybdataPurchaseExam,
+} from "../lib/providers/kybdata";
 
 // ── PROVIDER HELPER ────────────────────────────────────────────────────────────
 // Read a single settings key from the DB. Returns undefined if not set.
@@ -54,6 +64,14 @@ async function getSetting(key: string): Promise<string | undefined> {
 
 // Clubkonnect electricity network IDs (matches EasyAccess company codes 1-12)
 const CK_ELEC_NETWORK_ID: Record<string, string> = {
+  "ikeja-electric": "1", "eko-electric": "2", "abuja-electric": "3",
+  "kaduna-electric": "4", "portharcourt-electric": "5", "ibadan-electric": "6",
+  "enugu-electric": "7", "jos-electric": "8", "benin-electric": "9",
+  "kano-electric": "10", "yola-electric": "11", "aba-electric": "12",
+};
+
+// KYB Data electricity disco IDs (from GET /api/v2/services/electricity)
+const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "ikeja-electric": "1", "eko-electric": "2", "abuja-electric": "3",
   "kaduna-electric": "4", "portharcourt-electric": "5", "ibadan-electric": "6",
   "enugu-electric": "7", "jos-electric": "8", "benin-electric": "9",
@@ -132,7 +150,11 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    if (dataProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (dataProvider === "kybdata" && isKybdataConfigured()) {
+      const kybRes = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
+      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+      req.log?.info({ kybRes }, "KYB Data data purchase response");
+    } else if (dataProvider === "nellobyte" && isNellobyteconfigured()) {
       const nbRes = await nellobytePurchaseData({ network: plan.network, phone, planId: plan.providerCode, amount: price, requestId: reference });
       delivered = nbRes.status === "200" || nbRes.status?.toLowerCase() === "success";
       req.log?.info({ nbRes }, "Nellobyte data purchase response");
@@ -224,7 +246,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    if (airtimeProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (airtimeProvider === "kybdata" && isKybdataConfigured()) {
+      const kybRes = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
+      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+      req.log?.info({ kybRes }, "KYB Data airtime purchase response");
+    } else if (airtimeProvider === "nellobyte" && isNellobyteconfigured()) {
       const nbRes = await nellobytePurchaseAirtime({ network, phone, amount, requestId: reference });
       delivered = nbRes.status === "200" || nbRes.status?.toLowerCase() === "success";
       req.log?.info({ nbRes }, "Nellobyte airtime purchase response");
@@ -310,7 +336,11 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   const elecProvider = await getSetting("electricityProvider") ?? "easyaccess";
 
   try {
-    if (elecProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (elecProvider === "kybdata" && isKybdataConfigured()) {
+      const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
+      const kybRes = await kybdataVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
+      res.json({ meterNumber, name: kybRes.customer_name || "Customer", address: kybRes.address || "" });
+    } else if (elecProvider === "nellobyte" && isNellobyteconfigured()) {
       const networkId = CK_ELEC_NETWORK_ID[providerCode.toLowerCase()];
       const meterTypeCode = (meterType ?? "prepaid").toLowerCase() === "postpaid" ? "2" : "1";
       if (!networkId) { res.json({ meterNumber, name: "Customer", address: "" }); return; }
@@ -362,7 +392,13 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   let delivered = false;
 
   try {
-    if (elecProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (elecProvider === "kybdata" && isKybdataConfigured()) {
+      const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
+      const kybRes = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
+      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+      elecToken = kybRes.token ?? "";
+      req.log?.info({ kybRes }, "KYB Data electricity purchase response");
+    } else if (elecProvider === "nellobyte" && isNellobyteconfigured()) {
       const networkId = CK_ELEC_NETWORK_ID[providerCode.toLowerCase()];
       const meterTypeCode = (meterType ?? "prepaid").toLowerCase() === "postpaid" ? "2" : "1";
       if (networkId) {
@@ -491,7 +527,11 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   const cableProvider = await getSetting("cableProvider") ?? "easyaccess";
 
   try {
-    if (cableProvider === "nellobyte" && isNellobyteconfigured() && provider) {
+    if (cableProvider === "kybdata" && isKybdataConfigured() && provider) {
+      const kybRes = await kybdataVerifySmartcard({ smart_card_number: smartcardNumber, cable_name: provider });
+      res.json({ smartcardNumber, name: kybRes.customer_name || "Customer", currentPlan: kybRes.current_plan || "", dueDate: "" });
+      return;
+    } else if (cableProvider === "nellobyte" && isNellobyteconfigured() && provider) {
       const cableId = NELLOBYTE_CABLE_ID[provider.toLowerCase()] ?? "01";
       const nbRes = await nellobyteVerifySmartcard({ smartcardNumber, cableId });
       res.json({ smartcardNumber, name: nbRes.CustomerName || "Customer", currentPlan: nbRes.CustomerPackage || "", dueDate: "" });
@@ -533,7 +573,11 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   let delivered = false;
 
   try {
-    if (cableProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (cableProvider === "kybdata" && isKybdataConfigured()) {
+      const kybRes = await kybdataPurchaseCable({ plan_id: plan.eaPlanId, smart_card_number: smartcardNumber });
+      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+      req.log?.info({ kybRes }, "KYB Data cable subscribe response");
+    } else if (cableProvider === "nellobyte" && isNellobyteconfigured()) {
       const cableId = NELLOBYTE_CABLE_ID[plan.provider.toLowerCase()] ?? "01";
       const nbRes = await nellobyteCableSubscribe({ cableId, smartcardNumber, planId: plan.eaPlanId.toString(), amount: plan.price, phone: "", requestId: reference });
       delivered = nbRes.status === "200" || nbRes.status?.toLowerCase() === "success";
@@ -646,7 +690,14 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    if (examProvider === "nellobyte" && isNellobyteconfigured()) {
+    if (examProvider === "kybdata" && isKybdataConfigured()) {
+      const kybRes = await kybdataPurchaseExam({ examid: examType.code, quantity });
+      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+      if (delivered && Array.isArray(kybRes.pins)) {
+        pins = kybRes.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
+      }
+      req.log?.info({ kybRes }, "KYB Data exam purchase response");
+    } else if (examProvider === "nellobyte" && isNellobyteconfigured()) {
       const examRef = `EXAM-NB-${Date.now()}`;
       const nbRes = await nellobyteGetExamPins({ examType: examType.code, quantity, requestId: examRef });
       delivered = nbRes.status === "200" || nbRes.status?.toLowerCase() === "success";

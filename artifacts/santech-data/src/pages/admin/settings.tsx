@@ -36,18 +36,20 @@ async function callAdminAction(path: string): Promise<any> {
   return res.json();
 }
 
-type Provider = "easyaccess" | "clubkonnect" | "nellobyte";
+type Provider = "easyaccess" | "clubkonnect" | "nellobyte" | "kybdata";
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   easyaccess: "EasyAccess",
   clubkonnect: "Clubkonnect",
   nellobyte: "Nellobyte",
+  kybdata: "KYB Data",
 };
 
 const PROVIDER_COLORS: Record<Provider, string> = {
   easyaccess: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
   clubkonnect: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
   nellobyte: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  kybdata: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
 function ProviderToggle({
@@ -187,6 +189,9 @@ export default function AdminSettings() {
   const [nbApiKey, setNbApiKey] = useState("");
   const [nbUserId, setNbUserId] = useState("");
 
+  // KYB Data credentials
+  const [kybToken, setKybToken] = useState("");
+
   // Per-service provider selection
   const [airtimeProvider, setAirtimeProvider] = useState<Provider>("clubkonnect");
   const [dataProvider, setDataProvider] = useState<Provider>("easyaccess");
@@ -217,6 +222,7 @@ export default function AdminSettings() {
       if (s.clubkonnect_password) setCkPassword(s.clubkonnect_password);
       if (s.nellobyte_apikey) setNbApiKey(s.nellobyte_apikey);
       if (s.nellobyte_userid) setNbUserId(s.nellobyte_userid);
+      if (s.kybdata_api_token) setKybToken(s.kybdata_api_token);
       // Service providers
       if (s.airtimeProvider) setAirtimeProvider(s.airtimeProvider as Provider);
       if (s.dataProvider) setDataProvider(s.dataProvider as Provider);
@@ -230,6 +236,7 @@ export default function AdminSettings() {
   const eaConfigured = !!easyAccessToken;
   const ckConfigured = !!(ckPhone && ckApiKey);
   const nbConfigured = !!(nbApiKey && nbUserId);
+  const kybConfigured = !!kybToken;
 
   const handleSave = async () => {
     setSaving(true);
@@ -251,6 +258,7 @@ export default function AdminSettings() {
       if (ckPassword) payload.clubkonnect_password = ckPassword;
       if (nbApiKey) payload.nellobyte_apikey = nbApiKey;
       if (nbUserId) payload.nellobyte_userid = nbUserId;
+      if (kybToken) payload.kybdata_api_token = kybToken;
       await saveSettings(payload);
       toast({ title: "Settings saved!", description: "All changes applied — provider changes take effect immediately." });
     } catch {
@@ -396,6 +404,22 @@ export default function AdminSettings() {
               </div>
             </ProviderCard>
 
+            <ProviderCard
+              name="KYB Data"
+              icon={Key}
+              color="text-orange-500"
+              configured={kybConfigured}
+              badges={["Airtime", "Data", "Electricity", "Cable", "Exam"]}
+            >
+              <CredentialField
+                label="API Token"
+                value={kybToken}
+                onChange={setKybToken}
+                placeholder="Your KYB Data Bearer token"
+                hint="Generate via POST /api/v2/create-api-key on your KYB Data account. Paste the token here."
+              />
+            </ProviderCard>
+
             <p className="text-xs text-muted-foreground">
               To manage data plan IDs, go to <strong>Admin → Data Plans</strong>. Make sure your server IP is whitelisted on provider dashboards that require it.
             </p>
@@ -420,39 +444,39 @@ export default function AdminSettings() {
               icon={Phone}
               current={airtimeProvider}
               onChange={setAirtimeProvider}
-              options={["clubkonnect", "nellobyte"]}
+              options={["clubkonnect", "nellobyte", "kybdata"]}
             />
             <ProviderToggle
               label="Mobile Data"
               icon={Zap}
               current={dataProvider}
               onChange={setDataProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte"]}
+              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
             />
             <ProviderToggle
               label="Electricity"
               icon={Zap}
               current={electricityProvider}
               onChange={setElectricityProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte"]}
+              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
             />
             <ProviderToggle
               label="Cable TV"
               icon={Zap}
               current={cableProvider}
               onChange={setCableProvider}
-              options={["easyaccess", "nellobyte"]}
+              options={["easyaccess", "nellobyte", "kybdata"]}
             />
             <ProviderToggle
               label="Exam Tokens"
               icon={BookOpen}
               current={examProvider}
               onChange={setExamProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte"]}
+              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
             />
 
             <p className="text-xs text-muted-foreground pt-1">
-              Note: EasyAccess does not support Airtime. Clubkonnect does not support Cable TV via the admin panel.
+              Note: EasyAccess does not support Airtime. Clubkonnect does not support Cable TV.
             </p>
           </CardContent>
         </Card>
