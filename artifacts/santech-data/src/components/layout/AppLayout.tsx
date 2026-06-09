@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Wifi, Zap, Tv, BookOpen, CreditCard, History,
-  Users, Bell, MessageSquare, User, LogOut, ArrowRightLeft, Phone, ChevronRight,
+  Users, Bell, MessageSquare, User, LogOut, Phone, ChevronRight,
 } from "lucide-react";
 import { useGetNotifications } from "@workspace/api-client-react";
 
@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { href: "/buy-electricity",label: "Electricity",    icon: Zap             },
   { href: "/buy-cable",      label: "Cable TV",       icon: Tv              },
   { href: "/buy-exam",       label: "Exam Pins",      icon: BookOpen        },
-  { href: "/airtime-to-cash",label: "Airtime → Cash", icon: ArrowRightLeft  },
   { href: "/fund-wallet",    label: "Fund Wallet",    icon: CreditCard      },
   { href: "/transactions",   label: "Transactions",   icon: History         },
   { href: "/referrals",      label: "Referrals",      icon: Users           },

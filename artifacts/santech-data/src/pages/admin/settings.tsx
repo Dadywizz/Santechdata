@@ -87,9 +87,7 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  // Provider status (read from env, not editable here)
-  const [eaConfigured, setEaConfigured] = useState(false);
-  const [ckConfigured, setCkConfigured] = useState(false);
+  const [kybConfigured, setKybConfigured] = useState(false);
 
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -107,8 +105,7 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
-      setEaConfigured(s.easyaccess_configured === "true");
-      setCkConfigured(s.clubkonnect_configured === "true");
+      setKybConfigured(s.kybdata_configured === "true");
       setLoading(false);
     });
   }, []);
@@ -192,17 +189,10 @@ export default function AdminSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
               <div>
-                <p className="text-sm font-semibold text-slate-800">EasyAccess</p>
-                <p className="text-xs text-slate-500">Data · Electricity · Cable TV · Exam Pins</p>
+                <p className="text-sm font-semibold text-slate-800">KYB Data</p>
+                <p className="text-xs text-slate-500">Airtime · Data · Electricity · Cable TV · Exam Pins</p>
               </div>
-              <StatusBadge ok={eaConfigured} label={eaConfigured ? "Active" : "Token needed"} />
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div>
-                <p className="text-sm font-semibold text-slate-800">Clubkonnect</p>
-                <p className="text-xs text-slate-500">Airtime</p>
-              </div>
-              <StatusBadge ok={ckConfigured} label={ckConfigured ? "Active" : "Credentials needed"} />
+              <StatusBadge ok={kybConfigured} label={kybConfigured ? "Active" : "Token needed"} />
             </div>
           </div>
         </SectionCard>

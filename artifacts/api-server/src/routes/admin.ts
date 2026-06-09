@@ -11,8 +11,7 @@ import {
   settingsTable,
   examTypesTable,
 } from "@workspace/db";
-import { isEasyAccessConfigured } from "../lib/providers/easyaccess";
-import { isClubkonnectConfigured } from "../lib/providers/clubkonnect";
+import { isKybdataConfigured } from "../lib/providers/kybdata";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -497,8 +496,7 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const obj: Record<string, string> = {};
   for (const s of settings) obj[s.key] = s.value;
   // Inject live provider status (from env/memory, not DB)
-  obj.easyaccess_configured = String(isEasyAccessConfigured());
-  obj.clubkonnect_configured = String(isClubkonnectConfigured());
+  obj.kybdata_configured = String(isKybdataConfigured());
   res.json(obj);
 });
 

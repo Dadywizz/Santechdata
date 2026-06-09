@@ -4,18 +4,17 @@ import { WalletCard } from "@/components/WalletCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Phone, Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, ArrowRightLeft, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Phone, Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, CheckCircle, XCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 const SERVICES = [
-  { href: "/buy-data",       label: "Buy Data",       icon: Wifi,            bg: "bg-blue-500",   light: "bg-blue-50  text-blue-600"   },
-  { href: "/buy-airtime",    label: "Airtime",        icon: Phone,           bg: "bg-green-500",  light: "bg-green-50 text-green-600"  },
-  { href: "/buy-electricity",label: "Electricity",    icon: Zap,             bg: "bg-amber-500",  light: "bg-amber-50 text-amber-600"  },
-  { href: "/buy-cable",      label: "Cable TV",       icon: Tv,              bg: "bg-purple-500", light: "bg-purple-50 text-purple-600"},
-  { href: "/buy-exam",       label: "Exam Pins",      icon: BookOpen,        bg: "bg-red-500",    light: "bg-red-50   text-red-600"    },
-  { href: "/airtime-to-cash",label: "Airtime→Cash",   icon: ArrowRightLeft,  bg: "bg-orange-500", light: "bg-orange-50 text-orange-600"},
-  { href: "/fund-wallet",    label: "Fund Wallet",    icon: CreditCard,      bg: "bg-sky-500",    light: "bg-sky-50   text-sky-600"    },
-  { href: "/transactions",   label: "History",        icon: History,         bg: "bg-slate-500",  light: "bg-slate-50 text-slate-600"  },
+  { href: "/buy-data",        label: "Buy Data",    icon: Wifi,      bg: "bg-blue-500"  },
+  { href: "/buy-airtime",     label: "Buy Airtime", icon: Phone,     bg: "bg-green-500" },
+  { href: "/buy-electricity", label: "Electricity", icon: Zap,       bg: "bg-amber-500" },
+  { href: "/buy-cable",       label: "Cable TV",    icon: Tv,        bg: "bg-purple-500"},
+  { href: "/buy-exam",        label: "Exam Pins",   icon: BookOpen,  bg: "bg-red-500"   },
+  { href: "/fund-wallet",     label: "Fund Wallet", icon: CreditCard,bg: "bg-sky-500"   },
+  { href: "/transactions",    label: "History",     icon: History,   bg: "bg-slate-500" },
 ];
 
 const TX_ICONS: Record<string, React.ElementType> = {
@@ -29,9 +28,7 @@ export default function Dashboard() {
   });
 
   const firstName = (user?.fullName || user?.email || "").split(/\s|@/)[0];
-
-  const now = new Date();
-  const hour = now.getHours();
+  const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
@@ -65,7 +62,7 @@ export default function Dashboard() {
 
       {/* Services grid */}
       <div className="mb-6">
-        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Services</h2>
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Services</h2>
         <div className="grid grid-cols-4 gap-3">
           {SERVICES.map((s) => (
             <Link key={s.href} href={s.href}>
@@ -81,9 +78,9 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Transactions */}
-      <div className="mb-2">
+      <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Recent Transactions</h2>
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Recent Transactions</h2>
           <Link href="/transactions">
             <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold hover:underline cursor-pointer">
               View all <ArrowUpRight className="h-3.5 w-3.5" />
