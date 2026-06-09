@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import {
   dataPlansTable, transactionsTable, walletsTable, notificationsTable,
@@ -53,7 +53,7 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
 });
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
-router.get("/data/plans", authenticate, async (req: AuthRequest, res): Promise<void> => {
+router.get("/data/plans", async (req: Request, res): Promise<void> => {
   const params = GetDataPlansQueryParams.safeParse(req.query);
   const plans = await db.select().from(dataPlansTable).where(eq(dataPlansTable.isActive, true));
   const filtered = params.success && params.data.network
@@ -377,7 +377,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
 });
 
 // ── EXAM TOKENS ───────────────────────────────────────────────────────────────
-router.get("/exam/types", authenticate, async (_req, res): Promise<void> => {
+router.get("/exam/types", async (_req, res): Promise<void> => {
   const types = await db.select().from(examTypesTable);
   res.json(types.map((t) => ({ id: t.id, name: t.name, code: t.code, price: parseFloat(t.price), description: t.description })));
 });
