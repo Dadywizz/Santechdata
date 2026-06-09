@@ -56,12 +56,15 @@ export default function BuyExam() {
 
   return (
     <AppLayout>
-      <PageHeader title="Exam Tokens" description="NECO result checker pins" />
+      <PageHeader title="Exam Tokens" description="Purchase NECO result checker PIN" />
 
       <div className="max-w-2xl space-y-6 pb-28">
         {/* Exam type selection */}
         <div>
           <Label className="text-base font-semibold mb-3 block">Select Exam Type</Label>
+          {(examTypes as any[]).length === 0 && (
+            <p className="text-sm text-muted-foreground py-4">Loading available exam types…</p>
+          )}
           <div className="grid grid-cols-2 gap-4">
             {(examTypes as any[]).map((examItem: any) => (
               <button

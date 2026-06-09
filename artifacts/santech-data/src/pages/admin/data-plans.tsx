@@ -202,9 +202,9 @@ export default function AdminDataPlans() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <PageHeader title="Data Plans" description="Manage available data plans" />
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSyncPlans} disabled={syncing}>
+          <Button variant="outline" onClick={handleSyncPlans} disabled={syncing} title="Pull latest data plans from KYB Data API">
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing..." : "Sync from KYB Data"}
+            {syncing ? "Syncing…" : "Sync from KYB Data"}
           </Button>
           <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
             <Plus className="mr-2 h-4 w-4" /> Add Plan
