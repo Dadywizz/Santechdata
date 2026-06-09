@@ -11,9 +11,6 @@ import {
   settingsTable,
   examTypesTable,
 } from "@workspace/db";
-import { setEasyAccessToken } from "../lib/providers/easyaccess";
-import { setClubkonnectCredentials } from "../lib/providers/clubkonnect";
-import { setNellobytecredentials } from "../lib/providers/nellobyte";
 import { setKybdataToken } from "../lib/providers/kybdata";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
@@ -515,24 +512,13 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
     }
   }
 
-  // Collect provider credential fields before iterating
-  let ckPhone = "", ckApiKey = "", ckPassword = "";
-  let nbApiKey = "", nbUserId = "";
   let kybToken = "";
 
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    if (key === "easyaccess_api_token" && value) setEasyAccessToken(value);
-    if (key === "clubkonnect_phone") ckPhone = value;
-    if (key === "clubkonnect_apikey") ckApiKey = value;
-    if (key === "clubkonnect_password") ckPassword = value;
-    if (key === "nellobyte_apikey") nbApiKey = value;
-    if (key === "nellobyte_userid") nbUserId = value;
     if (key === "kybdata_api_token") kybToken = value;
   }
 
-  if (ckPhone || ckApiKey || ckPassword) setClubkonnectCredentials(ckPhone, ckApiKey, ckPassword);
-  if (nbApiKey || nbUserId) setNellobytecredentials(nbApiKey, nbUserId);
   if (kybToken) setKybdataToken(kybToken);
 
   res.json({ updated: entries.length });

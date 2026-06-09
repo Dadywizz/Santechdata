@@ -27,8 +27,11 @@ export function WalletCard() {
     });
   };
 
+  const [genError, setGenError] = useState<string | null>(null);
+
   const handleGenerate = async () => {
     setGenerating(true);
+    setGenError(null);
     try {
       const token = localStorage.getItem("santech_token");
       const res = await fetch("/api/wallet/generate-account", {
@@ -37,7 +40,12 @@ export function WalletCard() {
       });
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setGenError(data.error ?? "Could not generate account. Please try again or contact support.");
       }
+    } catch {
+      setGenError("Network error. Please check your connection and try again.");
     } finally {
       setGenerating(false);
     }
@@ -119,18 +127,23 @@ export function WalletCard() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-muted-foreground">No account assigned yet.</span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleGenerate}
-                disabled={generating}
-                className="shrink-0 gap-1 border-primary/30 text-primary hover:bg-primary/10"
-              >
-                {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                {generating ? "Generating..." : "Generate Account"}
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-muted-foreground">No account assigned yet.</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="shrink-0 gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {generating ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                  {generating ? "Generating..." : "Generate Account"}
+                </Button>
+              </div>
+              {genError && (
+                <p className="text-xs text-red-500">{genError}</p>
+              )}
             </div>
           )}
         </CardContent>

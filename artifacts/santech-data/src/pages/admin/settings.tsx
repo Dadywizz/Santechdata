@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Phone, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -36,60 +36,6 @@ async function callAdminAction(path: string): Promise<any> {
   return res.json();
 }
 
-type Provider = "easyaccess" | "clubkonnect" | "nellobyte" | "kybdata";
-
-const PROVIDER_LABELS: Record<Provider, string> = {
-  easyaccess: "EasyAccess",
-  clubkonnect: "Clubkonnect",
-  nellobyte: "Nellobyte",
-  kybdata: "KYB Data",
-};
-
-const PROVIDER_COLORS: Record<Provider, string> = {
-  easyaccess: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  clubkonnect: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  nellobyte: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  kybdata: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-};
-
-function ProviderToggle({
-  label, icon: Icon, current, onChange, options,
-}: {
-  label: string;
-  icon: React.ElementType;
-  current: Provider;
-  onChange: (v: Provider) => void;
-  options: Provider[];
-}) {
-  return (
-    <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-      <div className="flex items-center gap-3">
-        <Icon size={16} className="text-primary" />
-        <div>
-          <p className="font-semibold text-sm">{label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Active: <span className={`font-semibold px-1.5 py-0.5 rounded text-[10px] ${PROVIDER_COLORS[current]}`}>{PROVIDER_LABELS[current]}</span>
-          </p>
-        </div>
-      </div>
-      <div className="flex gap-1.5">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            onClick={() => onChange(opt)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-              current === opt
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-muted text-muted-foreground border-border hover:border-primary/40"
-            }`}
-          >
-            {PROVIDER_LABELS[opt]}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function CredentialField({
   label, value, onChange, placeholder, hint,
@@ -177,27 +123,8 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  // EasyAccess credentials
-  const [easyAccessToken, setEasyAccessToken] = useState("");
-
-  // Clubkonnect credentials
-  const [ckPhone, setCkPhone] = useState("");
-  const [ckApiKey, setCkApiKey] = useState("");
-  const [ckPassword, setCkPassword] = useState("");
-
-  // Nellobyte credentials
-  const [nbApiKey, setNbApiKey] = useState("");
-  const [nbUserId, setNbUserId] = useState("");
-
   // KYB Data credentials
   const [kybToken, setKybToken] = useState("");
-
-  // Per-service provider selection
-  const [airtimeProvider, setAirtimeProvider] = useState<Provider>("clubkonnect");
-  const [dataProvider, setDataProvider] = useState<Provider>("easyaccess");
-  const [electricityProvider, setElectricityProvider] = useState<Provider>("easyaccess");
-  const [cableProvider, setCableProvider] = useState<Provider>("easyaccess");
-  const [examProvider, setExamProvider] = useState<Provider>("easyaccess");
 
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -215,27 +142,11 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
-      // Provider credentials
-      if (s.easyaccess_api_token) setEasyAccessToken(s.easyaccess_api_token);
-      if (s.clubkonnect_phone) setCkPhone(s.clubkonnect_phone);
-      if (s.clubkonnect_apikey) setCkApiKey(s.clubkonnect_apikey);
-      if (s.clubkonnect_password) setCkPassword(s.clubkonnect_password);
-      if (s.nellobyte_apikey) setNbApiKey(s.nellobyte_apikey);
-      if (s.nellobyte_userid) setNbUserId(s.nellobyte_userid);
       if (s.kybdata_api_token) setKybToken(s.kybdata_api_token);
-      // Service providers
-      if (s.airtimeProvider) setAirtimeProvider(s.airtimeProvider as Provider);
-      if (s.dataProvider) setDataProvider(s.dataProvider as Provider);
-      if (s.electricityProvider) setElectricityProvider(s.electricityProvider as Provider);
-      if (s.cableProvider) setCableProvider(s.cableProvider as Provider);
-      if (s.examProvider) setExamProvider(s.examProvider as Provider);
       setLoading(false);
     });
   }, []);
 
-  const eaConfigured = !!easyAccessToken;
-  const ckConfigured = !!(ckPhone && ckApiKey);
-  const nbConfigured = !!(nbApiKey && nbUserId);
   const kybConfigured = !!kybToken;
 
   const handleSave = async () => {
@@ -250,17 +161,10 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
-        airtimeProvider, dataProvider, electricityProvider, cableProvider, examProvider,
       };
-      if (easyAccessToken) payload.easyaccess_api_token = easyAccessToken;
-      if (ckPhone) payload.clubkonnect_phone = ckPhone;
-      if (ckApiKey) payload.clubkonnect_apikey = ckApiKey;
-      if (ckPassword) payload.clubkonnect_password = ckPassword;
-      if (nbApiKey) payload.nellobyte_apikey = nbApiKey;
-      if (nbUserId) payload.nellobyte_userid = nbUserId;
       if (kybToken) payload.kybdata_api_token = kybToken;
       await saveSettings(payload);
-      toast({ title: "Settings saved!", description: "All changes applied — provider changes take effect immediately." });
+      toast({ title: "Settings saved!", description: "All changes applied." });
     } catch {
       toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
     } finally {
@@ -318,92 +222,18 @@ export default function AdminSettings() {
 
       <div className="space-y-6 max-w-2xl">
 
-        {/* Provider Credentials */}
+        {/* KYB Data Credentials */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Key className="text-primary" size={18} />
-              <CardTitle className="text-base">Provider Credentials</CardTitle>
+              <CardTitle className="text-base">KYB Data — Provider Credentials</CardTitle>
             </div>
             <p className="text-sm text-muted-foreground">
-              Enter your API credentials for each provider. Changes take effect immediately after saving — no server restart needed.
+              KYB Data powers all services (airtime, data, electricity, cable, exam). Changes take effect immediately after saving.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-
-            <ProviderCard
-              name="EasyAccess"
-              icon={Zap}
-              color="text-blue-500"
-              configured={eaConfigured}
-              badges={["Data", "Electricity", "Cable", "Exam"]}
-            >
-              <CredentialField
-                label="API Token"
-                value={easyAccessToken}
-                onChange={setEasyAccessToken}
-                placeholder="Paste your EasyAccess Bearer token"
-                hint="Stored securely in the database. Overrides the environment variable on save."
-              />
-            </ProviderCard>
-
-            <ProviderCard
-              name="Clubkonnect"
-              icon={Phone}
-              color="text-purple-500"
-              configured={ckConfigured}
-              badges={["Airtime", "Data", "Electricity", "Exam"]}
-            >
-              <div className="grid grid-cols-1 gap-3">
-                <CredentialField
-                  label="Registered Phone Number"
-                  value={ckPhone}
-                  onChange={setCkPhone}
-                  placeholder="e.g. 08012345678"
-                  hint="The phone number registered on your Clubkonnect account"
-                />
-                <CredentialField
-                  label="API Key"
-                  value={ckApiKey}
-                  onChange={setCkApiKey}
-                  placeholder="Your Clubkonnect API key"
-                  hint="Found in your Clubkonnect dashboard under API settings"
-                />
-                <CredentialField
-                  label="Account Password"
-                  value={ckPassword}
-                  onChange={setCkPassword}
-                  placeholder="Your Clubkonnect login password"
-                  hint="Required for data bundle purchases"
-                />
-              </div>
-            </ProviderCard>
-
-            <ProviderCard
-              name="Nellobyte"
-              icon={Settings}
-              color="text-green-500"
-              configured={nbConfigured}
-              badges={["Airtime", "Data", "Electricity", "Cable", "Exam"]}
-            >
-              <div className="grid grid-cols-1 gap-3">
-                <CredentialField
-                  label="API Key"
-                  value={nbApiKey}
-                  onChange={setNbApiKey}
-                  placeholder="Your Nellobyte API key"
-                  hint="Found in your Nellobytesystems dashboard"
-                />
-                <CredentialField
-                  label="User ID"
-                  value={nbUserId}
-                  onChange={setNbUserId}
-                  placeholder="Your Nellobyte User ID"
-                  hint="Your account User ID on Nellobytesystems"
-                />
-              </div>
-            </ProviderCard>
-
             <ProviderCard
               name="KYB Data"
               icon={Key}
@@ -419,64 +249,8 @@ export default function AdminSettings() {
                 hint="Generate via POST /api/v2/create-api-key on your KYB Data account. Paste the token here."
               />
             </ProviderCard>
-
             <p className="text-xs text-muted-foreground">
-              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>. Make sure your server IP is whitelisted on provider dashboards that require it.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Service Provider Selection */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Settings className="text-primary" size={18} />
-              <CardTitle className="text-base">Service Routing</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Choose which provider handles each service. Click a provider name to switch — save when done.
-            </p>
-
-            <ProviderToggle
-              label="Airtime"
-              icon={Phone}
-              current={airtimeProvider}
-              onChange={setAirtimeProvider}
-              options={["clubkonnect", "nellobyte", "kybdata"]}
-            />
-            <ProviderToggle
-              label="Mobile Data"
-              icon={Zap}
-              current={dataProvider}
-              onChange={setDataProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
-            />
-            <ProviderToggle
-              label="Electricity"
-              icon={Zap}
-              current={electricityProvider}
-              onChange={setElectricityProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
-            />
-            <ProviderToggle
-              label="Cable TV"
-              icon={Zap}
-              current={cableProvider}
-              onChange={setCableProvider}
-              options={["easyaccess", "nellobyte", "kybdata"]}
-            />
-            <ProviderToggle
-              label="Exam Tokens"
-              icon={BookOpen}
-              current={examProvider}
-              onChange={setExamProvider}
-              options={["easyaccess", "clubkonnect", "nellobyte", "kybdata"]}
-            />
-
-            <p className="text-xs text-muted-foreground pt-1">
-              Note: EasyAccess does not support Airtime. Clubkonnect does not support Cable TV.
+              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>.
             </p>
           </CardContent>
         </Card>

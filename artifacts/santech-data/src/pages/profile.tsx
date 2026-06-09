@@ -8,11 +8,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUpdateProfile, useChangePassword } from "@workspace/api-client-react";
-import { User, Lock, Save } from "lucide-react";
+import { User, Lock, Save, Copy, CheckCircle2 } from "lucide-react";
+
+function shortId(id: string | undefined): string {
+  if (!id) return "—";
+  return "STC-" + id.replace(/-/g, "").slice(0, 8).toUpperCase();
+}
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
   const { toast } = useToast();
+  const [copiedId, setCopiedId] = useState(false);
+
+  const customerId = shortId(user?.id);
 
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
@@ -82,7 +90,28 @@ export default function Profile() {
               <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12" />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2 pb-1 bg-muted/50 rounded-lg p-3 text-sm">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Your Customer ID</p>
+                  <p className="font-bold font-mono text-lg tracking-widest mt-0.5 text-primary">{customerId}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Use this ID when contacting support</p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(customerId).then(() => {
+                      setCopiedId(true);
+                      setTimeout(() => setCopiedId(false), 2000);
+                    });
+                  }}
+                  className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors"
+                >
+                  {copiedId ? <CheckCircle2 size={18} className="text-green-600" /> : <Copy size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 bg-muted/50 rounded-lg p-3 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs">Referral Code</p>
                 <p className="font-bold tracking-wider mt-0.5">{user?.referralCode || "—"}</p>
