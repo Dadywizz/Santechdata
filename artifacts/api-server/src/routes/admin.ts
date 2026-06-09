@@ -501,12 +501,28 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
 // PATCH /admin/settings
 router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const entries = Object.entries(req.body as Record<string, string>);
+
+  // Check if dataProvider is changing — if so, clear all data plans
+  const dataProviderEntry = entries.find(([k]) => k === "dataProvider");
+  if (dataProviderEntry) {
+    const [, newProvider] = dataProviderEntry;
+    const [existing] = await db.select().from(settingsTable).where(eq(settingsTable.key, "dataProvider"));
+    if (existing && existing.value !== newProvider) {
+      await db.delete(dataPlansTable);
+    }
+  }
+
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    // Apply provider token changes immediately (no restart needed)
     if (key === "easyaccess_api_token" && value) setEasyAccessToken(value);
   }
   res.json({ updated: entries.length });
+});
+
+// POST /admin/clear-data-plans — wipe all data plans so admin can re-add for a new provider
+router.post("/admin/clear-data-plans", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  await db.delete(dataPlansTable);
+  res.json({ message: "All data plans cleared. You can now add plans for your new provider." });
 });
 
 // POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB

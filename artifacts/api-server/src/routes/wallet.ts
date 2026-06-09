@@ -40,15 +40,17 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  const acct = await monnifyCreateReservedAccount({
-    accountReference: user.id,
-    accountName: user.fullName,
-    customerEmail: user.email,
-    customerName: user.fullName,
-  });
-
-  if (!acct) {
-    res.status(503).json({ error: "Could not generate account at this time. Please try again shortly." });
+  let acct: { accountNumber: string; bankName: string };
+  try {
+    acct = await monnifyCreateReservedAccount({
+      accountReference: user.id,
+      accountName: user.fullName || user.email,
+      customerEmail: user.email,
+      customerName: user.fullName || user.email,
+    });
+  } catch (err: any) {
+    req.log?.error({ err }, "Monnify DVA generation failed");
+    res.status(503).json({ error: err?.message ?? "Could not generate account at this time. Please try again shortly or contact support." });
     return;
   }
 

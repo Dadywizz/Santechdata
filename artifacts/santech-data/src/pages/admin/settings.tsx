@@ -36,11 +36,12 @@ async function callAdminAction(path: string): Promise<any> {
   return res.json();
 }
 
-type Provider = "easyaccess" | "clubkonnect";
+type Provider = "easyaccess" | "clubkonnect" | "vtpass";
 
 const PROVIDER_LABELS: Record<Provider, string> = {
   easyaccess: "EasyAccess",
   clubkonnect: "Clubkonnect",
+  vtpass: "VTpass",
 };
 
 function ProviderToggle({
@@ -109,6 +110,7 @@ export default function AdminSettings() {
   const [showEaToken, setShowEaToken] = useState(false);
 
   // Per-service provider selection
+  const [airtimeProvider, setAirtimeProvider] = useState<Provider>("clubkonnect");
   const [dataProvider, setDataProvider] = useState<Provider>("easyaccess");
   const [electricityProvider, setElectricityProvider] = useState<Provider>("easyaccess");
   const [cableProvider, setCableProvider] = useState<Provider>("easyaccess");
@@ -131,6 +133,7 @@ export default function AdminSettings() {
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
       if (s.easyaccess_api_token) setEasyAccessToken(s.easyaccess_api_token);
+      if (s.airtimeProvider) setAirtimeProvider(s.airtimeProvider as Provider);
       if (s.dataProvider) setDataProvider(s.dataProvider as Provider);
       if (s.electricityProvider) setElectricityProvider(s.electricityProvider as Provider);
       if (s.cableProvider) setCableProvider(s.cableProvider as Provider);
@@ -151,7 +154,7 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
-        dataProvider, electricityProvider, cableProvider, examProvider,
+        airtimeProvider, dataProvider, electricityProvider, cableProvider, examProvider,
       };
       if (easyAccessToken) payload.easyaccess_api_token = easyAccessToken;
       await saveSettings(payload);
@@ -296,51 +299,44 @@ export default function AdminSettings() {
               Choose which API provider handles each service. Click a provider name to switch — save when done.
             </p>
 
-            {/* Airtime — fixed to Clubkonnect */}
-            <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
-              <div className="flex items-center gap-3">
-                <Phone size={16} className="text-primary" />
-                <div>
-                  <p className="font-semibold text-sm">Airtime</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Active: <span className="font-medium text-foreground">Clubkonnect</span>
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-[10px]">Clubkonnect only</Badge>
-            </div>
-
+            <ProviderToggle
+              label="Airtime"
+              icon={Phone}
+              current={airtimeProvider}
+              onChange={setAirtimeProvider}
+              options={["clubkonnect", "vtpass"]}
+            />
             <ProviderToggle
               label="Mobile Data"
               icon={Zap}
               current={dataProvider}
               onChange={setDataProvider}
-              options={["easyaccess", "clubkonnect"]}
+              options={["easyaccess", "clubkonnect", "vtpass"]}
             />
             <ProviderToggle
               label="Electricity"
               icon={Zap}
               current={electricityProvider}
               onChange={setElectricityProvider}
-              options={["easyaccess", "clubkonnect"]}
+              options={["easyaccess", "clubkonnect", "vtpass"]}
             />
             <ProviderToggle
               label="Cable TV"
               icon={Zap}
               current={cableProvider}
               onChange={setCableProvider}
-              options={["easyaccess", "clubkonnect"]}
+              options={["easyaccess", "clubkonnect", "vtpass"]}
             />
             <ProviderToggle
               label="Exam Tokens"
               icon={BookOpen}
               current={examProvider}
               onChange={setExamProvider}
-              options={["easyaccess", "clubkonnect"]}
+              options={["easyaccess", "clubkonnect", "vtpass"]}
             />
 
             <p className="text-xs text-muted-foreground pt-1">
-              Both providers support all services above. Make sure you have valid credentials for whichever you choose.
+              Select any provider for each service. Changes take effect immediately on save. Make sure you have valid credentials for whichever provider you choose.
             </p>
           </CardContent>
         </Card>
