@@ -11,10 +11,8 @@ import { BookOpen, Check, X } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const EXAM_COLORS: Record<string, string> = {
-  WAEC: "bg-blue-600",
   NECO: "bg-green-700",
-  JAMB: "bg-red-600",
-  NABTEB: "bg-purple-700",
+  WAEC: "bg-blue-600",
 };
 
 export default function BuyExam() {
@@ -58,7 +56,7 @@ export default function BuyExam() {
 
   return (
     <AppLayout>
-      <PageHeader title="Exam Tokens" description="WAEC, NECO, JAMB & NABTEB scratch cards" />
+      <PageHeader title="Exam Tokens" description="NECO result checker pins" />
 
       <div className="max-w-2xl space-y-6 pb-28">
         {/* Exam type selection */}
