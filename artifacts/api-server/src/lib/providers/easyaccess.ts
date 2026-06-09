@@ -24,6 +24,11 @@ import { customFetch } from "../custom-fetch";
 
 const BASE_URL = "https://easyaccess.com.ng/api/live/v1";
 
+// Runtime token override — set by admin settings update without needing server restart
+let _tokenOverride: string | undefined;
+export function setEasyAccessToken(token: string): void { _tokenOverride = token || undefined; }
+export function getEasyAccessToken(): string { return _tokenOverride ?? process.env.EASYACCESS_API_TOKEN ?? ""; }
+
 const NETWORK_CODES: Record<string, number> = {
   MTN: 1, GLO: 2, AIRTEL: 3, "9MOBILE": 4,
 };
@@ -51,14 +56,14 @@ const CABLE_COMPANY_CODES: Record<string, number> = {
 
 function headers(): Record<string, string> {
   return {
-    "Authorization": `Bearer ${process.env.EASYACCESS_API_TOKEN ?? ""}`,
+    "Authorization": `Bearer ${getEasyAccessToken()}`,
     "Cache-Control": "no-cache",
     "Content-Type": "application/json",
   };
 }
 
 export function isEasyAccessConfigured(): boolean {
-  return !!(process.env.EASYACCESS_API_TOKEN);
+  return !!getEasyAccessToken();
 }
 
 type EaResponse = Record<string, unknown>;

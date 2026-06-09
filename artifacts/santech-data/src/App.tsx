@@ -33,6 +33,7 @@ import AdminAnalytics from "@/pages/admin/analytics";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
+import BuyAirtime from "@/pages/buy-airtime";
 import AirtimeToCash from "@/pages/airtime-to-cash";
 import AdminAirtimeToCash from "@/pages/admin/airtime-to-cash";
 
@@ -61,6 +62,7 @@ function Router() {
 
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/buy-data" component={BuyData} />
+      <Route path="/buy-airtime" component={BuyAirtime} />
       <Route path="/buy-electricity" component={BuyElectricity} />
       <Route path="/buy-cable" component={BuyCable} />
       <Route path="/buy-exam" component={BuyExam} />

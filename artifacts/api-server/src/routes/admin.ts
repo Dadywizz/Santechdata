@@ -9,7 +9,9 @@ import {
   notificationsTable,
   ticketsTable,
   settingsTable,
+  examTypesTable,
 } from "@workspace/db";
+import { setEasyAccessToken } from "../lib/providers/easyaccess";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -501,8 +503,58 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
   const entries = Object.entries(req.body as Record<string, string>);
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+    // Apply provider token changes immediately (no restart needed)
+    if (key === "easyaccess_api_token" && value) setEasyAccessToken(value);
   }
   res.json({ updated: entries.length });
+});
+
+// POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB
+router.post("/admin/seed-exam-types", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const TYPES = [
+    { name: "WAEC (West African Examinations Council)", code: "WAEC", price: "5069", description: "WAEC result checker PIN" },
+    { name: "NECO (National Examinations Council)", code: "NECO", price: "2099", description: "NECO result checker PIN" },
+    { name: "JAMB (Joint Admissions and Matriculation Board)", code: "JAMB", price: "700", description: "JAMB e-PIN / Mock result checker" },
+    { name: "NABTEB (National Business and Technical Examinations Board)", code: "NABTEB", price: "867", description: "NABTEB result checker PIN" },
+  ];
+
+  const existing = await db.select({ code: examTypesTable.code }).from(examTypesTable);
+  const existingCodes = new Set(existing.map((e) => e.code));
+
+  let added = 0;
+  for (const t of TYPES) {
+    if (!existingCodes.has(t.code)) {
+      await db.insert(examTypesTable).values(t);
+      added++;
+    }
+  }
+  res.json({ added, total: TYPES.length, message: `${added} exam type(s) added. ${existingCodes.size} already existed.` });
+});
+
+// POST /admin/debug-monnify — test Monnify auth (without creating any account)
+router.post("/admin/debug-monnify", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  if (!process.env.MONNIFY_API_KEY || !process.env.MONNIFY_SECRET_KEY || !process.env.MONNIFY_CONTRACT_CODE) {
+    res.json({ configured: false, error: "Missing MONNIFY_API_KEY, MONNIFY_SECRET_KEY, or MONNIFY_CONTRACT_CODE" });
+    return;
+  }
+  const baseUrl = process.env.MONNIFY_API_KEY?.startsWith("MK_TEST_") ? "https://sandbox.monnify.com" : "https://api.monnify.com";
+  try {
+    const creds = Buffer.from(`${process.env.MONNIFY_API_KEY}:${process.env.MONNIFY_SECRET_KEY}`).toString("base64");
+    const authRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${creds}`, "Content-Type": "application/json" },
+    });
+    const authData = await authRes.json() as Record<string, unknown>;
+    res.json({
+      configured: true,
+      baseUrl,
+      authSuccess: (authData as any).requestSuccessful === true,
+      contractCode: process.env.MONNIFY_CONTRACT_CODE?.slice(0, 4) + "****",
+      response: authData,
+    });
+  } catch (err: any) {
+    res.json({ configured: true, baseUrl, authSuccess: false, error: err?.message });
+  }
 });
 
 export default router;

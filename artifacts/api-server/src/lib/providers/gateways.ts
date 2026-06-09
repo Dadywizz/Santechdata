@@ -135,6 +135,26 @@ export async function monnifyCreateReservedAccount(opts: {
   if (!process.env.MONNIFY_API_KEY || !process.env.MONNIFY_SECRET_KEY || !process.env.MONNIFY_CONTRACT_CODE) return null;
   try {
     const token = await monnifyGetAccessToken();
+
+    // First try to fetch an existing reserved account (handles retry after fire-and-forget silently failed to save)
+    try {
+      const existing = await fetch(
+        `${monnifyBaseUrl()}/api/v2/bank-transfer/reserved-accounts/${encodeURIComponent(opts.accountReference)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (existing.ok) {
+        const eData = await existing.json() as {
+          requestSuccessful: boolean;
+          responseBody: { accounts?: Array<{ bankName: string; accountNumber: string }>; accountNumber?: string; bankName?: string };
+        };
+        if (eData.requestSuccessful) {
+          const accounts = eData.responseBody?.accounts;
+          if (accounts?.length) return { accountNumber: accounts[0].accountNumber, bankName: accounts[0].bankName };
+          if (eData.responseBody?.accountNumber) return { accountNumber: eData.responseBody.accountNumber, bankName: eData.responseBody.bankName ?? "Monnify" };
+        }
+      }
+    } catch { /* fall through to create */ }
+
     const res = await fetch(`${monnifyBaseUrl()}/api/v2/bank-transfer/reserved-accounts`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -150,11 +170,13 @@ export async function monnifyCreateReservedAccount(opts: {
     });
     const data = await res.json() as {
       requestSuccessful: boolean;
-      responseBody: { accounts: Array<{ bankName: string; accountNumber: string }> };
+      responseBody: { accounts?: Array<{ bankName: string; accountNumber: string }>; accountNumber?: string; bankName?: string };
     };
-    if (!data.requestSuccessful || !data.responseBody?.accounts?.length) return null;
-    const acct = data.responseBody.accounts[0];
-    return { accountNumber: acct.accountNumber, bankName: acct.bankName };
+    if (!data.requestSuccessful) return null;
+    const accounts = data.responseBody?.accounts;
+    if (accounts?.length) return { accountNumber: accounts[0].accountNumber, bankName: accounts[0].bankName };
+    if (data.responseBody?.accountNumber) return { accountNumber: data.responseBody.accountNumber, bankName: data.responseBody.bankName ?? "Monnify" };
+    return null;
   } catch {
     return null;
   }

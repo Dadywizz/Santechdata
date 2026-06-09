@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft } from "lucide-react";
+import { Settings, Mail, CreditCard, Megaphone, Save, Loader2, Zap, ArrowRightLeft, Key, BookOpen, RefreshCw, Bug } from "lucide-react";
 
 const API = "/api/admin/settings";
 
@@ -29,10 +30,18 @@ async function saveSettings(data: Record<string, string>): Promise<void> {
   if (!res.ok) throw new Error("Failed to save settings");
 }
 
+async function callAdminAction(path: string): Promise<any> {
+  const token = localStorage.getItem("santech_token");
+  const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  return res.json();
+}
+
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [seedingExams, setSeedingExams] = useState(false);
+  const [testingMonnify, setTestingMonnify] = useState(false);
 
   const [supportEmail, setSupportEmail] = useState("santechdata@gmail.com");
   const [supportPhone, setSupportPhone] = useState("09026329296");
@@ -48,6 +57,10 @@ export default function AdminSettings() {
   const [bankName, setBankName] = useState("");
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
+
+  // VTU provider API keys
+  const [easyAccessToken, setEasyAccessToken] = useState("");
+  const [showEaToken, setShowEaToken] = useState(false);
 
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -65,6 +78,7 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
+      if (s.easyaccess_api_token) setEasyAccessToken(s.easyaccess_api_token);
       setLoading(false);
     });
   }, []);
@@ -72,7 +86,7 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveSettings({
+      const payload: Record<string, string> = {
         supportEmail, supportPhone, whatsapp, announcement,
         announcementActive: String(announcementActive),
         paystackActive: String(paystackActive),
@@ -81,12 +95,42 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
-      });
-      toast({ title: "Settings saved!", description: "All changes have been applied" });
+      };
+      if (easyAccessToken) payload.easyaccess_api_token = easyAccessToken;
+      await saveSettings(payload);
+      toast({ title: "Settings saved!", description: "All changes applied — API tokens active immediately." });
     } catch {
       toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSeedExams = async () => {
+    setSeedingExams(true);
+    try {
+      const result = await callAdminAction("/api/admin/seed-exam-types");
+      toast({ title: "Exam types synced", description: result.message ?? `${result.added} type(s) added` });
+    } catch {
+      toast({ title: "Sync failed", description: "Please try again", variant: "destructive" });
+    } finally {
+      setSeedingExams(false);
+    }
+  };
+
+  const handleTestMonnify = async () => {
+    setTestingMonnify(true);
+    try {
+      const result = await callAdminAction("/api/admin/debug-monnify");
+      if (result.authSuccess) {
+        toast({ title: "Monnify OK ✓", description: `Auth successful on ${result.baseUrl}` });
+      } else {
+        toast({ title: "Monnify connection issue", description: result.error ?? JSON.stringify(result.response), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Test failed", variant: "destructive" });
+    } finally {
+      setTestingMonnify(false);
     }
   };
 
@@ -112,27 +156,105 @@ export default function AdminSettings() {
 
       <div className="space-y-6 max-w-2xl">
 
-        {/* VTU Provider Status */}
+        {/* VTU Provider API Keys */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <Zap className="text-primary" size={18} />
-              <CardTitle className="text-base">VTU Provider</CardTitle>
+              <Key className="text-primary" size={18} />
+              <CardTitle className="text-base">VTU Provider API Keys</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800">
-              <div>
-                <p className="font-semibold text-sm text-green-800 dark:text-green-300">EasyAccess — Live Mode</p>
-                <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
-                  Handles data, electricity, cable TV and exam tokens. Powered by easyaccess.com.ng.
-                </p>
-              </div>
-              <span className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-full font-semibold shrink-0">Active ✓</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              To manage data plan IDs, go to <strong>Admin → Data Plans</strong> and edit each plan's EasyAccess Plan ID.
+          <CardContent className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Paste your API token here to switch providers or update credentials. Saved values take effect immediately — no server restart needed.
             </p>
+
+            {/* EasyAccess */}
+            <div className="p-4 rounded-lg border border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap size={15} className="text-primary" />
+                <p className="font-semibold text-sm">EasyAccess API Token</p>
+                <Badge variant="outline" className="text-[10px]">Data · Electricity · Cable · Exam</Badge>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type={showEaToken ? "text" : "password"}
+                  value={easyAccessToken}
+                  onChange={(e) => setEasyAccessToken(e.target.value)}
+                  placeholder="Paste your EasyAccess Bearer token"
+                  className="h-11 font-mono text-sm"
+                />
+                <Button variant="outline" size="sm" onClick={() => setShowEaToken((v) => !v)} className="shrink-0 px-3">
+                  {showEaToken ? "Hide" : "Show"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Token is stored securely in the database and overrides the environment variable. Leaving it blank uses the env var.
+              </p>
+            </div>
+
+            {/* VTpass — read-only info */}
+            <div className="p-4 rounded-lg border border-border space-y-1">
+              <div className="flex items-center gap-2">
+                <Zap size={15} className="text-blue-600" />
+                <p className="font-semibold text-sm">VTpass</p>
+                <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-0">Airtime</Badge>
+                <Badge variant="outline" className="text-[10px]">Env var set ✓</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                VTpass handles <strong>airtime purchases</strong>. Keys are configured via environment variables (VTPASS_PUBLIC_KEY, VTPASS_SECRET_KEY). Contact your platform admin to update them.
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              To manage data plan IDs, go to <strong>Admin → Data Plans</strong>.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Exam Types Management */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="text-primary" size={18} />
+              <CardTitle className="text-base">Exam Types</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Ensure WAEC, NECO, JAMB and NABTEB exam types are available in the system. Click below to add any that are missing.
+            </p>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
+                <div key={code} className="p-3 rounded-lg border border-border bg-muted/40">
+                  <p className="font-bold text-sm">{code}</p>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" onClick={handleSeedExams} disabled={seedingExams} className="gap-2">
+              {seedingExams ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {seedingExams ? "Syncing..." : "Sync Exam Types"}
+            </Button>
+            <p className="text-xs text-muted-foreground">Safe to run multiple times — only adds missing types, never duplicates.</p>
+          </CardContent>
+        </Card>
+
+        {/* Monnify Debug */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Bug className="text-primary" size={18} />
+              <CardTitle className="text-base">Monnify Connection Test</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Test whether the Monnify API credentials are working. This helps diagnose why dedicated virtual accounts may not be generating.
+            </p>
+            <Button variant="outline" onClick={handleTestMonnify} disabled={testingMonnify} className="gap-2">
+              {testingMonnify ? <Loader2 size={14} className="animate-spin" /> : <Bug size={14} />}
+              {testingMonnify ? "Testing..." : "Test Monnify Auth"}
+            </Button>
           </CardContent>
         </Card>
 

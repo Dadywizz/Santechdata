@@ -25,6 +25,7 @@ import {
   eaPayTV,
   eaPurchaseExam,
 } from "../lib/providers/easyaccess";
+import { isVtpassConfigured, vtpassPurchaseAirtime } from "../lib/providers/vtpass";
 
 const router: IRouter = Router();
 
@@ -162,9 +163,73 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 });
 
 // ── AIRTIME ───────────────────────────────────────────────────────────────────
-// Airtime is not currently available. Route kept so the API contract remains valid.
-router.post("/airtime/purchase", authenticate, async (_req: AuthRequest, res): Promise<void> => {
-  res.status(503).json({ error: "Airtime is not currently available. Please check back later or contact support on 09026329296." });
+router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const parsed = PurchaseAirtimeBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { network, phone, amount } = parsed.data;
+
+  if (!isVtpassConfigured()) {
+    res.status(503).json({ error: "Airtime service is not currently configured. Please contact support on 09026329296." });
+    return;
+  }
+
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
+  if (parseFloat(wallet.balance) < amount) {
+    res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." });
+    return;
+  }
+
+  await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
+
+  const reference = `AIRTIME-${Date.now()}`;
+  let delivered = false;
+
+  try {
+    const result = await vtpassPurchaseAirtime({ network, phone, amount });
+    delivered = result.code === "000";
+    req.log?.info({ result }, "VTpass airtime purchase response");
+  } catch (err) {
+    req.log?.error({ err }, "VTpass airtime purchase error");
+  }
+
+  if (!delivered) {
+    await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
+    await db.insert(transactionsTable).values({
+      userId: req.userId!, type: "airtime", status: "failed",
+      amount: amount.toString(),
+      description: `${network} ₦${amount} airtime for ${phone} — delivery failed`,
+      reference,
+      metadata: { network, phone, amount },
+    });
+    await db.insert(notificationsTable).values({
+      userId: req.userId!, title: "Airtime Purchase Failed",
+      message: `₦${amount} ${network} airtime purchase failed. Your wallet has been refunded.`,
+      type: "airtime",
+    });
+    res.status(502).json({ error: "Airtime delivery failed. Your wallet has been refunded. Please try again or contact support." });
+    return;
+  }
+
+  const [tx] = await db.insert(transactionsTable).values({
+    userId: req.userId!, type: "airtime", status: "success",
+    amount: amount.toString(),
+    description: `${network} ₦${amount} airtime for ${phone}`,
+    reference,
+    metadata: { network, phone, amount },
+  }).returning();
+
+  await db.insert(notificationsTable).values({
+    userId: req.userId!, title: "Airtime Purchase Successful",
+    message: `₦${amount} ${network} airtime has been sent to ${phone}.`,
+    type: "airtime",
+  });
+
+  res.json({
+    id: tx.id, type: tx.type, status: tx.status,
+    amount: parseFloat(tx.amount), description: tx.description,
+    reference: tx.reference, metadata: tx.metadata, userId: tx.userId,
+    createdAt: tx.createdAt,
+  });
 });
 
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────
@@ -485,7 +550,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   }
 
   const code = examType.code.toLowerCase();
-  const supportedBoards = ["waec", "neco", "nabteb"];
+  const supportedBoards = ["waec", "neco", "nabteb", "jamb"];
   if (!supportedBoards.some((b) => code.includes(b))) {
     res.status(503).json({
       error: `${examType.name} tokens are not yet available. Please contact support on 09026329296.`,
@@ -510,6 +575,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let examBoard = "waec";
   if (code.includes("neco")) examBoard = "neco";
   else if (code.includes("nabteb")) examBoard = "nabteb";
+  else if (code.includes("jamb")) examBoard = "jamb";
 
   try {
     const eaRes = await eaPurchaseExam({ examBoard, count: quantity });
