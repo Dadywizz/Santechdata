@@ -88,8 +88,11 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   try {
     const r = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
-    delivered = String(r.status ?? "").toLowerCase() === "success" || String(r.status) === "200";
     req.log?.info({ r }, "KYB Data purchase response");
+    const st = String(r.status ?? "").toLowerCase();
+    const msg = String(r.message ?? "").toLowerCase();
+    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+      || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Data purchase error"); }
 
   if (!delivered) {
@@ -137,8 +140,11 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 
   try {
     const r = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
-    delivered = String(r.status ?? "").toLowerCase() === "success" || String(r.status) === "200";
     req.log?.info({ r }, "KYB Data airtime response");
+    const st = String(r.status ?? "").toLowerCase();
+    const msg = String(r.message ?? "").toLowerCase();
+    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+      || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Airtime purchase error"); }
 
   if (!delivered) {
@@ -222,9 +228,12 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
     const r = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
-    delivered = String(r.status ?? "").toLowerCase() === "success" || String(r.status) === "200";
-    elecToken = r.token ?? "";
     req.log?.info({ r }, "KYB Data electricity response");
+    const st = String(r.status ?? "").toLowerCase();
+    const msg = String(r.message ?? "").toLowerCase();
+    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+      || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
+    elecToken = r.token ?? "";
   } catch (err) { req.log?.error({ err }, "Electricity purchase error"); }
 
   if (!delivered) {
@@ -327,8 +336,11 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
 
   try {
     const r = await kybdataPurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
-    delivered = String(r.status ?? "").toLowerCase() === "success" || String(r.status) === "200";
     req.log?.info({ r }, "KYB Data cable response");
+    const st = String(r.status ?? "").toLowerCase();
+    const msg = String(r.message ?? "").toLowerCase();
+    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+      || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
   } catch (err) { req.log?.error({ err }, "Cable subscribe error"); }
 
   if (!delivered) {
@@ -390,9 +402,12 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   try {
     const r = await kybdataPurchaseExam({ examid: examType.code, quantity });
-    delivered = String(r.status ?? "").toLowerCase() === "success" || String(r.status) === "200";
-    if (delivered && Array.isArray(r.pins)) pins = r.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
     req.log?.info({ r }, "KYB Data exam response");
+    const st = String(r.status ?? "").toLowerCase();
+    const msg = String(r.message ?? "").toLowerCase();
+    delivered = st === "success" || st === "200" || st === "00" || st === "true"
+      || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
+    if (delivered && Array.isArray(r.pins)) pins = r.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
   } catch (err) { req.log?.error({ err }, "Exam purchase error"); }
 
   if (!delivered) {
