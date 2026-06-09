@@ -27,23 +27,6 @@ import {
   kybdataVerifySmartcard,
   kybdataPurchaseExam,
 } from "../lib/providers/kybdata";
-import {
-  isVtpassConfigured,
-  vtpassPurchaseAirtime,
-  vtpassPurchaseData,
-  vtpassVerifyMeter,
-  vtpassPayElectricity,
-  vtpassVerifySmartcard,
-  vtpassCableSubscribe,
-  vtpassPurchaseExam,
-} from "../lib/providers/vtpass";
-
-/** Returns the active VTU provider, preferring KYB Data then VTpass. */
-function getVtuProvider(): "kybdata" | "vtpass" | null {
-  if (isKybdataConfigured()) return "kybdata";
-  if (isVtpassConfigured()) return "vtpass";
-  return null;
-}
 
 async function getSetting(key: string): Promise<string | undefined> {
   const [s] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
@@ -104,8 +87,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   const [plan] = await db.select().from(dataPlansTable).where(eq(dataPlansTable.id, planId));
   if (!plan || !plan.isActive) { res.status(404).json({ error: "Data plan not found or unavailable" }); return; }
   if (!plan.providerCode) { res.status(503).json({ error: "This data plan is not yet configured. Please contact support." }); return; }
-  const dataProvider = getVtuProvider();
-  if (!dataProvider) { res.status(503).json({ error: "VTU service is currently unavailable. Please contact support." }); return; }
+  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   const price = parseFloat(plan.price);
@@ -120,15 +102,9 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    if (dataProvider === "kybdata") {
-      const kybRes = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
-      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
-      req.log?.info({ kybRes }, "KYB Data data purchase response");
-    } else {
-      const vtRes = await vtpassPurchaseData({ network: plan.network, phone, variationCode: plan.providerCode, amount: price });
-      delivered = vtRes.code === "000" || String((vtRes.content as any)?.transactions?.status ?? "").toLowerCase() === "delivered";
-      req.log?.info({ vtRes }, "VTpass data purchase response");
-    }
+    const kybRes = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
+    delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+    req.log?.info({ kybRes }, "KYB Data data purchase response");
   } catch (err) {
     req.log?.error({ err }, "Data purchase error");
   }
@@ -179,8 +155,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { network, phone, amount } = parsed.data;
 
-  const airtimeProvider = getVtuProvider();
-  if (!airtimeProvider) { res.status(503).json({ error: "VTU service is currently unavailable. Please contact support." }); return; }
+  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
@@ -194,15 +169,9 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    if (airtimeProvider === "kybdata") {
-      const kybRes = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
-      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
-      req.log?.info({ kybRes }, "KYB Data airtime purchase response");
-    } else {
-      const vtRes = await vtpassPurchaseAirtime({ network, phone, amount });
-      delivered = vtRes.code === "000" || String((vtRes.content as any)?.transactions?.status ?? "").toLowerCase() === "delivered";
-      req.log?.info({ vtRes }, "VTpass airtime purchase response");
-    }
+    const kybRes = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
+    delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+    req.log?.info({ kybRes }, "KYB Data airtime purchase response");
   } catch (err) {
     req.log?.error({ err }, "Airtime purchase error");
   }
@@ -279,13 +248,6 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
       res.json({ meterNumber, name: kybRes.customer_name || "Customer", address: kybRes.address || "" });
       return;
     }
-    if (isVtpassConfigured()) {
-      const vtRes = await vtpassVerifyMeter({ serviceID: providerCode.toLowerCase(), meterNumber, meterType: meterType ?? "prepaid" });
-      const name = vtRes.content?.Customer_Name || "Customer";
-      const address = vtRes.content?.Address || "";
-      res.json({ meterNumber, name, address });
-      return;
-    }
   } catch (err) {
     req.log?.error({ err }, "Meter verify error");
   }
@@ -298,8 +260,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const { meterNumber, providerCode, meterType, amount, phone } = parsed.data;
 
   if (amount < 500) { res.status(400).json({ error: "Minimum electricity purchase is ₦500" }); return; }
-  const elecVtuProvider = getVtuProvider();
-  if (!elecVtuProvider) { res.status(503).json({ error: "VTU service is currently unavailable. Please contact support." }); return; }
+  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
@@ -314,18 +275,11 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   let delivered = false;
 
   try {
-    if (elecVtuProvider === "kybdata") {
-      const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-      const kybRes = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
-      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
-      elecToken = kybRes.token ?? "";
-      req.log?.info({ kybRes }, "KYB Data electricity purchase response");
-    } else {
-      const vtRes = await vtpassPayElectricity({ serviceID: providerCode.toLowerCase(), meterNumber, meterType: meterType ?? "prepaid", amount, phone });
-      delivered = vtRes.code === "000" || String((vtRes.content as any)?.transactions?.status ?? "").toLowerCase() === "delivered";
-      elecToken = (vtRes.content as any)?.transactions?.token ?? "";
-      req.log?.info({ vtRes }, "VTpass electricity purchase response");
-    }
+    const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
+    const kybRes = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
+    delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+    elecToken = kybRes.token ?? "";
+    req.log?.info({ kybRes }, "KYB Data electricity purchase response");
   } catch (err) {
     req.log?.error({ err }, "Electricity purchase error");
   }
@@ -373,26 +327,26 @@ const CABLE_PROVIDERS = [
 ];
 
 const CABLE_PLANS = [
-  { id: "dstv-90",  provider: "dstv",      name: "DStv Padi",               price: 4399,  validity: "Monthly", kybPlanId: 90,  vtpassCode: "dstv-padi"         },
-  { id: "dstv-91",  provider: "dstv",      name: "DStv Yanga",              price: 5999,  validity: "Monthly", kybPlanId: 91,  vtpassCode: "dstv-yanga"        },
-  { id: "dstv-92",  provider: "dstv",      name: "DStv Confam",             price: 10999, validity: "Monthly", kybPlanId: 92,  vtpassCode: "dstv-confam"       },
-  { id: "dstv-93",  provider: "dstv",      name: "DStv Compact",            price: 18999, validity: "Monthly", kybPlanId: 93,  vtpassCode: "dstv-compact"      },
-  { id: "dstv-105", provider: "dstv",      name: "DStv Compact Plus",       price: 29999, validity: "Monthly", kybPlanId: 105, vtpassCode: "dstv-compact-plus" },
-  { id: "dstv-106", provider: "dstv",      name: "DStv Premium",            price: 44499, validity: "Monthly", kybPlanId: 106, vtpassCode: "dstv-premium"      },
-  { id: "gotv-94",  provider: "gotv",      name: "GOtv Smallie",            price: 1899,  validity: "Monthly", kybPlanId: 94,  vtpassCode: "gotv-smallie"      },
-  { id: "gotv-97",  provider: "gotv",      name: "GOtv Jinja",              price: 3899,  validity: "Monthly", kybPlanId: 97,  vtpassCode: "gotv-jinja"        },
-  { id: "gotv-96",  provider: "gotv",      name: "GOtv Jolli",              price: 5799,  validity: "Monthly", kybPlanId: 96,  vtpassCode: "gotv-jolli"        },
-  { id: "gotv-95",  provider: "gotv",      name: "GOtv Max",                price: 8499,  validity: "Monthly", kybPlanId: 95,  vtpassCode: "gotv-max"          },
-  { id: "gotv-112", provider: "gotv",      name: "GOtv Supa",               price: 11399, validity: "Monthly", kybPlanId: 112, vtpassCode: "gotv-supa"         },
-  { id: "gotv-113", provider: "gotv",      name: "GOtv Supa Plus",          price: 16799, validity: "Monthly", kybPlanId: 113, vtpassCode: "gotv-supa-plus"    },
-  { id: "st-100",   provider: "startimes", name: "StarTimes Nova (Antenna) Monthly",    price: 2099,  validity: "Monthly", kybPlanId: 100, vtpassCode: "nova-e"     },
-  { id: "st-139",   provider: "startimes", name: "StarTimes Nova (Dish) Monthly",       price: 2099,  validity: "Monthly", kybPlanId: 139, vtpassCode: "nova-d"     },
-  { id: "st-101",   provider: "startimes", name: "StarTimes Basic (Antenna) Monthly",   price: 3999,  validity: "Monthly", kybPlanId: 101, vtpassCode: "basic-e"    },
-  { id: "st-102",   provider: "startimes", name: "StarTimes Basic (Dish) Monthly",      price: 5099,  validity: "Monthly", kybPlanId: 102, vtpassCode: "basic-d"    },
-  { id: "st-103",   provider: "startimes", name: "StarTimes Classic (Antenna) Monthly", price: 5999,  validity: "Monthly", kybPlanId: 103, vtpassCode: "classic-e"  },
-  { id: "st-140",   provider: "startimes", name: "StarTimes Classic (Dish) Monthly",    price: 7399,  validity: "Monthly", kybPlanId: 140, vtpassCode: "classic-d"  },
-  { id: "st-104",   provider: "startimes", name: "StarTimes Super (Antenna) Monthly",   price: 9499,  validity: "Monthly", kybPlanId: 104, vtpassCode: "super-e"    },
-  { id: "st-141",   provider: "startimes", name: "StarTimes Super (Dish) Monthly",      price: 9799,  validity: "Monthly", kybPlanId: 141, vtpassCode: "super-d"    },
+  { id: "dstv-90",  provider: "dstv",      name: "DStv Padi",               price: 4399,  validity: "Monthly", kybPlanId: 90  },
+  { id: "dstv-91",  provider: "dstv",      name: "DStv Yanga",              price: 5999,  validity: "Monthly", kybPlanId: 91  },
+  { id: "dstv-92",  provider: "dstv",      name: "DStv Confam",             price: 10999, validity: "Monthly", kybPlanId: 92  },
+  { id: "dstv-93",  provider: "dstv",      name: "DStv Compact",            price: 18999, validity: "Monthly", kybPlanId: 93  },
+  { id: "dstv-105", provider: "dstv",      name: "DStv Compact Plus",       price: 29999, validity: "Monthly", kybPlanId: 105 },
+  { id: "dstv-106", provider: "dstv",      name: "DStv Premium",            price: 44499, validity: "Monthly", kybPlanId: 106 },
+  { id: "gotv-94",  provider: "gotv",      name: "GOtv Smallie",            price: 1899,  validity: "Monthly", kybPlanId: 94  },
+  { id: "gotv-97",  provider: "gotv",      name: "GOtv Jinja",              price: 3899,  validity: "Monthly", kybPlanId: 97  },
+  { id: "gotv-96",  provider: "gotv",      name: "GOtv Jolli",              price: 5799,  validity: "Monthly", kybPlanId: 96  },
+  { id: "gotv-95",  provider: "gotv",      name: "GOtv Max",                price: 8499,  validity: "Monthly", kybPlanId: 95  },
+  { id: "gotv-112", provider: "gotv",      name: "GOtv Supa",               price: 11399, validity: "Monthly", kybPlanId: 112 },
+  { id: "gotv-113", provider: "gotv",      name: "GOtv Supa Plus",          price: 16799, validity: "Monthly", kybPlanId: 113 },
+  { id: "st-100",   provider: "startimes", name: "StarTimes Nova (Antenna) Monthly",    price: 2099,  validity: "Monthly", kybPlanId: 100 },
+  { id: "st-139",   provider: "startimes", name: "StarTimes Nova (Dish) Monthly",       price: 2099,  validity: "Monthly", kybPlanId: 139 },
+  { id: "st-101",   provider: "startimes", name: "StarTimes Basic (Antenna) Monthly",   price: 3999,  validity: "Monthly", kybPlanId: 101 },
+  { id: "st-102",   provider: "startimes", name: "StarTimes Basic (Dish) Monthly",      price: 5099,  validity: "Monthly", kybPlanId: 102 },
+  { id: "st-103",   provider: "startimes", name: "StarTimes Classic (Antenna) Monthly", price: 5999,  validity: "Monthly", kybPlanId: 103 },
+  { id: "st-140",   provider: "startimes", name: "StarTimes Classic (Dish) Monthly",    price: 7399,  validity: "Monthly", kybPlanId: 140 },
+  { id: "st-104",   provider: "startimes", name: "StarTimes Super (Antenna) Monthly",   price: 9499,  validity: "Monthly", kybPlanId: 104 },
+  { id: "st-141",   provider: "startimes", name: "StarTimes Super (Dish) Monthly",      price: 9799,  validity: "Monthly", kybPlanId: 141 },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
@@ -418,11 +372,6 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
       res.json({ smartcardNumber, name: kybRes.customer_name || "Customer", currentPlan: kybRes.current_plan || "", dueDate: "" });
       return;
     }
-    if (isVtpassConfigured() && provider) {
-      const vtRes = await vtpassVerifySmartcard({ serviceID: provider.toLowerCase(), smartcardNumber });
-      res.json({ smartcardNumber, name: vtRes.content?.Customer_Name || "Customer", currentPlan: vtRes.content?.Status || "", dueDate: "" });
-      return;
-    }
   } catch (err) {
     req.log?.error({ err }, "Smartcard verify error");
   }
@@ -437,8 +386,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
 
   const plan = CABLE_PLANS.find((p) => p.id === planId);
   if (!plan) { res.status(404).json({ error: "Plan not found" }); return; }
-  const cableVtuProvider = getVtuProvider();
-  if (!cableVtuProvider) { res.status(503).json({ error: "VTU service is currently unavailable. Please contact support." }); return; }
+  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < plan.price) {
@@ -452,15 +400,9 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   let delivered = false;
 
   try {
-    if (cableVtuProvider === "kybdata") {
-      const kybRes = await kybdataPurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
-      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
-      req.log?.info({ kybRes }, "KYB Data cable subscribe response");
-    } else {
-      const vtRes = await vtpassCableSubscribe({ serviceID: plan.provider, smartcardNumber, variationCode: plan.vtpassCode, amount: plan.price, phone: smartcardNumber });
-      delivered = vtRes.code === "000" || String((vtRes.content as any)?.transactions?.status ?? "").toLowerCase() === "delivered";
-      req.log?.info({ vtRes }, "VTpass cable subscribe response");
-    }
+    const kybRes = await kybdataPurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
+    delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+    req.log?.info({ kybRes }, "KYB Data cable subscribe response");
   } catch (err) {
     req.log?.error({ err }, "Cable subscribe error");
   }
@@ -522,8 +464,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   const [examType] = await db.select().from(examTypesTable).where(eq(examTypesTable.id, examTypeId));
   if (!examType) { res.status(404).json({ error: "Exam type not found" }); return; }
-  const examVtuProvider = getVtuProvider();
-  if (!examVtuProvider) { res.status(503).json({ error: "VTU service is currently unavailable. Please contact support." }); return; }
+  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const code = examType.code.toLowerCase();
   const supportedBoards = ["waec", "neco", "nabteb", "jamb"];
@@ -546,22 +487,12 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    if (examVtuProvider === "kybdata") {
-      const kybRes = await kybdataPurchaseExam({ examid: examType.code, quantity });
-      delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
-      if (delivered && Array.isArray(kybRes.pins)) {
-        pins = kybRes.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
-      }
-      req.log?.info({ kybRes }, "KYB Data exam purchase response");
-    } else {
-      const vtRes = await vtpassPurchaseExam({ examCode: examType.code, phone, quantity, amount: parseFloat(examType.price) * quantity });
-      delivered = vtRes.code === "000" || String((vtRes.content as any)?.transactions?.status ?? "").toLowerCase() === "delivered";
-      const cards = (vtRes.content as any)?.transactions?.cards ?? [];
-      if (delivered && Array.isArray(cards)) {
-        pins = cards.map((c: any) => ({ pin: c.Pin ?? c.pin ?? "", serial: c.Serial ?? c.serial ?? "" }));
-      }
-      req.log?.info({ vtRes }, "VTpass exam purchase response");
+    const kybRes = await kybdataPurchaseExam({ examid: examType.code, quantity });
+    delivered = String(kybRes.status ?? "").toLowerCase() === "success" || String(kybRes.status) === "200";
+    if (delivered && Array.isArray(kybRes.pins)) {
+      pins = kybRes.pins.map((p) => ({ pin: p.pin, serial: p.serial }));
     }
+    req.log?.info({ kybRes }, "KYB Data exam purchase response");
   } catch (err) {
     req.log?.error({ err }, "Exam purchase error");
   }
