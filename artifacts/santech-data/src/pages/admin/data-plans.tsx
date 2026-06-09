@@ -125,7 +125,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
         </div>
       </div>
       <div>
-        <Label className="font-semibold mb-2 block">EasyAccess Plan ID</Label>
+        <Label className="font-semibold mb-2 block">KYB Data Plan ID</Label>
         <Input
           placeholder="e.g. 104"
           value={form.providerCode}
@@ -133,7 +133,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
           className="h-12 font-mono text-sm"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          The numeric plan ID from EasyAccess (easyaccess.com.ng). Required for delivery to work.
+          The numeric plan ID from KYB Data. Use "Sync from KYB Data" to auto-fill these. Required for delivery to work.
         </p>
       </div>
 
@@ -156,7 +156,7 @@ export default function AdminDataPlans() {
     setSyncing(true);
     try {
       const token = localStorage.getItem("santech_token");
-      const res = await fetch("/api/admin/sync-ea-plans", {
+      const res = await fetch("/api/admin/sync-kyb-plans", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
       });
@@ -165,7 +165,7 @@ export default function AdminDataPlans() {
         toast({ title: "Sync failed", description: (data as any).error ?? "Unknown error", variant: "destructive" });
       } else {
         toast({
-          title: "Plans synced from EasyAccess",
+          title: "Plans synced from KYB Data",
           description: `${data.added ?? 0} added, ${data.updated ?? 0} updated${data.errors?.length ? ` (${data.errors.length} errors)` : ""}`,
         });
         queryClient.invalidateQueries({ queryKey: getAdminGetDataPlansQueryKey() });
@@ -204,7 +204,7 @@ export default function AdminDataPlans() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleSyncPlans} disabled={syncing}>
             <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing..." : "Sync from EasyAccess"}
+            {syncing ? "Syncing..." : "Sync from KYB Data"}
           </Button>
           <Button onClick={() => { setDialogMode("create"); setEditPlan(null); }}>
             <Plus className="mr-2 h-4 w-4" /> Add Plan
@@ -216,8 +216,8 @@ export default function AdminDataPlans() {
         <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>
-            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing an EasyAccess Plan ID — customers can't buy them yet.
-            Edit each plan and set the <strong>EasyAccess Plan ID</strong> (numeric, e.g. <code className="font-mono text-xs">104</code>).
+            <strong>{(data as any[]).length - configuredCount} plan(s)</strong> are missing a KYB Data Plan ID — customers can't buy them yet.
+            Use <strong>Sync from KYB Data</strong> to auto-fill plan IDs, or edit each plan manually.
           </span>
         </div>
       )}

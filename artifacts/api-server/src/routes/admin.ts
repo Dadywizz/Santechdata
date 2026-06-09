@@ -11,7 +11,7 @@ import {
   settingsTable,
   examTypesTable,
 } from "@workspace/db";
-import { isKybdataConfigured } from "../lib/providers/kybdata";
+import { isKybdataConfigured, setKybdataToken, kybdataGetDataPlans } from "../lib/providers/kybdata";
 import { eq, sql, desc } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -380,9 +380,85 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
 
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+    // Hot-reload KYB Data token without restart
+    if (key === "kybdata_api_token" && value) setKybdataToken(value);
   }
 
   res.json({ updated: entries.length });
+});
+
+// POST /admin/sync-kyb-plans — fetch data plans from KYB Data and upsert into DB
+router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  if (!isKybdataConfigured()) {
+    res.status(503).json({ error: "KYB Data token not configured. Set it in Admin → Settings." });
+    return;
+  }
+
+  function parseSize(name: string): string {
+    const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
+    if (!m) return "?";
+    const unit = m[2].toUpperCase().replace(/^G$/, "GB").replace(/^M$/, "MB");
+    return `${m[1]}${unit}`.slice(0, 20);
+  }
+
+  function parseValidity(name: string, raw?: string): string {
+    const src = raw || name;
+    const m = src.match(/(\d+)\s*(day|days|month|months|week|weeks)/i);
+    if (!m) return "30 Days";
+    const n = parseInt(m[1]);
+    const u = m[2].toLowerCase();
+    if (u.startsWith("week")) return `${n * 7} Days`;
+    if (u.startsWith("month")) return `${n} Month${n > 1 ? "s" : ""}`;
+    return `${n} Day${n > 1 ? "s" : ""}`;
+  }
+
+  let added = 0, updated = 0;
+  const errors: string[] = [];
+
+  try {
+    const plans = await kybdataGetDataPlans();
+    req.log?.info({ count: plans.length }, "KYB Data sync: fetched plans");
+
+    for (const p of plans) {
+      if (!p.id || !p.network) continue;
+      const providerCode = String(p.id);
+      const network = p.network.toUpperCase().replace("ETISALAT", "9MOBILE");
+      if (!["MTN", "AIRTEL", "GLO", "9MOBILE"].includes(network)) continue;
+
+      const size = p.size ? String(p.size).slice(0, 20) : parseSize(p.name);
+      const validity = parseValidity(p.name, p.validity);
+      const price = Number(p.price) || 0;
+      const costPrice = (price * 0.97).toFixed(2);
+
+      const existing = await db.select({ id: dataPlansTable.id })
+        .from(dataPlansTable)
+        .where(eq(dataPlansTable.providerCode, providerCode));
+
+      if (existing.length > 0) {
+        await db.update(dataPlansTable)
+          .set({ name: p.name.slice(0, 100), size, validity, price: price.toString(), costPrice, updatedAt: new Date() })
+          .where(eq(dataPlansTable.providerCode, providerCode));
+        updated++;
+      } else {
+        await db.insert(dataPlansTable).values({
+          network,
+          name: p.name.slice(0, 100),
+          size, validity,
+          price: price.toString(),
+          costPrice,
+          providerCode,
+          isActive: true,
+        });
+        added++;
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(msg);
+    req.log?.error({ err }, "KYB Data sync error");
+  }
+
+  res.json({ added, updated, errors });
 });
 
 // POST /admin/clear-data-plans — wipe all data plans so admin can re-add for a new provider
@@ -394,7 +470,6 @@ router.post("/admin/clear-data-plans", authenticate, requireAdmin, async (_req, 
 // POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB
 router.post("/admin/seed-exam-types", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const TYPES = [
-    { name: "WAEC (West African Examinations Council)", code: "WAEC", price: "5069", description: "WAEC result checker PIN" },
     { name: "NECO (National Examinations Council)", code: "NECO", price: "2099", description: "NECO result checker PIN" },
     { name: "JAMB (Joint Admissions and Matriculation Board)", code: "JAMB", price: "700", description: "JAMB e-PIN / Mock result checker" },
     { name: "NABTEB (National Business and Technical Examinations Board)", code: "NABTEB", price: "867", description: "NABTEB result checker PIN" },
