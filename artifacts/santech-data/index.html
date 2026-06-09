@@ -19,6 +19,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        var v = '20260609c';
+        if (sessionStorage.getItem('_appv') !== v) {
+          sessionStorage.setItem('_appv', v);
+          window.location.reload(true);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx?v=20260609c"></script>
   </body>
 </html>
