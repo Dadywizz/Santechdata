@@ -127,9 +127,6 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
 // ── AIRTIME ───────────────────────────────────────────────────────────────────
 router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
-  // KYB Data does not support airtime — block before any wallet deduction
-  res.status(503).json({ error: "Airtime purchase is currently unavailable. Please contact support on 09026329296 for assistance." }); return;
-
   const parsed = PurchaseAirtimeBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { network, phone, amount } = parsed.data;

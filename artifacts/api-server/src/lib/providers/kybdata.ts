@@ -100,14 +100,18 @@ export async function kybdataVerifySmartcard(opts: {
 
 // ─── Purchases ───────────────────────────────────────────────────────────────
 
+// KYB Data airtime uses numeric network IDs, NOT text names
+const KYB_AIRTIME_NETWORK_ID: Record<string, string> = {
+  mtn: "1", glo: "2", airtel: "3", "9mobile": "4", etisalat: "4",
+};
+
 export async function kybdataPurchaseAirtime(opts: {
   network: string; amount: number; mobile_number: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
-  // KYB Data expects lowercase network names
-  const network = opts.network.toLowerCase().replace("9mobile", "9mobile").replace("etisalat", "9mobile");
+  const networkId = KYB_AIRTIME_NETWORK_ID[opts.network.toLowerCase()] ?? "1";
   return kybFetch(`${BASE}/api/v2/purchase/airtime`, {
     method: "POST",
-    body: JSON.stringify({ network, amount: opts.amount, mobile_number: opts.mobile_number }),
+    body: JSON.stringify({ network: networkId, amount: opts.amount, mobile_number: opts.mobile_number }),
   });
 }
 
