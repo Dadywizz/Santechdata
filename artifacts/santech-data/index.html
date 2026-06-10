@@ -21,13 +21,17 @@
     <div id="root"></div>
     <script>
       (function() {
-        var v = '20260609c';
-        if (sessionStorage.getItem('_appv') !== v) {
-          sessionStorage.setItem('_appv', v);
-          window.location.reload(true);
+        var v = '20260610a';
+        var key = '_appv';
+        if (localStorage.getItem(key) !== v) {
+          localStorage.setItem(key, v);
+          var url = location.pathname + '?_r=' + v;
+          location.replace(url);
+        } else if (location.search.indexOf('_r=') !== -1) {
+          history.replaceState(null, '', location.pathname + location.hash);
         }
       })();
     </script>
-    <script type="module" src="/src/main.tsx?v=20260609c"></script>
+    <script type="module" src="/src/main.tsx?v=20260610a"></script>
   </body>
 </html>
