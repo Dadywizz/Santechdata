@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveCreateVirtualAccount, flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -72,6 +72,53 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
     .where(eq(walletsTable.id, wallet.id));
 
   res.json({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName });
+});
+
+// POST /wallet/fund/flutterwave-va — generate a temporary Flutterwave virtual account for a specific amount
+router.post("/wallet/fund/flutterwave-va", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const amount = Number(req.body?.amount);
+  if (!amount || amount < 100) { res.status(400).json({ error: "Minimum funding amount is ₦100" }); return; }
+  if (!process.env.FLUTTERWAVE_SECRET_KEY) { res.status(503).json({ error: "Bank transfer not available right now" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const reference = `FLW-VA-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const nameParts = (user.fullName || "SanTech User").trim().split(/\s+/);
+
+  try {
+    const va = await flutterwaveCreateVirtualAccount({
+      email: user.email,
+      amount,
+      reference,
+      firstName: nameParts[0],
+      lastName: nameParts.slice(1).join(" ") || nameParts[0],
+      phone: user.phone ?? undefined,
+      narration: `SanTech wallet funding - ${user.email}`,
+    });
+
+    // Save a pending transaction so webhook can match by reference
+    await db.insert(transactionsTable).values({
+      userId: req.userId!,
+      type: "wallet_fund",
+      status: "pending",
+      amount: amount.toString(),
+      description: `Wallet funding via bank transfer (Flutterwave)`,
+      reference,
+      metadata: { gateway: "flutterwave_va", amount, orderRef: va.orderRef },
+    });
+
+    res.json({
+      accountNumber: va.accountNumber,
+      bankName: va.bankName,
+      amount,
+      expiresAt: va.expiresAt,
+      reference,
+    });
+  } catch (err: any) {
+    req.log?.error({ err }, "Flutterwave VA creation failed");
+    res.status(503).json({ error: err?.message ?? "Could not generate bank account. Please try again." });
+  }
 });
 
 // POST /wallet/fund/initiate
@@ -375,6 +422,52 @@ router.post("/wallet/webhook/paystack", async (req: Request, res: Response): Pro
           userId: tx.userId,
           title: "Wallet Funded",
           message: `Your wallet has been credited with ₦${amountNaira.toLocaleString()} via bank transfer.`,
+          type: "wallet",
+        });
+      }
+    }
+  }
+
+  res.sendStatus(200);
+});
+
+// POST /wallet/webhook/flutterwave — Flutterwave VA payment notification
+router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): Promise<void> => {
+  const secret = process.env.FLUTTERWAVE_SECRET_KEY;
+  if (!secret) { res.sendStatus(200); return; }
+
+  // Verify hash
+  const hash = req.headers["verif-hash"] as string | undefined;
+  const webhookSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+  if (webhookSecret && hash !== webhookSecret) { res.sendStatus(401); return; }
+
+  const event = req.body as {
+    event?: string;
+    data?: {
+      tx_ref?: string;
+      flw_ref?: string;
+      status?: string;
+      amount?: number;
+      customer?: { email?: string };
+      payment_type?: string;
+    };
+  };
+
+  if (event.event === "charge.completed" && event.data?.status === "successful") {
+    const txRef = event.data.tx_ref;
+    const amountPaid = event.data.amount ?? 0;
+
+    if (txRef && amountPaid > 0) {
+      const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
+      if (tx && tx.status !== "success") {
+        await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
+        await db.update(walletsTable)
+          .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
+          .where(eq(walletsTable.userId, tx.userId));
+        await db.insert(notificationsTable).values({
+          userId: tx.userId,
+          title: "Wallet Funded",
+          message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
           type: "wallet",
         });
       }
