@@ -121,6 +121,64 @@ router.post("/wallet/fund/flutterwave-va", authenticate, async (req: AuthRequest
   }
 });
 
+// POST /wallet/fund/flutterwave-va/check — user clicks "I've transferred"; we query Flutterwave for the payment
+router.post("/wallet/fund/flutterwave-va/check", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const reference = req.body?.reference as string | undefined;
+  if (!reference) { res.status(400).json({ error: "Missing reference" }); return; }
+  if (!process.env.FLUTTERWAVE_SECRET_KEY) { res.status(503).json({ error: "Not configured" }); return; }
+
+  // Look up the pending transaction
+  const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
+  if (!tx || tx.userId !== req.userId!) { res.status(404).json({ error: "Transaction not found" }); return; }
+
+  if (tx.status === "success") {
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
+    res.json({ credited: true, balance: parseFloat(wallet.balance) });
+    return;
+  }
+
+  // Query Flutterwave transactions by tx_ref
+  try {
+    const flwRes = await fetch(
+      `https://api.flutterwave.com/v3/transactions?tx_ref=${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}` } }
+    );
+    const flwData = await flwRes.json() as {
+      status: string;
+      data: Array<{ status: string; amount: number; id: number }>;
+    };
+
+    const successful = flwData.data?.find(
+      (t) => t.status === "successful" && t.amount >= parseFloat(tx.amount)
+    );
+
+    if (!successful) {
+      res.status(202).json({ credited: false, message: "Payment not received yet. Wait a moment and try again." });
+      return;
+    }
+
+    const amount = successful.amount;
+
+    // Credit wallet
+    await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
+    await db.update(walletsTable)
+      .set({ balance: sql`balance + ${amount}`, updatedAt: new Date() })
+      .where(eq(walletsTable.userId, req.userId!));
+    await db.insert(notificationsTable).values({
+      userId: req.userId!,
+      title: "Wallet Funded",
+      message: `Your wallet has been credited with ₦${amount.toLocaleString()}.`,
+      type: "wallet",
+    });
+
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
+    res.json({ credited: true, balance: parseFloat(wallet.balance) });
+  } catch (err: any) {
+    req.log?.error({ err }, "Flutterwave VA check failed");
+    res.status(502).json({ error: "Could not check payment status. Please try again." });
+  }
+});
+
 // POST /wallet/fund/initiate
 router.post("/wallet/fund/initiate", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const parsed = InitiateFundingBody.safeParse(req.body);
