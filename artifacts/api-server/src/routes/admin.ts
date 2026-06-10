@@ -484,25 +484,23 @@ router.post("/admin/clear-data-plans", authenticate, requireAdmin, async (_req, 
   res.json({ message: "All data plans cleared. You can now add plans for your new provider." });
 });
 
-// POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB
+// POST /admin/seed-exam-types — upsert NECO + WAEC (KYB Data supported types)
 router.post("/admin/seed-exam-types", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const TYPES = [
-    { name: "NECO (National Examinations Council)", code: "NECO", price: "2099", description: "NECO result checker PIN" },
-    { name: "JAMB (Joint Admissions and Matriculation Board)", code: "JAMB", price: "700", description: "JAMB e-PIN / Mock result checker" },
-    { name: "NABTEB (National Business and Technical Examinations Board)", code: "NABTEB", price: "867", description: "NABTEB result checker PIN" },
+    { name: "NECO (National Examinations Council)", code: "NECO" as const, price: "2099", costPrice: "1950", description: "NECO result checker PIN" },
+    { name: "WAEC (West African Examinations Council)", code: "WAEC" as const, price: "3700", costPrice: "3500", description: "WAEC result checker PIN" },
   ];
 
-  const existing = await db.select({ code: examTypesTable.code }).from(examTypesTable);
-  const existingCodes = new Set(existing.map((e) => e.code));
-
-  let added = 0;
+  let upserted = 0;
   for (const t of TYPES) {
-    if (!existingCodes.has(t.code)) {
-      await db.insert(examTypesTable).values(t);
-      added++;
-    }
+    await db.insert(examTypesTable).values(t)
+      .onConflictDoUpdate({
+        target: examTypesTable.code,
+        set: { name: t.name, price: t.price, costPrice: t.costPrice, description: t.description },
+      });
+    upserted++;
   }
-  res.json({ added, total: TYPES.length, message: `${added} exam type(s) added. ${existingCodes.size} already existed.` });
+  res.json({ upserted, message: `${upserted} exam type(s) synced (NECO + WAEC).` });
 });
 
 // POST /admin/debug-monnify — test Monnify auth (without creating any account)
