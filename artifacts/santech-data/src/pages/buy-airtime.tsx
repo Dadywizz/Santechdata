@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePurchaseAirtime } from "@workspace/api-client-react";
-import { Check, X, AlertTriangle } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const NETWORKS = [
@@ -16,7 +16,7 @@ const NETWORKS = [
   { id: "9MOBILE", name: "9Mobile", color: "bg-[#006633] text-white", border: "border-[#006633]" },
 ];
 
-const AMOUNTS = [50, 100, 200, 500, 1000, 2000];
+const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 export default function BuyAirtime() {
   const { toast } = useToast();
@@ -49,12 +49,12 @@ export default function BuyAirtime() {
   });
 
   const finalAmount = amount ?? (customAmount ? parseFloat(customAmount) : 0);
-  const isReady = !!network && phone.length >= 10 && finalAmount >= 50;
+  const isReady = !!network && phone.length >= 10 && finalAmount >= 100;
 
   const handlePurchase = () => {
     if (!network) { toast({ title: "Select a network", variant: "destructive" }); return; }
     if (phone.length < 10) { toast({ title: "Invalid phone number", variant: "destructive" }); return; }
-    if (!finalAmount || finalAmount < 50) { toast({ title: "Minimum airtime is ₦50", variant: "destructive" }); return; }
+    if (!finalAmount || finalAmount < 100) { toast({ title: "Minimum airtime is ₦100", variant: "destructive" }); return; }
     mutation.mutate({ data: { network: network as any, phone, amount: finalAmount } });
   };
 
@@ -64,16 +64,7 @@ export default function BuyAirtime() {
     <AppLayout>
       <PageHeader title="Buy Airtime" description="Instant airtime recharge for all networks" />
 
-      {/* Unavailability notice */}
-      <div className="max-w-4xl mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-        <div>
-          <p className="font-semibold">Airtime recharge is temporarily unavailable</p>
-          <p className="text-sm mt-0.5">We are working to restore this service. Please contact support on <strong>09026329296</strong> for urgent airtime needs.</p>
-        </div>
-      </div>
-
-      <div className="grid gap-8 md:grid-cols-3 max-w-4xl pb-28 opacity-50 pointer-events-none select-none">
+      <div className="grid gap-8 md:grid-cols-3 max-w-4xl pb-28">
         <div className="md:col-span-1 space-y-6">
           <div>
             <Label className="text-base font-semibold mb-3 block">Select Network</Label>
@@ -127,7 +118,7 @@ export default function BuyAirtime() {
               <Label className="text-sm text-muted-foreground mb-1 block">Or enter custom amount</Label>
               <Input
                 type="number"
-                placeholder="Enter amount (min ₦50)"
+                placeholder="Enter amount (min ₦100)"
                 value={customAmount}
                 onChange={(e) => { setCustomAmount(e.target.value); setAmount(null); }}
                 className="h-12"
@@ -138,7 +129,7 @@ export default function BuyAirtime() {
       </div>
 
       {/* Sticky purchase bar */}
-      {finalAmount >= 50 && (
+      {finalAmount >= 100 && (
         <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background/95 backdrop-blur border-t border-border shadow-2xl">
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
