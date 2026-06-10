@@ -112,10 +112,13 @@ export default function PaymentCallback() {
 
     const paystackRef = params.get("reference") || params.get("trxref");
 
-    const reference = txRef || monnifyRef || paystackRef;
+    // Fall back to the reference saved in localStorage when the gateway redirected without params
+    const savedRef = localStorage.getItem("santech_last_ref") ?? undefined;
+
+    const reference = txRef || monnifyRef || paystackRef || savedRef;
 
     if (!reference) {
-      setErrorMsg("Invalid payment callback. Missing reference.");
+      setErrorMsg("No payment reference found. If you completed a payment, please contact support with your transaction details.");
       setStatus("failed");
       return;
     }
@@ -213,10 +216,13 @@ export default function PaymentCallback() {
               ✓ No money was taken from you
             </p>
             <p className="text-muted-foreground">{errorMsg}</p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               <Button onClick={() => navigate("/fund-wallet")}>Try Again</Button>
-              <Button variant="outline" onClick={() => navigate("/support")}>Contact Support</Button>
+              <Button variant="outline" onClick={() => navigate("/transactions")}>Check Transactions</Button>
             </div>
+            <p className="text-sm text-muted-foreground">
+              If you already sent money, call <a href="tel:09026329296" className="font-bold text-primary underline">09026329296</a> and we'll sort it out.
+            </p>
           </>
         )}
       </div>
