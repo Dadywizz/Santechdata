@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,29 +29,30 @@ export default function Login() {
   const { login: setAuth } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [idleBanner, setIdleBanner] = useState(false);
 
   const params = new URLSearchParams(window.location.search);
   const returnTo = params.get("returnTo") || "";
 
+  useEffect(() => {
+    if (sessionStorage.getItem("santech_idle_logout")) {
+      sessionStorage.removeItem("santech_idle_logout");
+      setIdleBanner(true);
+    }
+  }, []);
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
   const loginMutation = useLogin({
     mutation: {
       onSuccess: (data) => {
+        setIdleBanner(false);
         setAuth(data);
-        toast({
-          title: "Welcome back",
-          description: "You have successfully logged in.",
-        });
-        if (returnTo) {
-          navigate(returnTo);
-        }
+        toast({ title: "Welcome back", description: "You have successfully logged in." });
+        if (returnTo) navigate(returnTo);
       },
       onError: (error) => {
         toast({
@@ -70,6 +71,12 @@ export default function Login() {
   return (
     <AuthLayout>
       <div className="space-y-6">
+        {idleBanner && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+            You were signed out after 10 minutes of inactivity. Please sign in again.
+          </div>
+        )}
+
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="text-sm text-muted-foreground mt-1">

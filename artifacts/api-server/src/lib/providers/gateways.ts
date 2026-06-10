@@ -30,6 +30,59 @@ export async function paystackInitTransaction(opts: {
   return data.data;
 }
 
+export async function paystackCreateDedicatedAccount(opts: {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+}): Promise<{ accountNumber: string; bankName: string }> {
+  const isTest = process.env.PAYSTACK_SECRET_KEY?.startsWith("sk_test_");
+
+  // Step 1: Create customer on Paystack
+  const custRes = await fetch("https://api.paystack.co/customer", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: opts.email,
+      first_name: opts.firstName,
+      last_name: opts.lastName || opts.firstName,
+      phone: opts.phone,
+      metadata: { userId: opts.userId },
+    }),
+  });
+  const custData = await custRes.json() as { status: boolean; data?: { customer_code: string }; message?: string };
+  const customerCode = custData.data?.customer_code;
+  if (!customerCode) throw new Error(`Paystack customer creation failed: ${custData.message ?? JSON.stringify(custData)}`);
+
+  // Step 2: Assign dedicated virtual account
+  const acctRes = await fetch("https://api.paystack.co/dedicated_account", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      customer: customerCode,
+      preferred_bank: isTest ? "test-bank" : "wema-bank",
+    }),
+  });
+  const acctData = await acctRes.json() as {
+    status: boolean;
+    message?: string;
+    data?: { dedicated_account?: { account_number: string; bank?: { name: string } } };
+  };
+
+  if (!acctData.status) throw new Error(`Paystack DVA failed: ${acctData.message ?? JSON.stringify(acctData)}`);
+  const account = acctData.data?.dedicated_account;
+  if (!account?.account_number) throw new Error("Paystack DVA: no account number in response");
+
+  return { accountNumber: account.account_number, bankName: account.bank?.name ?? "Paystack" };
+}
+
 export async function paystackVerifyTransaction(reference: string) {
   const res = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
     headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },

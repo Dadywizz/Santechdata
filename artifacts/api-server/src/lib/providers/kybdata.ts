@@ -28,10 +28,23 @@ function headers() {
 }
 
 async function kybFetch(url: string, opts: RequestInit = {}) {
-  const res = await fetch(url, { ...opts, headers: { ...headers(), ...(opts.headers as Record<string, string> ?? {}) } });
-  const text = await res.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error(`KYB Data non-JSON response: ${text.slice(0, 300)}`); }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      signal: controller.signal,
+      headers: { ...headers(), ...(opts.headers as Record<string, string> ?? {}) },
+    });
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch { throw new Error(`KYB Data non-JSON response: ${text.slice(0, 300)}`); }
+  } catch (err: any) {
+    if (err.name === "AbortError") throw new Error("KYB Data request timed out. Please try again.");
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────

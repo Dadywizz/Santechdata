@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -42,14 +42,27 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
 
   let acct: { accountNumber: string; bankName: string };
   try {
-    acct = await monnifyCreateReservedAccount({
-      accountReference: user.id,
-      accountName: user.fullName || user.email,
-      customerEmail: user.email,
-      customerName: user.fullName || user.email,
-    });
+    if (process.env.PAYSTACK_SECRET_KEY) {
+      // Paystack DVA — no merchant KYC needed, works immediately
+      const nameParts = (user.fullName || "").trim().split(/\s+/);
+      acct = await paystackCreateDedicatedAccount({
+        userId: user.id,
+        email: user.email,
+        firstName: nameParts[0] || user.email,
+        lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+        phone: user.phone ?? undefined,
+      });
+    } else {
+      // Fall back to Monnify if Paystack not configured
+      acct = await monnifyCreateReservedAccount({
+        accountReference: user.id,
+        accountName: user.fullName || user.email,
+        customerEmail: user.email,
+        customerName: user.fullName || user.email,
+      });
+    }
   } catch (err: any) {
-    req.log?.error({ err }, "Monnify DVA generation failed");
+    req.log?.error({ err }, "DVA generation failed");
     res.status(503).json({ error: err?.message ?? "Could not generate account at this time. Please try again shortly or contact support." });
     return;
   }
@@ -305,24 +318,66 @@ router.post("/wallet/webhook/paystack", async (req: Request, res: Response): Pro
   const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
   if (sig !== expected) { res.sendStatus(401); return; }
 
-  const event = req.body as { event: string; data: { reference: string; amount: number; status: string } };
+  const event = req.body as {
+    event: string;
+    data: {
+      reference: string;
+      amount: number;
+      status: string;
+      channel?: string;
+      customer?: { email: string };
+    };
+  };
 
   if (event.event === "charge.success") {
-    const { reference, amount } = event.data;
+    const { reference, amount, channel } = event.data;
     const amountNaira = amount / 100;
 
-    const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
-    if (tx && tx.status !== "success") {
-      await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
-      await db.update(walletsTable)
-        .set({ balance: sql`balance + ${amountNaira}`, updatedAt: new Date() })
-        .where(eq(walletsTable.userId, tx.userId));
-      await db.insert(notificationsTable).values({
-        userId: tx.userId,
-        title: "Wallet Funded",
-        message: `Your wallet has been credited with ₦${amountNaira.toLocaleString()} via bank transfer.`,
-        type: "wallet",
-      });
+    if (channel === "dedicated_nuban") {
+      // Paystack DVA payment — credit wallet by customer email
+      const email = event.data.customer?.email;
+      if (email) {
+        const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+        if (user) {
+          const dvaRef = `DVA-PS-${reference}`;
+          const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, dvaRef));
+          if (!existing.length) {
+            await db.update(walletsTable)
+              .set({ balance: sql`balance + ${amountNaira}`, updatedAt: new Date() })
+              .where(eq(walletsTable.userId, user.id));
+            await db.insert(transactionsTable).values({
+              userId: user.id,
+              type: "wallet_fund",
+              status: "success",
+              amount: amountNaira.toString(),
+              description: "Wallet funded via dedicated bank account",
+              reference: dvaRef,
+              metadata: { gateway: "paystack_dva", amount: amountNaira },
+            });
+            await db.insert(notificationsTable).values({
+              userId: user.id,
+              title: "Wallet Funded",
+              message: `Your wallet has been credited with ₦${amountNaira.toLocaleString()} via bank transfer.`,
+              type: "wallet",
+            });
+          }
+        }
+      }
+    } else {
+      // Regular Paystack checkout payment — look up by reference
+      const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
+      if (tx && tx.status !== "success") {
+        await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
+        await db.update(walletsTable)
+          .set({ balance: sql`balance + ${amountNaira}`, updatedAt: new Date() })
+          .where(eq(walletsTable.userId, tx.userId));
+        await db.insert(notificationsTable).values({
+          userId: tx.userId,
+          title: "Wallet Funded",
+          message: `Your wallet has been credited with ₦${amountNaira.toLocaleString()} via bank transfer.`,
+          type: "wallet",
+        });
+      }
     }
   }
 
