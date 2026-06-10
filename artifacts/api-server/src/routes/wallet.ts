@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveCreateVirtualAccount, flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyCreateOneTimeVA, monnifyVerifyOneTimeVA, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -74,60 +74,56 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   res.json({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName });
 });
 
-// POST /wallet/fund/flutterwave-va — generate a temporary Flutterwave virtual account for a specific amount
-router.post("/wallet/fund/flutterwave-va", authenticate, async (req: AuthRequest, res): Promise<void> => {
+// POST /wallet/fund/bank-transfer — generate a one-time Monnify (Sterling Bank) virtual account
+router.post("/wallet/fund/bank-transfer", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const amount = Number(req.body?.amount);
   if (!amount || amount < 100) { res.status(400).json({ error: "Minimum funding amount is ₦100" }); return; }
-  if (!process.env.FLUTTERWAVE_SECRET_KEY) { res.status(503).json({ error: "Bank transfer not available right now" }); return; }
+  if (!process.env.MONNIFY_API_KEY || !process.env.MONNIFY_SECRET_KEY || !process.env.MONNIFY_CONTRACT_CODE) {
+    res.status(503).json({ error: "Bank transfer not available right now" }); return;
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  const reference = `FLW-VA-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  const nameParts = (user.fullName || "SanTech User").trim().split(/\s+/);
+  const reference = `SANTECH-BT-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   try {
-    const va = await flutterwaveCreateVirtualAccount({
-      email: user.email,
+    const va = await monnifyCreateOneTimeVA({
       amount,
       reference,
-      firstName: nameParts[0],
-      lastName: nameParts.slice(1).join(" ") || nameParts[0],
-      phone: user.phone ?? undefined,
-      narration: `SanTech wallet funding - ${user.email}`,
+      customerName: user.fullName || user.email,
+      customerEmail: user.email,
     });
 
-    // Save a pending transaction so webhook can match by reference
     await db.insert(transactionsTable).values({
       userId: req.userId!,
       type: "wallet_fund",
       status: "pending",
       amount: amount.toString(),
-      description: `Wallet funding via bank transfer (Flutterwave)`,
+      description: `Wallet funding via bank transfer`,
       reference,
-      metadata: { gateway: "flutterwave_va", amount, orderRef: va.orderRef },
+      metadata: { gateway: "monnify_va", amount, transactionReference: va.transactionReference },
     });
 
     res.json({
       accountNumber: va.accountNumber,
       bankName: va.bankName,
       amount,
-      expiresAt: va.expiresAt,
+      expiresAt: va.expiresOn,
       reference,
+      ussd: va.ussd ?? null,
     });
   } catch (err: any) {
-    req.log?.error({ err }, "Flutterwave VA creation failed");
+    req.log?.error({ err }, "Monnify VA creation failed");
     res.status(503).json({ error: err?.message ?? "Could not generate bank account. Please try again." });
   }
 });
 
-// POST /wallet/fund/flutterwave-va/check — user clicks "I've transferred"; we query Flutterwave for the payment
-router.post("/wallet/fund/flutterwave-va/check", authenticate, async (req: AuthRequest, res): Promise<void> => {
+// POST /wallet/fund/bank-transfer/check — user taps "I've Transferred"; verify with Monnify
+router.post("/wallet/fund/bank-transfer/check", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const reference = req.body?.reference as string | undefined;
   if (!reference) { res.status(400).json({ error: "Missing reference" }); return; }
-  if (!process.env.FLUTTERWAVE_SECRET_KEY) { res.status(503).json({ error: "Not configured" }); return; }
 
-  // Look up the pending transaction
   const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, reference));
   if (!tx || tx.userId !== req.userId!) { res.status(404).json({ error: "Transaction not found" }); return; }
 
@@ -137,29 +133,19 @@ router.post("/wallet/fund/flutterwave-va/check", authenticate, async (req: AuthR
     return;
   }
 
-  // Query Flutterwave transactions by tx_ref
+  const meta = tx.metadata as Record<string, any>;
+  const monnifyTxRef = meta?.transactionReference as string | undefined;
+  if (!monnifyTxRef) { res.status(400).json({ error: "Invalid transaction metadata" }); return; }
+
   try {
-    const flwRes = await fetch(
-      `https://api.flutterwave.com/v3/transactions?tx_ref=${encodeURIComponent(reference)}`,
-      { headers: { Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}` } }
-    );
-    const flwData = await flwRes.json() as {
-      status: string;
-      data: Array<{ status: string; amount: number; id: number }>;
-    };
+    const result = await monnifyVerifyOneTimeVA(monnifyTxRef);
 
-    const successful = flwData.data?.find(
-      (t) => t.status === "successful" && t.amount >= parseFloat(tx.amount)
-    );
-
-    if (!successful) {
-      res.status(202).json({ credited: false, message: "Payment not received yet. Wait a moment and try again." });
+    if (!result.success) {
+      res.status(202).json({ credited: false, message: "Transfer not received yet. Please wait a few seconds after sending and try again." });
       return;
     }
 
-    const amount = successful.amount;
-
-    // Credit wallet
+    const amount = result.amount;
     await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
     await db.update(walletsTable)
       .set({ balance: sql`balance + ${amount}`, updatedAt: new Date() })
@@ -174,7 +160,7 @@ router.post("/wallet/fund/flutterwave-va/check", authenticate, async (req: AuthR
     const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
     res.json({ credited: true, balance: parseFloat(wallet.balance) });
   } catch (err: any) {
-    req.log?.error({ err }, "Flutterwave VA check failed");
+    req.log?.error({ err }, "Monnify VA check failed");
     res.status(502).json({ error: "Could not check payment status. Please try again." });
   }
 });

@@ -129,7 +129,7 @@ export default function FundWallet() {
     setCheckMsg("");
     try {
       const token = localStorage.getItem("santech_token");
-      const res = await fetch("/api/wallet/fund/flutterwave-va", {
+      const res = await fetch("/api/wallet/fund/bank-transfer", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ amount: useAmt }),
@@ -150,17 +150,17 @@ export default function FundWallet() {
     setCheckMsg("");
     try {
       const token = localStorage.getItem("santech_token");
-      const res = await fetch("/api/wallet/fund/flutterwave-va/check", {
+      const res = await fetch("/api/wallet/fund/bank-transfer/check", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ reference: flwVA.reference }),
       });
       const data = await res.json();
       if (data.credited) {
-        toast({ title: "Wallet Credited! 🎉", description: `New balance: ₦${Number(data.balance).toLocaleString()}` });
+        toast({ title: "Wallet Credited!", description: `New balance: ₦${Number(data.balance).toLocaleString()}` });
         navigate("/dashboard");
       } else {
-        setCheckMsg(data.message ?? "Payment not received yet. Wait a moment and try again.");
+        setCheckMsg(data.message ?? "Transfer not received yet. Wait a few seconds after sending and try again.");
       }
     } catch {
       setCheckMsg("Could not check payment status. Please try again.");

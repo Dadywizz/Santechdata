@@ -214,6 +214,80 @@ export async function monnifyInitTransaction(opts: {
   return data.responseBody;
 }
 
+export async function monnifyCreateOneTimeVA(opts: {
+  amount: number;
+  reference: string;
+  customerName: string;
+  customerEmail: string;
+}): Promise<{ accountNumber: string; bankName: string; transactionReference: string; expiresOn: string; ussd?: string }> {
+  const token = await monnifyGetAccessToken();
+  const base = monnifyBaseUrl();
+
+  // Step 1: init transaction (account transfer only)
+  const initRes = await fetch(`${base}/api/v1/merchant/transactions/init-transaction`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: opts.amount,
+      customerName: opts.customerName,
+      customerEmail: opts.customerEmail,
+      paymentReference: opts.reference,
+      paymentDescription: "SanTech Data Wallet Funding",
+      currencyCode: "NGN",
+      contractCode: process.env.MONNIFY_CONTRACT_CODE,
+      redirectUrl: "https://santechdata.com.ng/payment/callback",
+      paymentMethods: ["ACCOUNT_TRANSFER"],
+    }),
+  });
+  const initData = await initRes.json() as {
+    requestSuccessful: boolean; responseMessage?: string;
+    responseBody: { transactionReference: string };
+  };
+  if (!initData.requestSuccessful) throw new Error(`Monnify init failed: ${initData.responseMessage}`);
+  const txRef = initData.responseBody.transactionReference;
+
+  // Step 2: request a bank account number for this transaction (Sterling Bank = 232)
+  const vaRes = await fetch(`${base}/api/v1/merchant/bank-transfer/init-payment`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ transactionReference: txRef, bankCode: "232" }),
+  });
+  const vaData = await vaRes.json() as {
+    requestSuccessful: boolean; responseMessage?: string;
+    responseBody: {
+      accountNumber: string; accountName: string; bankName: string;
+      expiresOn: string; transactionReference: string; ussdPayment?: string;
+    };
+  };
+  if (!vaData.requestSuccessful) throw new Error(`Monnify VA failed: ${vaData.responseMessage}`);
+  const b = vaData.responseBody;
+  return {
+    accountNumber: b.accountNumber,
+    bankName: b.bankName,
+    transactionReference: b.transactionReference,
+    expiresOn: b.expiresOn,
+    ussd: b.ussdPayment,
+  };
+}
+
+export async function monnifyVerifyOneTimeVA(transactionReference: string): Promise<{ success: boolean; amount: number }> {
+  const token = await monnifyGetAccessToken();
+  const base = monnifyBaseUrl();
+  const encoded = encodeURIComponent(transactionReference);
+  const res = await fetch(`${base}/api/v2/transactions/${encoded}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json() as {
+    requestSuccessful: boolean;
+    responseBody: { paymentStatus: string; amountPaid: number };
+  };
+  if (!data.requestSuccessful) throw new Error("Monnify verify failed");
+  return {
+    success: data.responseBody?.paymentStatus === "PAID",
+    amount: data.responseBody?.amountPaid ?? 0,
+  };
+}
+
 export async function monnifyCreateReservedAccount(opts: {
   accountReference: string;
   accountName: string;
