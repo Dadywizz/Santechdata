@@ -29,10 +29,13 @@ import {
 } from "../lib/providers/kybdata";
 
 const KYB_ELEC_DISCO_ID: Record<string, string> = {
-  "ikeja-electric": "1", "eko-electric": "2", "abuja-electric": "3",
-  "kaduna-electric": "4", "portharcourt-electric": "5", "ibadan-electric": "6",
-  "enugu-electric": "7", "jos-electric": "8", "benin-electric": "9",
-  "kano-electric": "10", "yola-electric": "11", "aba-electric": "12",
+  "ikeja-electric":        "28",
+  "abuja-electric":        "1",
+  "kaduna-electric":       "74",
+  "portharcourt-electric": "15",
+  "ibadan-electric":       "14",
+  "jos-electric":          "53",
+  "kano-electric":         "63",
 };
 
 const router: IRouter = Router();
@@ -124,6 +127,9 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
 // ── AIRTIME ───────────────────────────────────────────────────────────────────
 router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  // KYB Data does not support airtime — block before any wallet deduction
+  res.status(503).json({ error: "Airtime purchase is currently unavailable. Please contact support on 09026329296 for assistance." }); return;
+
   const parsed = PurchaseAirtimeBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { network, phone, amount } = parsed.data;
@@ -178,17 +184,12 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────
 const ELECTRICITY_PROVIDERS = [
   { id: "ikeja-electric",        name: "Ikeja Electric (IKEDC)"        },
-  { id: "eko-electric",          name: "Eko Electric (EKEDC)"          },
   { id: "abuja-electric",        name: "Abuja Electric (AEDC)"         },
   { id: "kaduna-electric",       name: "Kaduna Electric (KAEDCO)"      },
   { id: "portharcourt-electric", name: "Port Harcourt Electric (PHED)" },
   { id: "ibadan-electric",       name: "Ibadan Electric (IBEDC)"       },
-  { id: "enugu-electric",        name: "Enugu Electric (EEDC)"         },
   { id: "jos-electric",          name: "Jos Electric (JED)"            },
-  { id: "benin-electric",        name: "Benin Electric (BEDC)"         },
   { id: "kano-electric",         name: "Kano Electric (KEDCO)"         },
-  { id: "yola-electric",         name: "Yola Electric (YEDC)"          },
-  { id: "aba-electric",          name: "Aba Electric (APLE)"           },
 ];
 
 router.get("/electricity/providers", authenticate, async (_req, res): Promise<void> => {
@@ -273,26 +274,23 @@ const CABLE_PROVIDERS = [
 ];
 
 const CABLE_PLANS = [
-  { id: "dstv-90",  provider: "dstv",      name: "DStv Padi",                          price: 4399,  validity: "Monthly", kybPlanId: 90  },
-  { id: "dstv-91",  provider: "dstv",      name: "DStv Yanga",                         price: 5999,  validity: "Monthly", kybPlanId: 91  },
-  { id: "dstv-92",  provider: "dstv",      name: "DStv Confam",                        price: 10999, validity: "Monthly", kybPlanId: 92  },
-  { id: "dstv-93",  provider: "dstv",      name: "DStv Compact",                       price: 18999, validity: "Monthly", kybPlanId: 93  },
-  { id: "dstv-105", provider: "dstv",      name: "DStv Compact Plus",                  price: 29999, validity: "Monthly", kybPlanId: 105 },
-  { id: "dstv-106", provider: "dstv",      name: "DStv Premium",                       price: 44499, validity: "Monthly", kybPlanId: 106 },
-  { id: "gotv-94",  provider: "gotv",      name: "GOtv Smallie",                       price: 1899,  validity: "Monthly", kybPlanId: 94  },
-  { id: "gotv-97",  provider: "gotv",      name: "GOtv Jinja",                         price: 3899,  validity: "Monthly", kybPlanId: 97  },
-  { id: "gotv-96",  provider: "gotv",      name: "GOtv Jolli",                         price: 5799,  validity: "Monthly", kybPlanId: 96  },
-  { id: "gotv-95",  provider: "gotv",      name: "GOtv Max",                           price: 8499,  validity: "Monthly", kybPlanId: 95  },
-  { id: "gotv-112", provider: "gotv",      name: "GOtv Supa",                          price: 11399, validity: "Monthly", kybPlanId: 112 },
-  { id: "gotv-113", provider: "gotv",      name: "GOtv Supa Plus",                     price: 16799, validity: "Monthly", kybPlanId: 113 },
-  { id: "st-100",   provider: "startimes", name: "StarTimes Nova (Antenna) Monthly",   price: 2099,  validity: "Monthly", kybPlanId: 100 },
-  { id: "st-139",   provider: "startimes", name: "StarTimes Nova (Dish) Monthly",      price: 2099,  validity: "Monthly", kybPlanId: 139 },
-  { id: "st-101",   provider: "startimes", name: "StarTimes Basic (Antenna) Monthly",  price: 3999,  validity: "Monthly", kybPlanId: 101 },
-  { id: "st-102",   provider: "startimes", name: "StarTimes Basic (Dish) Monthly",     price: 5099,  validity: "Monthly", kybPlanId: 102 },
-  { id: "st-103",   provider: "startimes", name: "StarTimes Classic (Antenna) Monthly",price: 5999,  validity: "Monthly", kybPlanId: 103 },
-  { id: "st-140",   provider: "startimes", name: "StarTimes Classic (Dish) Monthly",   price: 7399,  validity: "Monthly", kybPlanId: 140 },
-  { id: "st-104",   provider: "startimes", name: "StarTimes Super (Antenna) Monthly",  price: 9499,  validity: "Monthly", kybPlanId: 104 },
-  { id: "st-141",   provider: "startimes", name: "StarTimes Super (Dish) Monthly",     price: 9799,  validity: "Monthly", kybPlanId: 141 },
+  { id: "dstv-54",  provider: "dstv",      name: "DStv Padi",         price: 4200,  validity: "Monthly", kybPlanId: 54  },
+  { id: "dstv-25",  provider: "dstv",      name: "DStv Yanga",        price: 5800,  validity: "Monthly", kybPlanId: 25  },
+  { id: "dstv-68",  provider: "dstv",      name: "DStv Confam",       price: 10500, validity: "Monthly", kybPlanId: 68  },
+  { id: "dstv-67",  provider: "dstv",      name: "DStv Asia",         price: 13800, validity: "Monthly", kybPlanId: 67  },
+  { id: "dstv-45",  provider: "dstv",      name: "DStv Compact",      price: 17500, validity: "Monthly", kybPlanId: 45  },
+  { id: "dstv-52",  provider: "dstv",      name: "DStv Compact Plus", price: 27500, validity: "Monthly", kybPlanId: 52  },
+  { id: "dstv-43",  provider: "dstv",      name: "DStv Premium",      price: 40500, validity: "Monthly", kybPlanId: 43  },
+  { id: "gotv-58",  provider: "gotv",      name: "GOtv Smallie",      price: 2000,  validity: "Monthly", kybPlanId: 58  },
+  { id: "gotv-22",  provider: "gotv",      name: "GOtv Jinja",        price: 3800,  validity: "Monthly", kybPlanId: 22  },
+  { id: "gotv-76",  provider: "gotv",      name: "GOtv Jolli",        price: 5400,  validity: "Monthly", kybPlanId: 76  },
+  { id: "gotv-23",  provider: "gotv",      name: "GOtv Max",          price: 8200,  validity: "Monthly", kybPlanId: 23  },
+  { id: "gotv-60",  provider: "gotv",      name: "GOtv Supa",         price: 10800, validity: "Monthly", kybPlanId: 60  },
+  { id: "st-57",    provider: "startimes", name: "StarTimes Nova",    price: 2300,  validity: "Monthly", kybPlanId: 57  },
+  { id: "st-12",    provider: "startimes", name: "StarTimes Smart",   price: 4200,  validity: "Monthly", kybPlanId: 12  },
+  { id: "st-75",    provider: "startimes", name: "StarTimes Basic",   price: 4200,  validity: "Monthly", kybPlanId: 75  },
+  { id: "st-21",    provider: "startimes", name: "StarTimes Classic", price: 6200,  validity: "Monthly", kybPlanId: 21  },
+  { id: "st-8",     provider: "startimes", name: "StarTimes Super",   price: 9800,  validity: "Monthly", kybPlanId: 8   },
 ];
 
 router.get("/cable/providers", authenticate, async (_req, res): Promise<void> => {
