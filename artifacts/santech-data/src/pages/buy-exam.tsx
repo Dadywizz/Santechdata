@@ -56,7 +56,7 @@ export default function BuyExam() {
 
   return (
     <AppLayout>
-      <PageHeader title="Exam Tokens" description="Purchase NECO result checker PIN" />
+      <PageHeader title="Exam Tokens" description="Purchase NECO & WAEC result checker PINs" />
 
       <div className="max-w-2xl space-y-6 pb-28">
         {/* Exam type selection */}
