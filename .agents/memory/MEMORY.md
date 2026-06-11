@@ -1,4 +1,4 @@
 - [VTpass provider](vtpass-provider.md) — purchases fail: VTPASS_API_KEY = "null" string; public-key/secret-key work for read-only only
-- [Payment gateways](payment-gateways.md) — Paystack ✅ Monnify ✅ Flutterwave ❌ (wrong key stored, removed from UI)
+- [Payment gateways](payment-gateways.md) — Paystack ✅ Flutterwave ✅ (account activated, both shown in Fund Wallet); Monnify VA broken (KYC incomplete), removed from UI
 - [Clubkonnect](clubkonnect-dead.md) — all VTU endpoints broken (404/INVALID_CREDENTIALS); do not use
 - [EasyAccess API](easyaccess-api.md) — active VTU provider for data/electricity/cable/exam; airtime not supported (still uses VTpass)

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-react";
-import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall } from "lucide-react";
+import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall, Zap } from "lucide-react";
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 const SUPPORT_PHONE = "09026329296";
@@ -26,6 +26,7 @@ export default function FundWallet() {
   const [tab, setTab] = useState<Tab>("fund");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
+  const [pendingGateway, setPendingGateway] = useState<"paystack" | "flutterwave" | null>(null);
   const [transferPhone, setTransferPhone] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
   const [transferNote, setTransferNote] = useState("");
@@ -67,9 +68,10 @@ export default function FundWallet() {
 
   const finalAmount = amount ?? (customAmount ? parseFloat(customAmount) : 0);
 
-  const handleFund = () => {
+  const handleFund = (gateway: "paystack" | "flutterwave") => {
     if (!finalAmount || finalAmount < 100) { toast({ title: "Minimum funding is ₦100", variant: "destructive" }); return; }
-    fundMutation.mutate({ data: { amount: finalAmount, gateway: "paystack" as any } });
+    setPendingGateway(gateway);
+    fundMutation.mutate({ data: { amount: finalAmount, gateway: gateway as any } });
   };
 
   const handleTransfer = () => {
@@ -108,17 +110,10 @@ export default function FundWallet() {
           ))}
         </div>
 
-        {/* ── FUND WALLET (Paystack) ── */}
+        {/* ── FUND WALLET (Paystack + Flutterwave) ── */}
         {tab === "fund" && (
           <Card>
             <CardContent className="p-6 space-y-6">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                <CreditCard className="text-primary shrink-0" size={18} />
-                <p className="text-sm font-medium">
-                  Pay securely with <strong>Paystack</strong> — card, bank transfer, or USSD.
-                </p>
-              </div>
-
               <div>
                 <Label className="font-semibold mb-3 block">Select Amount</Label>
                 <div className="grid grid-cols-3 gap-3 mb-3">
@@ -143,16 +138,43 @@ export default function FundWallet() {
                 />
               </div>
 
-              <Button
-                size="lg" className="w-full"
-                onClick={handleFund}
-                disabled={fundMutation.isPending || !finalAmount || finalAmount < 100}
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                {fundMutation.isPending
-                  ? "Opening Paystack..."
-                  : `Pay ₦${finalAmount ? finalAmount.toLocaleString() : "0"} via Paystack`}
-              </Button>
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Choose payment method</p>
+
+                <button
+                  onClick={() => handleFund("paystack")}
+                  disabled={fundMutation.isPending || !finalAmount || finalAmount < 100}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-primary/40 hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[#0BA4DB]/10 flex items-center justify-center shrink-0">
+                    <CreditCard size={20} className="text-[#0BA4DB]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">Paystack</p>
+                    <p className="text-xs text-muted-foreground">Card · Bank Transfer · USSD</p>
+                  </div>
+                  {fundMutation.isPending && pendingGateway === "paystack"
+                    ? <span className="text-xs text-muted-foreground animate-pulse">Opening...</span>
+                    : <ExternalLink size={14} className="text-muted-foreground shrink-0" />}
+                </button>
+
+                <button
+                  onClick={() => handleFund("flutterwave")}
+                  disabled={fundMutation.isPending || !finalAmount || finalAmount < 100}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-orange-400/40 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center shrink-0">
+                    <Zap size={20} className="text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">Flutterwave</p>
+                    <p className="text-xs text-muted-foreground">Card · Bank Transfer · USSD · Mobile Money</p>
+                  </div>
+                  {fundMutation.isPending && pendingGateway === "flutterwave"
+                    ? <span className="text-xs text-muted-foreground animate-pulse">Opening...</span>
+                    : <ExternalLink size={14} className="text-muted-foreground shrink-0" />}
+                </button>
+              </div>
             </CardContent>
           </Card>
         )}
