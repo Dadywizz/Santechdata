@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyCreateOneTimeVA, monnifyVerifyOneTimeVA, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveCreatePermanentVA, flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyCreateOneTimeVA, monnifyVerifyOneTimeVA, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -42,8 +42,18 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
 
   let acct: { accountNumber: string; bankName: string };
   try {
-    if (process.env.PAYSTACK_SECRET_KEY) {
-      // Paystack DVA — no merchant KYC needed, works immediately
+    if (process.env.FLUTTERWAVE_SECRET_KEY) {
+      // Flutterwave permanent virtual account — one account per user, valid forever
+      const nameParts = (user.fullName || "").trim().split(/\s+/);
+      const result = await flutterwaveCreatePermanentVA({
+        email: user.email,
+        firstName: nameParts[0] || user.email,
+        lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+        phone: user.phone ?? undefined,
+        narration: "SanTech Data Wallet",
+      });
+      acct = { accountNumber: result.accountNumber, bankName: result.bankName };
+    } else if (process.env.PAYSTACK_SECRET_KEY) {
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       acct = await paystackCreateDedicatedAccount({
         userId: user.id,
@@ -53,13 +63,8 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
         phone: user.phone ?? undefined,
       });
     } else {
-      // Fall back to Monnify if Paystack not configured
-      acct = await monnifyCreateReservedAccount({
-        accountReference: user.id,
-        accountName: user.fullName || user.email,
-        customerEmail: user.email,
-        customerName: user.fullName || user.email,
-      });
+      res.status(503).json({ error: "No payment gateway configured for account generation." });
+      return;
     }
   } catch (err: any) {
     req.log?.error({ err }, "DVA generation failed");
@@ -475,7 +480,7 @@ router.post("/wallet/webhook/paystack", async (req: Request, res: Response): Pro
   res.sendStatus(200);
 });
 
-// POST /wallet/webhook/flutterwave — Flutterwave VA payment notification
+// POST /wallet/webhook/flutterwave — Flutterwave payment notifications
 router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): Promise<void> => {
   const secret = process.env.FLUTTERWAVE_SECRET_KEY;
   if (!secret) { res.sendStatus(200); return; }
@@ -499,9 +504,14 @@ router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): 
 
   if (event.event === "charge.completed" && event.data?.status === "successful") {
     const txRef = event.data.tx_ref;
+    const customerEmail = event.data.customer?.email;
     const amountPaid = event.data.amount ?? 0;
+    const flwRef = event.data.flw_ref ?? "";
 
-    if (txRef && amountPaid > 0) {
+    if (amountPaid <= 0) { res.sendStatus(200); return; }
+
+    // Case 1: checkout payment — match by tx_ref in transactions table
+    if (txRef) {
       const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
       if (tx && tx.status !== "success") {
         await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
@@ -511,9 +521,40 @@ router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): 
         await db.insert(notificationsTable).values({
           userId: tx.userId,
           title: "Wallet Funded",
-          message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
+          message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()}.`,
           type: "wallet",
         });
+      }
+      res.sendStatus(200); return;
+    }
+
+    // Case 2: permanent virtual account payment — match by customer email
+    if (customerEmail) {
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.email, customerEmail));
+      if (user) {
+        // Idempotency: skip if this flw_ref was already processed
+        const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, flwRef));
+        if (existing.length === 0) {
+          const ref = flwRef || `FLW-VA-${Date.now()}`;
+          await db.insert(transactionsTable).values({
+            userId: user.id,
+            type: "wallet_fund",
+            status: "success",
+            amount: amountPaid.toString(),
+            description: "Wallet funding via bank transfer",
+            reference: ref,
+            metadata: { gateway: "flutterwave_va", amount: amountPaid },
+          });
+          await db.update(walletsTable)
+            .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
+            .where(eq(walletsTable.userId, user.id));
+          await db.insert(notificationsTable).values({
+            userId: user.id,
+            title: "Wallet Funded",
+            message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
+            type: "wallet",
+          });
+        }
       }
     }
   }

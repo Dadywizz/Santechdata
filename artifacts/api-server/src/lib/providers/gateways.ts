@@ -99,9 +99,9 @@ export async function paystackVerifyTransaction(reference: string) {
 
 // ── FLUTTERWAVE ───────────────────────────────────────────────────────────────
 
-export async function flutterwaveCreateVirtualAccount(opts: {
-  email: string; amount: number; reference: string; firstName: string; lastName: string; phone?: string; narration: string;
-}): Promise<{ accountNumber: string; bankName: string; expiresAt: string; orderRef: string }> {
+export async function flutterwaveCreatePermanentVA(opts: {
+  email: string; firstName: string; lastName: string; phone?: string; narration: string;
+}): Promise<{ accountNumber: string; bankName: string; orderRef: string }> {
   const res = await fetch("https://api.flutterwave.com/v3/virtual-account-numbers", {
     method: "POST",
     headers: {
@@ -110,26 +110,23 @@ export async function flutterwaveCreateVirtualAccount(opts: {
     },
     body: JSON.stringify({
       email: opts.email,
-      is_permanent: false,
-      amount: opts.amount,
+      is_permanent: true,
       phonenumber: opts.phone || "09000000000",
       firstname: opts.firstName,
       lastname: opts.lastName,
       narration: opts.narration,
-      tx_ref: opts.reference,
     }),
   });
   const data = await res.json() as {
     status: string; message?: string;
-    data?: { account_number: string; bank_name: string; expiry_date: string; order_ref: string; amount?: string };
+    data?: { account_number: string; bank_name: string; order_ref: string };
   };
   if (data.status !== "success" || !data.data?.account_number) {
-    throw new Error(`Flutterwave VA failed: ${data.message ?? JSON.stringify(data)}`);
+    throw new Error(`Flutterwave permanent VA failed: ${data.message ?? JSON.stringify(data)}`);
   }
   return {
     accountNumber: data.data.account_number,
     bankName: data.data.bank_name,
-    expiresAt: data.data.expiry_date,
     orderRef: data.data.order_ref,
   };
 }
