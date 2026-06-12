@@ -23,7 +23,7 @@ type PublicSettings = {
 
 export default function FundWallet() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("fund");
+  const [tab, setTab] = useState<Tab>("bank");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [pendingGateway, setPendingGateway] = useState<"paystack" | "flutterwave" | null>(null);
@@ -130,9 +130,10 @@ export default function FundWallet() {
   const showManualTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: "fund", label: "Fund Wallet" },
+    { id: "bank", label: "Bank Transfer" },
+    { id: "fund", label: "Card / USSD" },
     { id: "transfer", label: "Transfer" },
-    ...(showManualTab ? [{ id: "manual" as Tab, label: "Bank Transfer" }] : []),
+    ...(showManualTab ? [{ id: "manual" as Tab, label: "Manual" }] : []),
   ];
 
   return (
