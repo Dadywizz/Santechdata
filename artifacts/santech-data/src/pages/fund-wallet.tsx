@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useInitiateFunding, useWalletTransfer } from "@workspace/api-client-react";
-import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall, Zap } from "lucide-react";
+import { CreditCard, ArrowRightLeft, ExternalLink, Building2, Copy, CheckCircle2, PhoneCall, Zap, Landmark, Loader2, RefreshCw } from "lucide-react";
 
 const AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 const SUPPORT_PHONE = "09026329296";
 
-type Tab = "fund" | "transfer" | "manual";
+type Tab = "bank" | "fund" | "transfer" | "manual";
 
 type PublicSettings = {
   bankTransferActive: boolean;
@@ -23,7 +23,7 @@ type PublicSettings = {
 
 export default function FundWallet() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("fund");
+  const [tab, setTab] = useState<Tab>("bank");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [pendingGateway, setPendingGateway] = useState<"paystack" | "flutterwave" | null>(null);
@@ -33,12 +33,61 @@ export default function FundWallet() {
   const [bankSettings, setBankSettings] = useState<PublicSettings | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [va, setVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
+  const [vaLoading, setVaLoading] = useState(false);
+  const [vaGenerating, setVaGenerating] = useState(false);
+  const [vaError, setVaError] = useState("");
+  const [vaCopied, setVaCopied] = useState(false);
+
   useEffect(() => {
     fetch("/api/settings/public")
       .then((r) => r.json())
       .then((d: PublicSettings) => setBankSettings(d))
       .catch(() => {});
   }, []);
+
+  // Load existing VA on mount
+  useEffect(() => {
+    const token = localStorage.getItem("santech_token");
+    if (!token) return;
+    setVaLoading(true);
+    fetch("/api/wallet", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((w: any) => {
+        if (w.virtualAccountNumber) {
+          setVa({ accountNumber: w.virtualAccountNumber, bankName: w.virtualAccountBank ?? "Bank" });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setVaLoading(false));
+  }, []);
+
+  const handleGenerateVA = async () => {
+    setVaGenerating(true);
+    setVaError("");
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch("/api/wallet/generate-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to generate account");
+      setVa({ accountNumber: data.virtualAccountNumber, bankName: data.virtualAccountBank ?? "Bank" });
+    } catch (err: any) {
+      setVaError(err.message);
+    } finally {
+      setVaGenerating(false);
+    }
+  };
+
+  const handleCopyVA = () => {
+    if (!va) return;
+    navigator.clipboard.writeText(va.accountNumber).then(() => {
+      setVaCopied(true);
+      setTimeout(() => setVaCopied(false), 2000);
+    });
+  };
 
   const fundMutation = useInitiateFunding({
     mutation: {
@@ -83,9 +132,10 @@ export default function FundWallet() {
   const showManualTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: "fund", label: "Fund Wallet" },
+    { id: "bank", label: "Bank Transfer" },
+    { id: "fund", label: "Card / USSD" },
     { id: "transfer", label: "Transfer" },
-    ...(showManualTab ? [{ id: "manual" as Tab, label: "Bank Transfer" }] : []),
+    ...(showManualTab ? [{ id: "manual" as Tab, label: "Manual" }] : []),
   ];
 
   return (
@@ -106,6 +156,83 @@ export default function FundWallet() {
             </button>
           ))}
         </div>
+
+        {/* ── BANK TRANSFER (Monnify reserved account) ── */}
+        {tab === "bank" && (
+          <Card>
+            <CardContent className="p-6 space-y-5">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <Landmark className="text-green-600 shrink-0" size={18} />
+                <p className="text-sm text-green-900 dark:text-green-100 font-medium">
+                  Your <strong>personal bank account</strong> — transfer any amount anytime and your wallet is credited automatically.
+                </p>
+              </div>
+
+              {vaLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+                  <Loader2 size={18} className="animate-spin" /> Loading account details...
+                </div>
+              ) : !va ? (
+                <div className="text-center space-y-4 py-4">
+                  <div className="w-16 h-16 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center mx-auto">
+                    <Landmark size={28} className="text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-lg">No account yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Generate your free dedicated bank account — takes a few seconds.</p>
+                  </div>
+                  {vaError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{vaError}</p>}
+                  <Button size="lg" className="w-full gap-2" onClick={handleGenerateVA} disabled={vaGenerating}>
+                    {vaGenerating
+                      ? <><Loader2 size={16} className="animate-spin" /> Generating account...</>
+                      : <><Landmark size={16} /> Get My Bank Account</>}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-xl border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 p-5 space-y-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Dedicated Account</p>
+
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                        <p className="font-bold text-3xl tracking-widest font-mono">{va.accountNumber}</p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handleCopyVA} className="shrink-0 gap-1.5">
+                        {vaCopied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
+                        {vaCopied ? "Copied!" : "Copy"}
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-green-200 dark:border-green-700">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Bank</p>
+                        <p className="font-semibold text-sm">{va.bankName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Account Name</p>
+                        <p className="font-semibold text-sm">SanTech Data</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-1.5">
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">How it works</p>
+                    <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-decimal list-inside">
+                      <li>Copy your account number above</li>
+                      <li>Transfer any amount from any bank app, USSD, or internet banking</li>
+                      <li>Your wallet is credited automatically — no need to do anything else</li>
+                    </ol>
+                  </div>
+
+                  <p className="text-xs text-center text-muted-foreground">
+                    This account is yours permanently. You can always transfer to it.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── FUND WALLET (Paystack + Flutterwave checkout) ── */}
         {tab === "fund" && (

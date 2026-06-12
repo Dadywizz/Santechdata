@@ -42,8 +42,16 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
 
   let acct: { accountNumber: string; bankName: string };
   try {
-    if (process.env.FLUTTERWAVE_SECRET_KEY) {
-      // Flutterwave permanent virtual account — one account per user, valid forever
+    if (process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE) {
+      // Monnify reserved account — permanent, one per user, credited automatically via webhook
+      acct = await monnifyCreateReservedAccount({
+        accountReference: user.id,
+        accountName: user.fullName || user.email,
+        customerEmail: user.email,
+        customerName: user.fullName || user.email,
+      });
+    } else if (process.env.FLUTTERWAVE_SECRET_KEY) {
+      // Flutterwave permanent virtual account
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       const result = await flutterwaveCreatePermanentVA({
         email: user.email,
