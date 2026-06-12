@@ -1,16 +1,27 @@
 import { useGetWallet, getGetWalletQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Eye, EyeOff } from "lucide-react";
+import { CreditCard, Eye, EyeOff, Landmark, Copy, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 
 export function WalletCard() {
   const [showBalance, setShowBalance] = useState(true);
+  const [copied, setCopied] = useState(false);
   const { data: wallet, isLoading } = useGetWallet({
     query: { queryKey: getGetWalletQueryKey() }
   });
+
+  const w = wallet as any;
+  const hasVA = !!w?.virtualAccountNumber;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(w.virtualAccountNumber).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <Card className="bg-primary text-primary-foreground border-none overflow-hidden relative">
@@ -18,7 +29,7 @@ export function WalletCard() {
       <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
 
       <CardContent className="p-6 relative z-10">
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start mb-4">
           <div>
             <p className="text-primary-foreground/80 text-sm font-medium mb-1">Available Balance</p>
             <div className="flex items-center gap-3">
@@ -41,6 +52,29 @@ export function WalletCard() {
             </div>
           </div>
         </div>
+
+        {/* Dedicated bank account — shown when available */}
+        {!isLoading && hasVA && (
+          <div className="mb-4 p-3 rounded-xl bg-white/10 border border-white/20">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">Your Bank Account</p>
+                  <p className="font-mono font-bold text-base tracking-widest">{w.virtualAccountNumber}</p>
+                  <p className="text-xs text-primary-foreground/70">{w.virtualAccountBank}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleCopy}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                title="Copy account number"
+              >
+                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           <Button asChild variant="secondary" className="font-semibold px-6">

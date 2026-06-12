@@ -150,12 +150,12 @@ export default function FundWallet() {
       <PageHeader title="Fund Wallet" description="Add money to your SanTech wallet" />
 
       <div className="max-w-2xl">
-        <div className="flex gap-1 mb-6 bg-muted p-1 rounded-xl w-fit">
+        <div className="flex gap-1 mb-6 bg-muted p-1 rounded-xl w-full">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              className={`flex-1 py-2 px-2 rounded-lg font-medium text-sm transition-all text-center whitespace-nowrap ${
                 tab === t.id ? "bg-background shadow text-foreground" : "text-muted-foreground"
               }`}
             >
