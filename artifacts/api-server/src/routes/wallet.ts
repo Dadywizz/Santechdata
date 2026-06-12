@@ -54,12 +54,14 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   let acct: { accountNumber: string; bankName: string };
   try {
     if (process.env.FLUTTERWAVE_SECRET_KEY) {
-      // Flutterwave permanent virtual account — verified live merchant, BVN required by CBN
+      // Flutterwave permanent virtual account — use userId-based email so each user gets
+      // a unique Flutterwave identity (prevents old unverified accounts being reused)
+      const pvaEmail = `${user.id}@pva.santechdata.ng`;
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       const result = await flutterwaveCreatePermanentVA({
-        email: user.email,
-        firstName: nameParts[0] || user.email,
-        lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+        email: pvaEmail,
+        firstName: nameParts[0] || "Customer",
+        lastName: nameParts.slice(1).join(" ") || nameParts[0] || "User",
         phone: user.phone ?? undefined,
         narration: "SanTech Data Wallet",
         bvn,
@@ -548,9 +550,18 @@ router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): 
       res.sendStatus(200); return;
     }
 
-    // Case 2: permanent virtual account payment — match by customer email
+    // Case 2: permanent virtual account payment
+    // Email format is either "{userId}@pva.santechdata.ng" (new) or real email (legacy)
     if (customerEmail) {
-      const [user] = await db.select().from(usersTable).where(eq(usersTable.email, customerEmail));
+      let user: typeof usersTable.$inferSelect | undefined;
+      if (customerEmail.endsWith("@pva.santechdata.ng")) {
+        const userId = customerEmail.replace("@pva.santechdata.ng", "");
+        const [found] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+        user = found;
+      } else {
+        const [found] = await db.select().from(usersTable).where(eq(usersTable.email, customerEmail));
+        user = found;
+      }
       if (user) {
         // Idempotency: skip if this flw_ref was already processed
         const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, flwRef));
