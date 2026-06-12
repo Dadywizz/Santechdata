@@ -100,7 +100,7 @@ export async function paystackVerifyTransaction(reference: string) {
 // ── FLUTTERWAVE ───────────────────────────────────────────────────────────────
 
 export async function flutterwaveCreatePermanentVA(opts: {
-  email: string; firstName: string; lastName: string; phone?: string; narration: string;
+  email: string; firstName: string; lastName: string; phone?: string; narration: string; bvn: string;
 }): Promise<{ accountNumber: string; bankName: string; orderRef: string }> {
   const res = await fetch("https://api.flutterwave.com/v3/virtual-account-numbers", {
     method: "POST",
@@ -111,6 +111,7 @@ export async function flutterwaveCreatePermanentVA(opts: {
     body: JSON.stringify({
       email: opts.email,
       is_permanent: true,
+      bvn: opts.bvn,
       phonenumber: opts.phone || "09000000000",
       firstname: opts.firstName,
       lastname: opts.lastName,

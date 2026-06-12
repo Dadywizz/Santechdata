@@ -40,10 +40,21 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
+  // BVN required for Flutterwave PVA (CBN KYC regulation)
+  const bvn = (req.body?.bvn ?? "").toString().replace(/\s+/g, "");
+  if (process.env.FLUTTERWAVE_SECRET_KEY && !bvn) {
+    res.status(400).json({ error: "BVN is required to generate your bank account. Please enter your 11-digit BVN." });
+    return;
+  }
+  if (bvn && !/^\d{11}$/.test(bvn)) {
+    res.status(400).json({ error: "BVN must be exactly 11 digits." });
+    return;
+  }
+
   let acct: { accountNumber: string; bankName: string };
   try {
     if (process.env.FLUTTERWAVE_SECRET_KEY) {
-      // Flutterwave permanent virtual account — verified live merchant
+      // Flutterwave permanent virtual account — verified live merchant, BVN required by CBN
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       const result = await flutterwaveCreatePermanentVA({
         email: user.email,
@@ -51,6 +62,7 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
         lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
         phone: user.phone ?? undefined,
         narration: "SanTech Data Wallet",
+        bvn,
       });
       acct = { accountNumber: result.accountNumber, bankName: result.bankName };
     } else if (process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE) {

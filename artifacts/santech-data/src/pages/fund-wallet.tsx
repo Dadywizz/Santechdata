@@ -100,7 +100,14 @@ export default function FundWallet() {
     transferMutation.mutate({ data: { recipientPhone: transferPhone, amount: parseFloat(transferAmount), note: transferNote } });
   };
 
+  const [bvn, setBvn] = useState("");
+
   const handleGenerateVA = async () => {
+    const trimmedBvn = bvn.replace(/\s+/g, "");
+    if (!trimmedBvn || !/^\d{11}$/.test(trimmedBvn)) {
+      setVaError("Please enter your valid 11-digit BVN.");
+      return;
+    }
     setVaGenerating(true);
     setVaError("");
     try {
@@ -108,10 +115,12 @@ export default function FundWallet() {
       const res = await fetch("/api/wallet/generate-account", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ bvn: trimmedBvn }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate account");
       setVa({ accountNumber: data.virtualAccountNumber, bankName: data.virtualAccountBank ?? "Bank" });
+      setBvn("");
     } catch (err: any) {
       setVaError(err.message || "Could not generate account. Please try again.");
     } finally {
@@ -171,19 +180,45 @@ export default function FundWallet() {
                   <Loader2 size={18} className="animate-spin" /> Loading account details...
                 </div>
               ) : !va ? (
-                <div className="text-center space-y-4 py-4">
-                  <div className="w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mx-auto">
-                    <Landmark size={28} className="text-orange-500" />
+                <div className="space-y-4">
+                  <div className="text-center space-y-1 pt-2">
+                    <div className="w-14 h-14 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mx-auto mb-3">
+                      <Landmark size={26} className="text-orange-500" />
+                    </div>
+                    <p className="font-semibold text-lg">Get Your Dedicated Bank Account</p>
+                    <p className="text-sm text-muted-foreground">Enter your BVN to generate a personal Wema Bank account number. Transfers credit your wallet automatically.</p>
                   </div>
+
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">Why is BVN required?</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires every virtual bank account in Nigeria to be linked to a BVN. Your BVN is sent securely to our banking partner and is never stored on our servers.</p>
+                  </div>
+
                   <div>
-                    <p className="font-semibold text-lg">No account yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">Generate your free dedicated bank account — takes a few seconds.</p>
+                    <Label className="font-semibold mb-2 block">Your BVN (11 digits)</Label>
+                    <Input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="Enter your 11-digit BVN"
+                      value={bvn}
+                      onChange={(e) => { setBvn(e.target.value.replace(/\D/g, "")); setVaError(""); }}
+                      className="h-12 font-mono tracking-widest text-lg"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Dial <strong>*565*0#</strong> on any phone to get your BVN instantly.</p>
                   </div>
+
                   {vaError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{vaError}</p>}
-                  <Button size="lg" className="w-full gap-2 bg-orange-500 hover:bg-orange-600" onClick={handleGenerateVA} disabled={vaGenerating}>
+
+                  <Button
+                    size="lg"
+                    className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+                    onClick={handleGenerateVA}
+                    disabled={vaGenerating || bvn.length !== 11}
+                  >
                     {vaGenerating
                       ? <><Loader2 size={16} className="animate-spin" /> Generating account...</>
-                      : <><Landmark size={16} /> Get My Bank Account</>}
+                      : <><Landmark size={16} /> Generate My Bank Account</>}
                   </Button>
                 </div>
               ) : (
