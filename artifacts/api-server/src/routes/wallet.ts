@@ -42,16 +42,8 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
 
   let acct: { accountNumber: string; bankName: string };
   try {
-    if (process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE) {
-      // Monnify reserved account — permanent, one per user, credited automatically via webhook
-      acct = await monnifyCreateReservedAccount({
-        accountReference: user.id,
-        accountName: user.fullName || user.email,
-        customerEmail: user.email,
-        customerName: user.fullName || user.email,
-      });
-    } else if (process.env.FLUTTERWAVE_SECRET_KEY) {
-      // Flutterwave permanent virtual account
+    if (process.env.FLUTTERWAVE_SECRET_KEY) {
+      // Flutterwave permanent virtual account — verified live merchant
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       const result = await flutterwaveCreatePermanentVA({
         email: user.email,
@@ -61,6 +53,14 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
         narration: "SanTech Data Wallet",
       });
       acct = { accountNumber: result.accountNumber, bankName: result.bankName };
+    } else if (process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE) {
+      // Monnify reserved account (fallback)
+      acct = await monnifyCreateReservedAccount({
+        accountReference: user.id,
+        accountName: user.fullName || user.email,
+        customerEmail: user.email,
+        customerName: user.fullName || user.email,
+      });
     } else if (process.env.PAYSTACK_SECRET_KEY) {
       const nameParts = (user.fullName || "").trim().split(/\s+/);
       acct = await paystackCreateDedicatedAccount({
