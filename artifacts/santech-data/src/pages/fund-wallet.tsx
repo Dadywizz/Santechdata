@@ -34,13 +34,18 @@ export default function FundWallet() {
   const [copied, setCopied] = useState(false);
 
   // VA state
-  const [va, setVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
-  const [vaLoading, setVaLoading] = useState(true);
   const [vaGenerating, setVaGenerating] = useState(false);
   const [vaError, setVaError] = useState("");
   const [vaCopied, setVaCopied] = useState(false);
+  const [generatedVa, setGeneratedVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
 
-  const { data: walletData } = useGetWallet();
+  const { data: walletData, isLoading: vaLoading } = useGetWallet();
+
+  // Derive VA from wallet data (existing account) or from just-generated one
+  const existingVa = walletData?.virtualAccountNumber
+    ? { accountNumber: walletData.virtualAccountNumber!, bankName: walletData.virtualAccountBank ?? "Bank" }
+    : null;
+  const va = generatedVa ?? existingVa;
 
   useEffect(() => {
     fetch("/api/settings/public")
@@ -48,17 +53,6 @@ export default function FundWallet() {
       .then((d: PublicSettings) => setBankSettings(d))
       .catch(() => {});
   }, []);
-
-  // Load existing VA from wallet data
-  useEffect(() => {
-    if (walletData) {
-      const w = walletData as any;
-      if (w.virtualAccountNumber) {
-        setVa({ accountNumber: w.virtualAccountNumber, bankName: w.virtualAccountBank ?? "Bank" });
-      }
-      setVaLoading(false);
-    }
-  }, [walletData]);
 
   const fundMutation = useInitiateFunding({
     mutation: {
@@ -120,7 +114,7 @@ export default function FundWallet() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate account");
-      setVa({ accountNumber: data.virtualAccountNumber, bankName: data.virtualAccountBank ?? "Bank" });
+      setGeneratedVa({ accountNumber: data.virtualAccountNumber, bankName: data.virtualAccountBank ?? "Bank" });
       setIdNumber("");
     } catch (err: any) {
       setVaError(err.message || "Could not generate account. Please try again.");
