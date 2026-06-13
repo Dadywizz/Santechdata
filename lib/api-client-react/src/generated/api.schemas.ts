@@ -121,6 +121,8 @@ export interface Wallet {
   userId: string;
   balance: number;
   currency: string;
+  virtualAccountNumber?: string | null;
+  virtualAccountBank?: string | null;
   updatedAt: string;
 }
 

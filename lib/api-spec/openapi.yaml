@@ -1456,6 +1456,12 @@ components:
           type: number
         currency:
           type: string
+        virtualAccountNumber:
+          type: string
+          nullable: true
+        virtualAccountBank:
+          type: string
+          nullable: true
         updatedAt:
           type: string
 

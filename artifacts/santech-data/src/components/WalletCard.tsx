@@ -13,11 +13,10 @@ export function WalletCard() {
     query: { queryKey: getGetWalletQueryKey() }
   });
 
-  const w = wallet as any;
-  const hasVA = !!w?.virtualAccountNumber;
+  const hasVA = !!wallet?.virtualAccountNumber;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(w.virtualAccountNumber).then(() => {
+    navigator.clipboard.writeText(wallet!.virtualAccountNumber!).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -61,8 +60,8 @@ export function WalletCard() {
                 <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">Your Bank Account</p>
-                  <p className="font-mono font-bold text-base tracking-widest">{w.virtualAccountNumber}</p>
-                  <p className="text-xs text-primary-foreground/70">{w.virtualAccountBank}</p>
+                  <p className="font-mono font-bold text-base tracking-widest">{wallet!.virtualAccountNumber}</p>
+                  <p className="text-xs text-primary-foreground/70">{wallet!.virtualAccountBank}</p>
                 </div>
               </div>
               <button
