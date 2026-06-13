@@ -1,0 +1,146 @@
+Documentation
+Introduction
+Getting Started
+Quickstart
+
+Charging a Card
+Making a Transfer
+Integration Journey
+Core Concepts
+Environments
+Authentication
+Supported Request Headers
+Encryption
+Errors
+Webhooks
+Idempotency
+Testing
+Best Practices
+Collections - inflow
+Introduction
+
+General Flow
+Orchestrator Flow
+Card Payments
+Mobile Money
+Pay With Bank Transfer
+USSD
+OPay
+Payouts - Outflows
+Introduction
+
+General Transfer Flow
+Transfer Orchestrator
+Bank Account Transfers
+Mobile Money Transfers
+Wallet-to-Wallet
+Payment Operations
+Settlements
+Refunds
+Chargebacks
+Reporting VAT
+Use cases
+Fintechs
+Banks and OFIs
+Travel and Hospitality
+E-Commerce
+Remittance
+Telecommunications
+API Workflows
+Loan disbursements
+Real-time FX conversion
+
+Pay With Bank Transfer
+Receive Bank transfer payments for NGN transactions.
+
+Pay with bank transfer (PWBT) allows you to receive payments via bank transfers initiated by customers. Each payment is made into a virtual bank account linked to your settlement wallet.
+
+You can generate either a dynamic or static virtual bank account to accept these payments:
+
+Dynamic accounts are generated per transaction and expire after use. Ideal for one-time payments.
+Static accounts are permanent and reusable, making them suitable for recurring payments.
+PWBT is currently available for transactions in NGN (Nigerian Naira) and GHS (Ghanaian Cedi) only.
+
+
+Requirements
+Before integrating PWBT, complete the following steps:
+
+Retrieve your API keys from the dashboard.
+Notify your customers that they will need to complete the payment by initiating a transfer from their bank account.
+How PWBT Works
+When a customer selects PWBT as their payment method, a unique bank account is generated for that transaction. To complete the payment, the customer must:
+
+Open their banking app or log in to internet banking.
+Transfer the exact amount to the provided virtual account details.
+Once the transfer is received, the payment is automatically verified and marked as successful. Both the customer and the merchant receive a confirmation.
+The transaction is only successful once the customer initiates and completes the transfer to the provided virtual account.
+
+Payment Flow
+Follow these steps to accept payments via bank transfer:
+
+Generate the virtual account details: Create a static or dynamic virtual bank account linked to the transaction.
+
+Display the account details to the customer – Prompt the customer to transfer the specified amount to the generated account.
+
+Listen for webhooks – Monitor the webhook events associated with the virtual account to detect successful transfers.
+
+Verify the payment – Before fulfilling the order or service, confirm:
+
+status is successful
+amount matches the expected amount
+customer_id is valid
+id (transaction reference) is consistent with the original request
+How to Create Virtual Accounts
+You can receive payments through either a static or dynamic virtual account. Although both types look and feel the same to customers, they operate quite differently.
+
+
+Static Virtual accounts
+Static virtual accounts (also called permanent accounts) do not expire. Once created, they can be assigned to a single customer and reused for multiple transactions.
+
+📘
+Static accounts are valid for 1000 years. To create them specify the transaction amount as 0 in your request.
+
+To create a static virtual account, collect the following customer information:
+
+Customer name, preferably the first and last name.
+Customer email.
+The Customer's national identification number. For NGN virtual accounts, either of the following is required:
+Bank Verification Number (BVN)
+National Identification Number (NIN)
+
+Use the Customer's personal Identification information (PII): the name and email to create a customer object. Store the customer_id from the response for the next step.
+
+cURL
+
+curl --location 'https://developersandbox-api.flutterwave.com/customers' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'X-Idempotency-Key: {{YOUR_UNIQUE_INDEMPOTENCY_KEY}}' \
+--header 'Authorization: Bearer {{YOUR_ACCESS_TOKEN}}' \
+--data-raw '{
+  "name": {
+    "first": "Cornelius",
+    "last": "Ashley-Osuzoka"
+  },
+  "email": "cornelius@devxpay.com"
+}'
+You'll get a response similar to this:
+
+201 Created
+
+{
+    "status": "success",
+    "message": "Customer created",
+    "data": {
+        "id": "cus_WWVaC0InrN",
+        "email": "cornelius@devxpay.com",
+        "name": {
+            "first": "Cornelius",
+            "last": "Ashley-Osuzoka"
+        },
+        "meta": {},
+        "created_datetime": "2025-06-02T07:40:48.637002170Z"
+    }
+}
+
+Use the customer_id along with other required details to create the virtual account using the create virtual account endpoint.

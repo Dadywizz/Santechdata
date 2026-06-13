@@ -23,7 +23,7 @@ type PublicSettings = {
 
 export default function FundWallet() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("fund");
+  const [tab, setTab] = useState<Tab>("bank");
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [pendingGateway, setPendingGateway] = useState<"paystack" | "flutterwave" | null>(null);
@@ -100,12 +100,13 @@ export default function FundWallet() {
     transferMutation.mutate({ data: { recipientPhone: transferPhone, amount: parseFloat(transferAmount), note: transferNote } });
   };
 
-  const [bvn, setBvn] = useState("");
+  const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
+  const [idNumber, setIdNumber] = useState("");
 
   const handleGenerateVA = async () => {
-    const trimmedBvn = bvn.replace(/\s+/g, "");
-    if (!trimmedBvn || !/^\d{11}$/.test(trimmedBvn)) {
-      setVaError("Please enter your valid 11-digit BVN.");
+    const trimmed = idNumber.replace(/\s+/g, "");
+    if (!trimmed || !/^\d{11}$/.test(trimmed)) {
+      setVaError(`Please enter your valid 11-digit ${idType.toUpperCase()}.`);
       return;
     }
     setVaGenerating(true);
@@ -115,12 +116,12 @@ export default function FundWallet() {
       const res = await fetch("/api/wallet/generate-account", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ bvn: trimmedBvn }),
+        body: JSON.stringify(idType === "bvn" ? { bvn: trimmed } : { nin: trimmed }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate account");
       setVa({ accountNumber: data.virtualAccountNumber, bankName: data.virtualAccountBank ?? "Bank" });
-      setBvn("");
+      setIdNumber("");
     } catch (err: any) {
       setVaError(err.message || "Could not generate account. Please try again.");
     } finally {
@@ -139,9 +140,10 @@ export default function FundWallet() {
   const showManualTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: "fund", label: "Fund Wallet" },
+    { id: "bank", label: "Bank Transfer" },
+    { id: "fund", label: "Card / USSD" },
     { id: "transfer", label: "Transfer" },
-    ...(showManualTab ? [{ id: "manual" as Tab, label: "Bank Transfer" }] : []),
+    ...(showManualTab ? [{ id: "manual" as Tab, label: "Manual" }] : []),
   ];
 
   return (
@@ -185,26 +187,40 @@ export default function FundWallet() {
                       <Landmark size={26} className="text-orange-500" />
                     </div>
                     <p className="font-semibold text-lg">Get Your Dedicated Bank Account</p>
-                    <p className="text-sm text-muted-foreground">Enter your BVN to generate a personal Wema Bank account number. Transfers credit your wallet automatically.</p>
+                    <p className="text-sm text-muted-foreground">A permanent account number is assigned to you — transfer anytime and your wallet is credited automatically.</p>
                   </div>
 
                   <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">Why is BVN required?</p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires every virtual bank account in Nigeria to be linked to a BVN. Your BVN is sent securely to our banking partner and is never stored on our servers.</p>
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">Why is BVN or NIN required?</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires every virtual bank account in Nigeria to be linked to a verified identity. Your details go directly to the bank — they are never stored on our servers.</p>
                   </div>
 
                   <div>
-                    <Label className="font-semibold mb-2 block">Your BVN (11 digits)</Label>
+                    <Label className="font-semibold mb-2 block">Verify with</Label>
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => { setIdType("bvn"); setIdNumber(""); setVaError(""); }}
+                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "bvn" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
+                      >BVN</button>
+                      <button
+                        onClick={() => { setIdType("nin"); setIdNumber(""); setVaError(""); }}
+                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "nin" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
+                      >NIN</button>
+                    </div>
                     <Input
                       type="tel"
                       inputMode="numeric"
                       maxLength={11}
-                      placeholder="Enter your 11-digit BVN"
-                      value={bvn}
-                      onChange={(e) => { setBvn(e.target.value.replace(/\D/g, "")); setVaError(""); }}
+                      placeholder={`Enter your 11-digit ${idType.toUpperCase()}`}
+                      value={idNumber}
+                      onChange={(e) => { setIdNumber(e.target.value.replace(/\D/g, "")); setVaError(""); }}
                       className="h-12 font-mono tracking-widest text-lg"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Dial <strong>*565*0#</strong> on any phone to get your BVN instantly.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {idType === "bvn"
+                        ? <>Dial <strong>*565*0#</strong> on any phone to get your BVN.</>
+                        : <>Dial <strong>*346#</strong> on your NIN-registered phone to get your NIN.</>}
+                    </p>
                   </div>
 
                   {vaError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{vaError}</p>}
@@ -213,7 +229,7 @@ export default function FundWallet() {
                     size="lg"
                     className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
                     onClick={handleGenerateVA}
-                    disabled={vaGenerating || bvn.length !== 11}
+                    disabled={vaGenerating || idNumber.length !== 11}
                   >
                     {vaGenerating
                       ? <><Loader2 size={16} className="animate-spin" /> Generating account...</>

@@ -40,14 +40,19 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  // BVN required for Flutterwave PVA (CBN KYC regulation)
+  // BVN or NIN required for Flutterwave static virtual accounts (CBN KYC regulation)
   const bvn = (req.body?.bvn ?? "").toString().replace(/\s+/g, "");
-  if (process.env.FLUTTERWAVE_SECRET_KEY && !bvn) {
-    res.status(400).json({ error: "BVN is required to generate your bank account. Please enter your 11-digit BVN." });
+  const nin = (req.body?.nin ?? "").toString().replace(/\s+/g, "");
+  if (process.env.FLUTTERWAVE_SECRET_KEY && !bvn && !nin) {
+    res.status(400).json({ error: "Please enter your BVN or NIN to generate your bank account." });
     return;
   }
   if (bvn && !/^\d{11}$/.test(bvn)) {
     res.status(400).json({ error: "BVN must be exactly 11 digits." });
+    return;
+  }
+  if (nin && !/^\d{11}$/.test(nin)) {
+    res.status(400).json({ error: "NIN must be exactly 11 digits." });
     return;
   }
 
@@ -64,7 +69,8 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
         lastName: nameParts.slice(1).join(" ") || nameParts[0] || "User",
         phone: user.phone ?? undefined,
         narration: "SanTech Data Wallet",
-        bvn,
+        bvn: bvn || undefined,
+        nin: nin || undefined,
       });
       acct = { accountNumber: result.accountNumber, bankName: result.bankName };
     } else if (process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE) {

@@ -100,23 +100,29 @@ export async function paystackVerifyTransaction(reference: string) {
 // ── FLUTTERWAVE ───────────────────────────────────────────────────────────────
 
 export async function flutterwaveCreatePermanentVA(opts: {
-  email: string; firstName: string; lastName: string; phone?: string; narration: string; bvn: string;
+  email: string; firstName: string; lastName: string; phone?: string; narration: string;
+  bvn?: string; nin?: string;
 }): Promise<{ accountNumber: string; bankName: string; orderRef: string }> {
+  const payload: Record<string, unknown> = {
+    email: opts.email,
+    is_permanent: true,
+    amount: 0,           // required for static (permanent) accounts per Flutterwave PWBT docs
+    phonenumber: opts.phone || "09000000000",
+    firstname: opts.firstName,
+    lastname: opts.lastName,
+    narration: opts.narration,
+  };
+  // BVN or NIN required for NGN virtual accounts (CBN regulation)
+  if (opts.bvn) payload.bvn = opts.bvn;
+  if (opts.nin) payload.nin = opts.nin;
+
   const res = await fetch("https://api.flutterwave.com/v3/virtual-account-numbers", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email: opts.email,
-      is_permanent: true,
-      bvn: opts.bvn,
-      phonenumber: opts.phone || "09000000000",
-      firstname: opts.firstName,
-      lastname: opts.lastName,
-      narration: opts.narration,
-    }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json() as {
     status: string; message?: string;
