@@ -1,7 +1,7 @@
 import { useGetWallet, getGetWalletQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Eye, EyeOff, Landmark, Copy, CheckCircle2 } from "lucide-react";
+import { CreditCard, Eye, EyeOff, Landmark, Copy, CheckCircle2, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -52,14 +52,14 @@ export function WalletCard() {
           </div>
         </div>
 
-        {/* Dedicated bank account — shown when available */}
+        {/* Show bank account if already set up */}
         {!isLoading && hasVA && (
           <div className="mb-4 p-3 rounded-xl bg-white/10 border border-white/20">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">Your Bank Account</p>
+                  <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">Your Dedicated Account</p>
                   <p className="font-mono font-bold text-base tracking-widest">{wallet!.virtualAccountNumber}</p>
                   <p className="text-xs text-primary-foreground/70">{wallet!.virtualAccountBank}</p>
                 </div>
@@ -73,6 +73,22 @@ export function WalletCard() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Prompt to set up bank account if not yet done */}
+        {!isLoading && !hasVA && (
+          <Link href="/fund-wallet">
+            <div className="mb-4 p-3 rounded-xl bg-white/15 border border-white/30 cursor-pointer hover:bg-white/20 transition-colors flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Landmark size={16} className="text-primary-foreground/80 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Get your free bank account</p>
+                  <p className="text-xs text-primary-foreground/70">Link BVN or NIN — fund via transfer anytime</p>
+                </div>
+              </div>
+              <ArrowRight size={16} className="text-primary-foreground/70 shrink-0" />
+            </div>
+          </Link>
         )}
 
         <div className="flex items-center gap-3">
