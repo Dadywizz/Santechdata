@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBroadcastNotification } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Send, Users } from "lucide-react";
+import { Bell, Send, Users, Landmark, Loader2 } from "lucide-react";
 
 export default function AdminNotifications() {
   const { toast } = useToast();
@@ -16,6 +16,7 @@ export default function AdminNotifications() {
   const [message, setMessage] = useState("");
   const [targetUserId, setTargetUserId] = useState("");
   const [mode, setMode] = useState<"all" | "single">("all");
+  const [notifyingUnlinked, setNotifyingUnlinked] = useState(false);
 
   const mutation = useBroadcastNotification({
     mutation: {
@@ -33,11 +34,62 @@ export default function AdminNotifications() {
     mutation.mutate({ data: { title, message, targetUserId: mode === "single" ? targetUserId : undefined } });
   };
 
+  const handleNotifyUnlinked = async () => {
+    setNotifyingUnlinked(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch("/api/admin/notifications/notify-unlinked", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      if (data.sent === 0) {
+        toast({ title: "All customers already linked!", description: "Every customer already has a bank account set up." });
+      } else {
+        toast({ title: `Notified ${data.sent} customer${data.sent === 1 ? "" : "s"}`, description: "They'll see a notification to set up their bank account." });
+      }
+    } catch (err: any) {
+      toast({ title: "Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setNotifyingUnlinked(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <PageHeader title="Broadcast Notifications" description="Send notifications to users" />
 
       <div className="max-w-2xl space-y-6">
+
+        {/* ── Quick action: notify unlinked customers ── */}
+        <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-800/40 flex items-center justify-center shrink-0">
+                <Landmark size={18} className="text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm mb-1">Notify Customers Without a Bank Account</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Finds all existing customers who haven't linked their BVN/NIN yet and sends them a notification telling them to set up their free dedicated bank account.
+                </p>
+                <Button
+                  onClick={handleNotifyUnlinked}
+                  disabled={notifyingUnlinked}
+                  className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+                  size="sm"
+                >
+                  {notifyingUnlinked
+                    ? <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                    : <><Landmark size={14} /> Notify Unlinked Customers</>}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Regular broadcast ── */}
         <div className="flex gap-3">
           {(["all", "single"] as const).map((m) => (
             <button

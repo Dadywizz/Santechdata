@@ -354,6 +354,33 @@ router.post("/admin/notifications/broadcast", authenticate, requireAdmin, async 
 });
 
 
+// POST /admin/notifications/notify-unlinked — notify all users with no virtual account
+router.post("/admin/notifications/notify-unlinked", authenticate, requireAdmin, async (_req: AuthRequest, res): Promise<void> => {
+  const usersWithoutVA = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .leftJoin(walletsTable, eq(walletsTable.userId, usersTable.id))
+    .where(sql`${walletsTable.virtualAccountNumber} IS NULL AND ${usersTable.role} = 'customer'`);
+
+  if (usersWithoutVA.length === 0) {
+    res.json({ sent: 0, message: "All customers already have a bank account linked." });
+    return;
+  }
+
+  await Promise.all(
+    usersWithoutVA.map((u) =>
+      db.insert(notificationsTable).values({
+        userId: u.id,
+        title: "🏦 Set Up Your Free Bank Account",
+        message: "You can now get a dedicated bank account number for your SanTech Data wallet. Transfer any amount anytime and your wallet is credited automatically. Tap here or go to Fund Wallet → Bank Transfer to set it up now.",
+        type: "general",
+      })
+    )
+  );
+
+  res.json({ sent: usersWithoutVA.length });
+});
+
 // GET /admin/settings
 router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const settings = await db.select().from(settingsTable);
