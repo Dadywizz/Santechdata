@@ -167,6 +167,17 @@ router.post("/admin/users/:id/fund", authenticate, requireAdmin, async (req: Aut
   res.json({ balance: parseFloat(wallet.balance) });
 });
 
+// POST /admin/users/:id/reset-virtual-account — clear stored VA so user can regenerate with BVN/NIN
+router.post("/admin/users/:id/reset-virtual-account", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const [wallet] = await db.update(walletsTable)
+    .set({ virtualAccountNumber: null, virtualAccountBank: null, updatedAt: new Date() })
+    .where(eq(walletsTable.userId, id))
+    .returning();
+  if (!wallet) { res.status(404).json({ error: "User wallet not found" }); return; }
+  res.json({ ok: true });
+});
+
 // GET /admin/transactions
 router.get("/admin/transactions", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const params = AdminGetTransactionsQueryParams.safeParse(req.query);

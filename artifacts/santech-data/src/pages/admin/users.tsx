@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAdminGetUsers, getAdminGetUsersQueryKey, useAdminUpdateUserStatus, useAdminFundUser } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Users, ShieldCheck, ShieldX, Wallet } from "lucide-react";
+import { Search, Users, ShieldCheck, ShieldX, Wallet, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,8 @@ export default function AdminUsers() {
   const [fundUser, setFundUser] = useState<any>(null);
   const [fundAmount, setFundAmount] = useState("");
   const [fundNote, setFundNote] = useState("");
+  const [resetUser, setResetUser] = useState<any>(null);
+  const [resetting, setResetting] = useState(false);
 
   const { data, isLoading } = useAdminGetUsers(
     { page, limit: 20, search: search || undefined, status: (status as any) || undefined },
@@ -48,6 +50,26 @@ export default function AdminUsers() {
       onError: (error: any) => toast({ title: "Failed to fund wallet", description: error.data?.error, variant: "destructive" }),
     },
   });
+
+  const handleResetVA = async () => {
+    if (!resetUser) return;
+    setResetting(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch(`/api/admin/users/${resetUser.id}/reset-virtual-account`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to reset");
+      toast({ title: "Account number cleared", description: `${resetUser.fullName} can now generate a new Flutterwave account on Fund Wallet.` });
+      setResetUser(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    } catch {
+      toast({ title: "Reset failed", description: "Could not clear the account number.", variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const users = (data as any)?.data ?? [];
   const total = (data as any)?.total ?? 0;
@@ -123,7 +145,7 @@ export default function AdminUsers() {
                     <p className="text-xs text-muted-foreground">{user.email} · {user.phone}</p>
                     <p className="text-xs text-muted-foreground">Joined {format(new Date(user.createdAt), "MMM d, yyyy")}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
@@ -131,6 +153,15 @@ export default function AdminUsers() {
                       className="gap-1"
                     >
                       <Wallet size={14} /> Fund
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setResetUser(user)}
+                      className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                      title="Clear stored bank account so user can generate a new Flutterwave account"
+                    >
+                      <RefreshCw size={14} /> Reset Account
                     </Button>
                     {user.status === "active" ? (
                       <Button
@@ -171,6 +202,7 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {/* Fund wallet dialog */}
       <Dialog open={!!fundUser} onOpenChange={() => setFundUser(null)}>
         <DialogContent>
           <DialogHeader>
@@ -188,6 +220,33 @@ export default function AdminUsers() {
             <Button className="w-full" onClick={() => adminFund.mutate({ id: fundUser.id, data: { amount: parseFloat(fundAmount), note: fundNote } })} disabled={adminFund.isPending || !fundAmount}>
               {adminFund.isPending ? "Processing..." : `Fund ₦${parseFloat(fundAmount || "0").toLocaleString()}`}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset virtual account confirmation dialog */}
+      <Dialog open={!!resetUser} onOpenChange={() => setResetUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Bank Account — {resetUser?.fullName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+              <p className="text-sm text-orange-800 dark:text-orange-200">
+                This will clear <strong>{resetUser?.fullName}</strong>'s stored bank account number. They will need to go to <strong>Fund Wallet → Bank Transfer</strong> and enter their BVN or NIN to get a new Flutterwave account.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">Their wallet balance is not affected.</p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setResetUser(null)}>Cancel</Button>
+              <Button
+                className="flex-1 gap-2 bg-orange-500 hover:bg-orange-600"
+                onClick={handleResetVA}
+                disabled={resetting}
+              >
+                {resetting ? <><RefreshCw size={14} className="animate-spin" /> Resetting...</> : <><RefreshCw size={14} /> Reset Account</>}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
