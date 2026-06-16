@@ -18,6 +18,12 @@ uri = "file://attached_assets/santech-logo-minimal-blue.png"
 type = "image"
 title = "SanTech Data minimal blue logo"
 
+[[generated]]
+id = "oJgqpeatPUTKt19HU-Dye"
+uri = "file://artifacts/santech-data/public/feature-graphic.png"
+type = "image"
+title = "santech-feature-graphic"
+
 [[outputs]]
 id = "hZ6Tfe1RqOM4VF9l43a2S"
 uri = "file://attached_assets/santech-logo-blue-green.png"
