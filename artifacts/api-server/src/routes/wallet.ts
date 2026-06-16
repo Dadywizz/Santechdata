@@ -541,19 +541,23 @@ router.post("/wallet/webhook/flutterwave", async (req: Request, res: Response): 
     // Case 1: checkout payment — match by tx_ref in transactions table
     if (txRef) {
       const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
-      if (tx && tx.status !== "success") {
-        await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
-        await db.update(walletsTable)
-          .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
-          .where(eq(walletsTable.userId, tx.userId));
-        await db.insert(notificationsTable).values({
-          userId: tx.userId,
-          title: "Wallet Funded",
-          message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()}.`,
-          type: "wallet",
-        });
+      if (tx) {
+        // Found a checkout transaction — handle it and stop
+        if (tx.status !== "success") {
+          await db.update(transactionsTable).set({ status: "success" }).where(eq(transactionsTable.id, tx.id));
+          await db.update(walletsTable)
+            .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
+            .where(eq(walletsTable.userId, tx.userId));
+          await db.insert(notificationsTable).values({
+            userId: tx.userId,
+            title: "Wallet Funded",
+            message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()}.`,
+            type: "wallet",
+          });
+        }
+        res.sendStatus(200); return;
       }
-      res.sendStatus(200); return;
+      // No matching checkout tx found — fall through to Case 2 (virtual account bank transfer)
     }
 
     // Case 2: permanent virtual account payment
