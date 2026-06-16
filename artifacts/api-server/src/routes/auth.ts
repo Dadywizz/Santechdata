@@ -20,6 +20,7 @@ import {
   UpdateProfileBody,
 } from "@workspace/api-zod";
 import { monnifyCreateReservedAccount } from "../lib/providers/gateways";
+import { sendOtpEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -89,6 +90,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   await db.insert(otpsTable).values({ email, otp, type: "email_verify", expiresAt });
+  sendOtpEmail(email, otp, "verify").catch(() => {});
 
   req.log.info({ userId: user.id }, "User registered");
 
@@ -217,8 +219,9 @@ router.post("/auth/resend-otp", async (req, res): Promise<void> => {
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   await db.insert(otpsTable).values({ email, otp, type: "email_verify", expiresAt });
+  sendOtpEmail(email, otp, "verify").catch(() => {});
 
-  req.log.info({ email, otp }, "OTP resent (log only, no email in demo)");
+  req.log.info({ email }, "OTP resent");
   res.json({ message: "OTP sent to your email" });
 });
 
@@ -236,7 +239,8 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     await db.insert(otpsTable).values({ email, otp, type: "password_reset", expiresAt });
-    req.log.info({ email, otp }, "Password reset OTP generated");
+    sendOtpEmail(email, otp, "reset").catch(() => {});
+    req.log.info({ email }, "Password reset OTP generated");
   }
 
   res.json({ message: "If that email exists, a reset link has been sent" });
