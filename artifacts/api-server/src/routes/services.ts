@@ -36,6 +36,8 @@ const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "ibadan-electric":       "14",
   "jos-electric":          "53",
   "kano-electric":         "63",
+  "enugu-electric":        "7",
+  "benin-electric":        "6",
 };
 
 const router: IRouter = Router();
@@ -187,6 +189,8 @@ const ELECTRICITY_PROVIDERS = [
   { id: "ibadan-electric",       name: "Ibadan Electric (IBEDC)"       },
   { id: "jos-electric",          name: "Jos Electric (JED)"            },
   { id: "kano-electric",         name: "Kano Electric (KEDCO)"         },
+  { id: "enugu-electric",        name: "Enugu Electric (EEDC)"         },
+  { id: "benin-electric",        name: "Benin Electric (BEDC)"         },
 ];
 
 router.get("/electricity/providers", authenticate, async (_req, res): Promise<void> => {
