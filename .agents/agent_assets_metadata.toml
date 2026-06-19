@@ -53,3 +53,15 @@ id = "XZm5PFYhdhfBciXWGW7S-"
 uri = "file://screenshots/screen2.jpg"
 type = "image"
 title = "Screenshot 2 — Buy Data"
+
+[[outputs]]
+id = "0KOW8eRgX0pnsgUy0B3uI"
+uri = "file://screenshots/real-dashboard.jpg"
+type = "image"
+title = "Screenshot 1 — Dashboard"
+
+[[outputs]]
+id = "523djd_v_FHuYKJnO_X-M"
+uri = "file://screenshots/real-buydata.jpg"
+type = "image"
+title = "Screenshot 2 — Buy Data"
