@@ -34,6 +34,8 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
 import BuyAirtime from "@/pages/buy-airtime";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import AirtimeToCash from "@/pages/airtime-to-cash";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +73,8 @@ function Router() {
       <Route path="/support" component={Support} />
       <Route path="/profile" component={Profile} />
       <Route path="/payment/callback" component={PaymentCallback} />
+      <Route path="/airtime-to-cash" component={AirtimeToCash} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
 
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/users" component={AdminUsers} />
