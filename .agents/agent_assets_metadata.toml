@@ -41,3 +41,15 @@ id = "WHAXB1bg5e9n5qYrT8fgj"
 uri = "file://attached_assets/santech-logo-minimal-blue.png"
 type = "image"
 title = "Option 3 — Minimal Blue (Clean)"
+
+[[outputs]]
+id = "LR4JUN0nT2nhlxRieDS0Q"
+uri = "file://screenshots/screen1.jpg"
+type = "image"
+title = "Screenshot 1 — Dashboard"
+
+[[outputs]]
+id = "XZm5PFYhdhfBciXWGW7S-"
+uri = "file://screenshots/screen2.jpg"
+type = "image"
+title = "Screenshot 2 — Buy Data"
