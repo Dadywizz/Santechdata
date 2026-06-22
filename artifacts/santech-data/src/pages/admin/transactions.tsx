@@ -42,7 +42,14 @@ export default function AdminTransactions() {
   const totalPages = Math.ceil(total / 25);
 
   const filtered = search
-    ? txs.filter((tx: any) => tx.description?.toLowerCase().includes(search.toLowerCase()) || tx.reference?.includes(search) || tx.userId?.includes(search))
+    ? txs.filter((tx: any) =>
+        tx.description?.toLowerCase().includes(search.toLowerCase()) ||
+        tx.reference?.includes(search) ||
+        tx.userId?.includes(search) ||
+        tx.user?.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+        tx.user?.phone?.includes(search) ||
+        tx.user?.email?.toLowerCase().includes(search.toLowerCase())
+      )
     : txs;
 
   return (

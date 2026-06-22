@@ -310,6 +310,7 @@ router.get("/admin/analytics/revenue", authenticate, requireAdmin, async (req: A
 
     const existing = grouped.get(key) ?? { revenue: 0, profit: 0, transactions: 0 };
     existing.revenue += parseFloat(tx.amount);
+    existing.profit += parseFloat(tx.amount) * 0.05;
     existing.transactions++;
     grouped.set(key, existing);
   }

@@ -143,6 +143,7 @@ export default function AdminUsers() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">{user.email} · {user.phone}</p>
+                    <p className="text-[10px] text-muted-foreground/60 font-mono select-all" title="User ID">{user.id}</p>
                     <p className="text-xs text-muted-foreground">Joined {format(new Date(user.createdAt), "MMM d, yyyy")}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
