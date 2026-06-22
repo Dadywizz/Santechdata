@@ -193,7 +193,19 @@ router.get("/admin/transactions", authenticate, requireAdmin, async (req: AuthRe
 
   const total = filtered.length;
   const paginated = filtered.slice((page - 1) * limit, page * limit);
-  res.json({ data: paginated.map(txToJson), total, page, limit });
+
+  const allUsers = await db.select().from(usersTable);
+  const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+  const data = paginated.map((tx) => {
+    const user = userMap.get(tx.userId);
+    return {
+      ...txToJson(tx),
+      user: user ? { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone } : null,
+    };
+  });
+
+  res.json({ data, total, page, limit });
 });
 
 // GET /admin/failed-payments — failed or pending wallet_fund transactions with user info

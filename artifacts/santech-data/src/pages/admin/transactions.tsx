@@ -89,6 +89,7 @@ export default function AdminTransactions() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-4 font-medium text-muted-foreground">Type</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Customer</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Description</th>
                 <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Reference</th>
                 <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
@@ -100,14 +101,14 @@ export default function AdminTransactions() {
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j} className="p-4"><div className="h-4 bg-muted rounded animate-pulse" /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
                     <History className="h-12 w-12 mx-auto mb-3 opacity-20" />
                     No transactions found
                   </td>
@@ -122,6 +123,17 @@ export default function AdminTransactions() {
                         <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", meta.bg, meta.color)}>
                           <Icon size={14} />
                         </div>
+                      </td>
+                      <td className="p-4 min-w-[160px]">
+                        {tx.user ? (
+                          <div>
+                            <p className="font-medium text-sm leading-tight">{tx.user.fullName}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{tx.user.phone}</p>
+                            <p className="text-[10px] text-muted-foreground/60 font-mono truncate max-w-[140px]">{tx.user.id}</p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground font-mono truncate max-w-[140px] block">{tx.userId}</span>
+                        )}
                       </td>
                       <td className="p-4">
                         <p className="font-medium truncate max-w-[200px]">{tx.description}</p>
