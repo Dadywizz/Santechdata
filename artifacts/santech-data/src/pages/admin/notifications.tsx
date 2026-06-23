@@ -37,7 +37,7 @@ export default function AdminNotifications() {
   const handleNotifyUnlinked = async () => {
     setNotifyingUnlinked(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch("/api/admin/notifications/notify-unlinked", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },

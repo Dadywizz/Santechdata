@@ -106,7 +106,7 @@ export default function FundWallet() {
     setVaGenerating(true);
     setVaError("");
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch("/api/wallet/generate-account", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

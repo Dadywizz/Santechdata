@@ -16,14 +16,14 @@ import {
 const API = "/api/admin/settings";
 
 async function fetchSettings(): Promise<Record<string, string>> {
-  const token = localStorage.getItem("santech_token");
+  const token = sessionStorage.getItem("santech_token");
   const res = await fetch(API, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return {};
   return res.json();
 }
 
 async function saveSettings(data: Record<string, string>): Promise<void> {
-  const token = localStorage.getItem("santech_token");
+  const token = sessionStorage.getItem("santech_token");
   const res = await fetch(API, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -33,7 +33,7 @@ async function saveSettings(data: Record<string, string>): Promise<void> {
 }
 
 async function callAdminAction(path: string): Promise<any> {
-  const token = localStorage.getItem("santech_token");
+  const token = sessionStorage.getItem("santech_token");
   const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
   return res.json();
 }

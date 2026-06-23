@@ -6,7 +6,7 @@ import App from "./App";
 import "./index.css";
 
 setBaseUrl(import.meta.env.BASE_URL);
-setAuthTokenGetter(() => localStorage.getItem("santech_token"));
+setAuthTokenGetter(() => sessionStorage.getItem("santech_token"));
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

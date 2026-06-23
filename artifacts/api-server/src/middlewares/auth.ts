@@ -38,5 +38,5 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
 }
 
 export function signToken(userId: string, role: string): string {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: "24h" });
 }

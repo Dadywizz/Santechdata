@@ -13,7 +13,7 @@ import { AlertTriangle, Wallet, RefreshCw, CheckCircle2, Clock, XCircle } from "
 import { format } from "date-fns";
 
 async function fetchFailedPayments() {
-  const token = localStorage.getItem("santech_token");
+  const token = sessionStorage.getItem("santech_token");
   const res = await fetch(`${import.meta.env.BASE_URL}api/admin/failed-payments`, {
     headers: { Authorization: `Bearer ${token}` },
   });

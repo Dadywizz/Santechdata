@@ -23,17 +23,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("santech_token");
-    const storedUser = localStorage.getItem("santech_user");
+    const storedToken = sessionStorage.getItem("santech_token");
+    const storedUser = sessionStorage.getItem("santech_user");
     if (storedToken && storedUser) {
       try {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem("santech_token");
-        localStorage.removeItem("santech_user");
+        sessionStorage.removeItem("santech_token");
+        sessionStorage.removeItem("santech_user");
       }
     }
+    // Also clear any stale localStorage tokens from old sessions
+    localStorage.removeItem("santech_token");
+    localStorage.removeItem("santech_user");
     setIsInitialized(true);
   }, []);
 
@@ -47,8 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       timer = setTimeout(() => {
         sessionStorage.setItem("santech_idle_logout", "1");
-        localStorage.removeItem("santech_token");
-        localStorage.removeItem("santech_user");
+        sessionStorage.removeItem("santech_token");
+        sessionStorage.removeItem("santech_user");
         setToken(null);
         setUser(null);
         setLocation("/login");
@@ -65,22 +68,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token, setLocation]);
 
   const login = (data: AuthResponse) => {
-    localStorage.setItem("santech_token", data.token);
-    localStorage.setItem("santech_user", JSON.stringify(data.user));
+    sessionStorage.setItem("santech_token", data.token);
+    sessionStorage.setItem("santech_user", JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
   };
 
   const logout = () => {
-    localStorage.removeItem("santech_token");
-    localStorage.removeItem("santech_user");
+    sessionStorage.removeItem("santech_token");
+    sessionStorage.removeItem("santech_user");
     setToken(null);
     setUser(null);
     setLocation("/login");
   };
 
   const updateUser = (updatedUser: User) => {
-    localStorage.setItem("santech_user", JSON.stringify(updatedUser));
+    sessionStorage.setItem("santech_user", JSON.stringify(updatedUser));
     setUser(updatedUser);
   };
 

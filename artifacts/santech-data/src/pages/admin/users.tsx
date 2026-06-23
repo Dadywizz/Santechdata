@@ -58,7 +58,7 @@ export default function AdminUsers() {
     if (!setPwdUser || setPwdValue.length < 6) return;
     setSettingPwd(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch(`/api/admin/users/${setPwdUser.id}/set-password`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -79,7 +79,7 @@ export default function AdminUsers() {
     if (!resetUser) return;
     setResetting(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch(`/api/admin/users/${resetUser.id}/reset-virtual-account`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },

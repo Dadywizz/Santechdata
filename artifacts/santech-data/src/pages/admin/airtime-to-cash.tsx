@@ -52,7 +52,7 @@ export default function AdminAirtimeToCash() {
   const [savingToggle, setSavingToggle] = useState(false);
 
   useState(() => {
-    const token = localStorage.getItem("santech_token");
+    const token = sessionStorage.getItem("santech_token");
     fetch("/api/admin/airtime-to-cash", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => { setRequests(d); setLoading(false); })
@@ -67,7 +67,7 @@ export default function AdminAirtimeToCash() {
 
   const handleToggle = async (val: boolean) => {
     setSavingToggle(true);
-    const token = localStorage.getItem("santech_token");
+    const token = sessionStorage.getItem("santech_token");
     await fetch("/api/admin/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -82,7 +82,7 @@ export default function AdminAirtimeToCash() {
     if (!selected || !action) return;
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch(`/api/admin/airtime-to-cash/${selected.id}/review`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

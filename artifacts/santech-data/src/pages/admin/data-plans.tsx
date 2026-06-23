@@ -155,7 +155,7 @@ export default function AdminDataPlans() {
   const handleSyncPlans = async () => {
     setSyncing(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch("/api/admin/sync-kyb-plans", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },

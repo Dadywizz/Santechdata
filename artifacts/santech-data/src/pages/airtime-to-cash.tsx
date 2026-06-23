@@ -57,7 +57,7 @@ export default function AirtimeToCash() {
     : 0;
 
   useState(() => {
-    const token = localStorage.getItem("santech_token");
+    const token = sessionStorage.getItem("santech_token");
     fetch("/api/airtime-to-cash/status", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d: { active: boolean }) => setServiceActive(d.active))
@@ -76,7 +76,7 @@ export default function AirtimeToCash() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("santech_token");
+      const token = sessionStorage.getItem("santech_token");
       const res = await fetch("/api/airtime-to-cash", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
