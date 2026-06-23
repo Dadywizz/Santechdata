@@ -39,6 +39,25 @@ export default function Dashboard() {
         <p className="text-sm text-slate-500 mt-0.5">What would you like to do today?</p>
       </div>
 
+      {/* Play Store banner — only shown in browser, not in installed app */}
+      {typeof window !== "undefined" && !window.matchMedia("(display-mode: standalone)").matches && (
+        <a
+          href="https://play.google.com/store/apps/details?id=ng.com.santechdata.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-4 py-3 mb-5 transition-colors"
+        >
+          <svg viewBox="0 0 24 24" className="w-7 h-7 shrink-0" fill="currentColor">
+            <path d="M3.18 23.76c.3.17.64.22.97.14l11.37-11.37L11.65 9l-8.47 14.76zM20.7 10.6l-2.9-1.67-3.43 3.43 3.43 3.43 2.92-1.68c.83-.48.83-1.03-.02-1.51zM2.4.43C2.14.7 2 1.1 2 1.62v20.76c0 .52.14.92.41 1.18L2.5 23.64l11.64-11.64L2.5.36 2.4.43zm9.25 11.21L3.18.24c-.33-.08-.67-.03-.97.14l8.47 14.76 2.97-3.5z"/>
+          </svg>
+          <div className="flex-1">
+            <p className="text-[10px] text-slate-400 leading-none">GET IT ON</p>
+            <p className="text-base font-bold leading-tight">Google Play</p>
+          </div>
+          <span className="text-xs text-slate-400 shrink-0">Download free →</span>
+        </a>
+      )}
+
       {/* Wallet Card */}
       <div className="mb-6">
         <WalletCard />
