@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PurchasingOverlay } from "@/components/ui/purchasing-overlay";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,7 @@ export default function BuyAirtime() {
       )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
+      <PurchasingOverlay open={mutation.isPending} />
     </AppLayout>
   );
 }

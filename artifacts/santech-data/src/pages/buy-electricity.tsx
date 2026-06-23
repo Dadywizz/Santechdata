@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PurchasingOverlay } from "@/components/ui/purchasing-overlay";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -213,6 +214,7 @@ export default function BuyElectricity() {
       )}
 
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
+      <PurchasingOverlay open={purchaseMutation.isPending} />
     </AppLayout>
   );
 }
