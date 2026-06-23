@@ -13,6 +13,7 @@ export const usersTable = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   referralCode: varchar("referral_code", { length: 20 }).unique(),
   referredBy: text("referred_by").references((): AnyPgColumn => usersTable.id),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -168,7 +168,16 @@ export default function AdminUsers() {
                     </div>
                     <p className="text-xs text-muted-foreground">{user.email} · {user.phone}</p>
                     <p className="text-[10px] text-muted-foreground/60 font-mono select-all" title="User ID">{user.id}</p>
-                    <p className="text-xs text-muted-foreground">Joined {format(new Date(user.createdAt), "MMM d, yyyy")}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Joined {format(new Date(user.createdAt), "MMM d, yyyy")}
+                      {user.lastLoginAt ? (
+                        <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                          · Last login {format(new Date(user.lastLoginAt), "MMM d, h:mm a")}
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-orange-500 font-medium">· Never logged in</span>
+                      )}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button

@@ -30,6 +30,7 @@ function userToJson(u: typeof usersTable.$inferSelect) {
     id: u.id, fullName: u.fullName, email: u.email, phone: u.phone,
     role: u.role, status: u.status, emailVerified: u.emailVerified,
     referralCode: u.referralCode, referredBy: u.referredBy, createdAt: u.createdAt,
+    lastLoginAt: u.lastLoginAt,
   };
 }
 
