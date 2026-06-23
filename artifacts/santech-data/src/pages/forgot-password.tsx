@@ -16,14 +16,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { AuthLayout } from "@/components/layout/AuthLayout";
-import { Mail, CheckCircle } from "lucide-react";
+import { CheckCircle2, Send } from "lucide-react";
 
-const emailSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-});
-
-const resetSchema = z.object({
-  otp: z.string().min(6, "Enter the 6-digit code from your email").max(6),
+const schema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  otp: z.string().length(6, "Enter the 6-digit code"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
 }).refine(d => d.password === d.confirmPassword, {
@@ -31,35 +28,31 @@ const resetSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type EmailForm = z.infer<typeof emailSchema>;
-type ResetForm = z.infer<typeof resetSchema>;
+type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPassword() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<"email" | "otp">("email");
-  const [sentEmail, setSentEmail] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [sentTo, setSentTo] = useState("");
 
-  const emailForm = useForm<EmailForm>({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { email: "" },
-  });
-
-  const resetForm = useForm<ResetForm>({
-    resolver: zodResolver(resetSchema),
-    defaultValues: { otp: "", password: "", confirmPassword: "" },
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "", otp: "", password: "", confirmPassword: "" },
   });
 
   const forgotMutation = useForgotPassword({
     mutation: {
       onSuccess: () => {
-        setSentEmail(emailForm.getValues("email"));
-        setStep("otp");
+        const email = form.getValues("email");
+        setSentTo(email);
+        setCodeSent(true);
+        toast({ title: "Code sent!", description: `Check ${email} for a 6-digit code.` });
       },
       onError: (error) => {
         toast({
-          title: "Request failed",
-          description: (error.data as any)?.error || "Could not process request. Please try again.",
+          title: "Failed to send code",
+          description: (error.data as any)?.error || "Please try again.",
           variant: "destructive",
         });
       },
@@ -69,128 +62,161 @@ export default function ForgotPassword() {
   const resetMutation = useResetPassword({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Password reset successful", description: "You can now log in with your new password." });
+        toast({ title: "Password reset!", description: "You can now log in with your new password." });
         setLocation("/login");
       },
       onError: (error) => {
         toast({
           title: "Reset failed",
-          description: (error.data as any)?.error || "Invalid or expired code. Please try again.",
+          description: (error.data as any)?.error || "Invalid or expired code. Please request a new one.",
           variant: "destructive",
         });
       },
     },
   });
 
-  if (step === "otp") {
-    return (
-      <AuthLayout>
-        <div className="space-y-6">
-          <div className="flex flex-col items-center text-center gap-2">
-            <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center">
-              <Mail className="h-7 w-7 text-orange-500" />
-            </div>
-            <h2 className="text-2xl font-semibold tracking-tight">Check your email</h2>
-            <p className="text-sm text-muted-foreground">
-              We sent a 6-digit code to <strong>{sentEmail}</strong>.<br />
-              Enter it below along with your new password.
-            </p>
-          </div>
+  const sendCode = () => {
+    const email = form.getValues("email");
+    const emailValid = z.string().email().safeParse(email);
+    if (!emailValid.success) {
+      form.setError("email", { message: "Enter a valid email address" });
+      return;
+    }
+    forgotMutation.mutate({ data: { email } });
+  };
 
-          <Form {...resetForm}>
-            <form onSubmit={resetForm.handleSubmit((data) => resetMutation.mutate({ data: { token: data.otp, password: data.password } }))} className="space-y-4">
-              <FormField
-                control={resetForm.control}
-                name="otp"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>6-Digit Code</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="123456"
-                        maxLength={6}
-                        className="text-center text-2xl tracking-widest font-mono h-14"
-                        {...field}
-                        disabled={resetMutation.isPending}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={resetForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password</FormLabel>
-                    <FormControl>
-                      <Input placeholder="••••••••" type="password" {...field} disabled={resetMutation.isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={resetForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input placeholder="••••••••" type="password" {...field} disabled={resetMutation.isPending} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={resetMutation.isPending}>
-                {resetMutation.isPending ? "Resetting..." : "Reset Password"}
-              </Button>
-            </form>
-          </Form>
-
-          <div className="text-center text-sm text-muted-foreground">
-            Didn't receive the email?{" "}
-            <button
-              className="text-primary hover:underline font-medium"
-              onClick={() => { setStep("email"); emailForm.reset(); resetForm.reset(); }}
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      </AuthLayout>
-    );
-  }
+  const onSubmit = (data: FormValues) => {
+    if (!codeSent) {
+      toast({ title: "Send the code first", description: "Click 'Send Code' next to your email.", variant: "destructive" });
+      return;
+    }
+    resetMutation.mutate({ data: { token: data.otp, password: data.password } });
+  };
 
   return (
     <AuthLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Forgot Password</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Reset Password</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter your email and we'll send you a reset code
+            Enter your email, get a code, then set a new password
           </p>
         </div>
 
-        <Form {...emailForm}>
-          <form onSubmit={emailForm.handleSubmit((data) => forgotMutation.mutate({ data }))} className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+            {/* Email + Send Code */}
             <FormField
-              control={emailForm.control}
+              control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email Address</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        placeholder="name@example.com"
+                        type="email"
+                        {...field}
+                        disabled={codeSent || forgotMutation.isPending}
+                        className="flex-1"
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant={codeSent ? "outline" : "default"}
+                      onClick={sendCode}
+                      disabled={forgotMutation.isPending || codeSent}
+                      className="shrink-0 gap-1"
+                    >
+                      {forgotMutation.isPending ? (
+                        "Sending..."
+                      ) : codeSent ? (
+                        <><CheckCircle2 size={14} className="text-green-500" /> Sent</>
+                      ) : (
+                        <><Send size={14} /> Send Code</>
+                      )}
+                    </Button>
+                  </div>
+                  {codeSent && (
+                    <p className="text-xs text-green-600 font-medium mt-1">
+                      ✓ Code sent to {sentTo} — check your inbox (and spam folder)
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* OTP Code */}
+            <FormField
+              control={form.control}
+              name="otp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>6-Digit Code from Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@example.com" type="email" {...field} disabled={forgotMutation.isPending} />
+                    <Input
+                      placeholder="• • • • • •"
+                      maxLength={6}
+                      inputMode="numeric"
+                      className="text-center text-2xl tracking-[0.5em] font-mono h-14"
+                      {...field}
+                      disabled={resetMutation.isPending}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={forgotMutation.isPending}>
-              {forgotMutation.isPending ? "Sending..." : "Send Reset Code"}
+
+            {/* New Password */}
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Minimum 8 characters"
+                      type="password"
+                      {...field}
+                      disabled={resetMutation.isPending}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Confirm Password */}
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm New Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Repeat your new password"
+                      type="password"
+                      {...field}
+                      disabled={resetMutation.isPending}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-semibold"
+              disabled={resetMutation.isPending}
+            >
+              {resetMutation.isPending ? "Resetting..." : "Reset Password"}
             </Button>
           </form>
         </Form>
@@ -198,7 +224,7 @@ export default function ForgotPassword() {
         <div className="text-center text-sm">
           Remember your password?{" "}
           <Link href="/login" className="font-medium text-primary hover:underline">
-            Back to login
+            Back to Login
           </Link>
         </div>
       </div>
