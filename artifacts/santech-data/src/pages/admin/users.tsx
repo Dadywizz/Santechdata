@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAdminGetUsers, getAdminGetUsersQueryKey, useAdminUpdateUserStatus, useAdminFundUser } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Users, ShieldCheck, ShieldX, Wallet, RefreshCw } from "lucide-react";
+import { Search, Users, ShieldCheck, ShieldX, Wallet, RefreshCw, KeyRound } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,9 @@ export default function AdminUsers() {
   const [fundNote, setFundNote] = useState("");
   const [resetUser, setResetUser] = useState<any>(null);
   const [resetting, setResetting] = useState(false);
+  const [setPwdUser, setSetPwdUser] = useState<any>(null);
+  const [setPwdValue, setSetPwdValue] = useState("");
+  const [settingPwd, setSettingPwd] = useState(false);
 
   const { data, isLoading } = useAdminGetUsers(
     { page, limit: 20, search: search || undefined, status: (status as any) || undefined },
@@ -50,6 +53,27 @@ export default function AdminUsers() {
       onError: (error: any) => toast({ title: "Failed to fund wallet", description: error.data?.error, variant: "destructive" }),
     },
   });
+
+  const handleSetPassword = async () => {
+    if (!setPwdUser || setPwdValue.length < 6) return;
+    setSettingPwd(true);
+    try {
+      const token = localStorage.getItem("santech_token");
+      const res = await fetch(`/api/admin/users/${setPwdUser.id}/set-password`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: setPwdValue }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast({ title: "Password updated", description: `${setPwdUser.fullName} can now log in with the new password.` });
+      setSetPwdUser(null);
+      setSetPwdValue("");
+    } catch {
+      toast({ title: "Failed to set password", variant: "destructive" });
+    } finally {
+      setSettingPwd(false);
+    }
+  };
 
   const handleResetVA = async () => {
     if (!resetUser) return;
@@ -158,6 +182,15 @@ export default function AdminUsers() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => { setSetPwdUser(user); setSetPwdValue(""); }}
+                      className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      title="Set a new password for this user"
+                    >
+                      <KeyRound size={14} /> Set Password
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => setResetUser(user)}
                       className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50"
                       title="Clear stored bank account so user can generate a new Flutterwave account"
@@ -221,6 +254,42 @@ export default function AdminUsers() {
             <Button className="w-full" onClick={() => adminFund.mutate({ id: fundUser.id, data: { amount: parseFloat(fundAmount), note: fundNote } })} disabled={adminFund.isPending || !fundAmount}>
               {adminFund.isPending ? "Processing..." : `Fund ₦${parseFloat(fundAmount || "0").toLocaleString()}`}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Password dialog */}
+      <Dialog open={!!setPwdUser} onOpenChange={() => { setSetPwdUser(null); setSetPwdValue(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Password — {setPwdUser?.fullName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                Set a new password for <strong>{setPwdUser?.fullName}</strong> ({setPwdUser?.email}). Share it with them securely and ask them to change it after logging in.
+              </p>
+            </div>
+            <div>
+              <Label className="font-semibold mb-2 block">New Password (min. 6 characters)</Label>
+              <Input
+                type="text"
+                placeholder="Enter new password"
+                value={setPwdValue}
+                onChange={(e) => setSetPwdValue(e.target.value)}
+                className="h-12 font-mono"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => { setSetPwdUser(null); setSetPwdValue(""); }}>Cancel</Button>
+              <Button
+                className="flex-1 gap-2 bg-blue-600 hover:bg-blue-700"
+                onClick={handleSetPassword}
+                disabled={settingPwd || setPwdValue.length < 6}
+              >
+                {settingPwd ? <><KeyRound size={14} className="animate-spin" /> Saving...</> : <><KeyRound size={14} /> Set Password</>}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

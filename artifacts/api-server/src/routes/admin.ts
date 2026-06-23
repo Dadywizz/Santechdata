@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import bcrypt from "bcryptjs";
 import { customFetch } from "../lib/custom-fetch";
 import { db } from "@workspace/db";
 import {
@@ -175,6 +176,21 @@ router.post("/admin/users/:id/reset-virtual-account", authenticate, requireAdmin
     .where(eq(walletsTable.userId, id))
     .returning();
   if (!wallet) { res.status(404).json({ error: "User wallet not found" }); return; }
+  res.json({ ok: true });
+});
+
+// POST /admin/users/:id/set-password — admin force-sets a user's password (bypasses email)
+router.post("/admin/users/:id/set-password", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { password } = req.body;
+  if (!password || typeof password !== "string" || password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [user] = await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id)).returning();
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  req.log.info({ adminId: req.userId, targetUserId: id }, "Admin set password for user");
   res.json({ ok: true });
 });
 
