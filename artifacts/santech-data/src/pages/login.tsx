@@ -29,15 +29,16 @@ export default function Login() {
   const { login: setAuth } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [idleBanner, setIdleBanner] = useState(false);
+  const [logoutReason, setLogoutReason] = useState<"idle" | "expired" | null>(null);
 
   const params = new URLSearchParams(window.location.search);
   const returnTo = params.get("returnTo") || "";
 
   useEffect(() => {
-    if (sessionStorage.getItem("santech_idle_logout")) {
+    const reason = sessionStorage.getItem("santech_idle_logout");
+    if (reason === "idle" || reason === "expired") {
       sessionStorage.removeItem("santech_idle_logout");
-      setIdleBanner(true);
+      setLogoutReason(reason);
     }
   }, []);
 
@@ -49,7 +50,7 @@ export default function Login() {
   const loginMutation = useLogin({
     mutation: {
       onSuccess: (data) => {
-        setIdleBanner(false);
+        setLogoutReason(null);
         setAuth(data);
         toast({ title: "Welcome back", description: "You have successfully logged in." });
         if (returnTo) navigate(returnTo);
@@ -71,9 +72,11 @@ export default function Login() {
   return (
     <AuthLayout>
       <div className="space-y-6">
-        {idleBanner && (
+        {logoutReason && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-            You were signed out after 10 minutes of inactivity. Please sign in again.
+            {logoutReason === "expired"
+              ? "Your session expired after 10 minutes. Please sign in again."
+              : "You were signed out after 10 minutes of inactivity. Please sign in again."}
           </div>
         )}
 
