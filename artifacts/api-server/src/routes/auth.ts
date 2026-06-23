@@ -70,6 +70,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     passwordHash,
     referralCode: myReferralCode,
     referredBy: referredById,
+    emailVerified: true,
   }).returning();
 
   const [newWallet] = await db.insert(walletsTable).values({ userId: user.id }).returning();
@@ -87,11 +88,6 @@ router.post("/auth/register", async (req, res): Promise<void> => {
         .where(eq(walletsTable.id, newWallet.id));
     }
   }).catch(() => {});
-
-  const otp = generateOtp();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-  await db.insert(otpsTable).values({ email, otp, type: "email_verify", expiresAt });
-  sendOtpEmail(email, otp, "verify").catch(() => {});
 
   req.log.info({ userId: user.id }, "User registered");
 

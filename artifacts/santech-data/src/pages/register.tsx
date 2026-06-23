@@ -51,7 +51,7 @@ export default function Register() {
           title: "Account created",
           description: "Welcome to SanTech Data!",
         });
-        setLocation("/verify-email");
+        setLocation("/dashboard");
       },
       onError: (error) => {
         toast({
