@@ -7,7 +7,7 @@ import {
   otpsTable,
   notificationsTable,
 } from "@workspace/db";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { authenticate, signToken, type AuthRequest } from "../middlewares/auth";
 import {
   RegisterBody,
@@ -39,7 +39,8 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { fullName, email, phone, password, referralCode } = parsed.data;
+  const { fullName, phone, password, referralCode } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
 
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email));
   if (existing) {
@@ -119,9 +120,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email, password } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password } = parsed.data;
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  const [user] = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${email}`);
   if (!user) {
     res.status(401).json({ error: "Invalid email or password" });
     return;
@@ -184,11 +186,12 @@ router.post("/auth/verify-email", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email, otp } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+  const { otp } = parsed.data;
 
   const [otpRecord] = await db.select().from(otpsTable).where(
     and(
-      eq(otpsTable.email, email),
+      sql`lower(${otpsTable.email}) = ${email}`,
       eq(otpsTable.otp, otp),
       eq(otpsTable.type, "email_verify"),
       eq(otpsTable.used, false),
@@ -202,7 +205,7 @@ router.post("/auth/verify-email", async (req, res): Promise<void> => {
   }
 
   await db.update(otpsTable).set({ used: true }).where(eq(otpsTable.id, otpRecord.id));
-  await db.update(usersTable).set({ emailVerified: true }).where(eq(usersTable.email, email));
+  await db.update(usersTable).set({ emailVerified: true }).where(sql`lower(${usersTable.email}) = ${email}`);
 
   res.json({ message: "Email verified successfully" });
 });
@@ -214,7 +217,7 @@ router.post("/auth/resend-otp", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
 
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -232,9 +235,9 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  const [user] = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${email}`);
   if (user) {
     const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
