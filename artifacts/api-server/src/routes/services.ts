@@ -105,7 +105,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     await db.update(walletsTable).set({ balance: sql`balance + ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "data", status: "failed", amount: price.toString(),
-      description: `${plan.network} ${plan.size} data for ${phone} — delivery failed`, reference,
+      description: `${plan.network} ${plan.name} data for ${phone} — delivery failed`, reference,
       metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone },
     });
     await db.insert(notificationsTable).values({
@@ -117,7 +117,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.userId!, type: "data", status: "success", amount: price.toString(),
-    description: `${plan.network} ${plan.size} data for ${phone}`, reference,
+    description: `${plan.network} ${plan.name} data for ${phone}`, reference,
     metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone },
   }).returning();
   await db.insert(notificationsTable).values({

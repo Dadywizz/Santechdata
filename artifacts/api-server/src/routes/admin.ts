@@ -13,7 +13,7 @@ import {
   examTypesTable,
 } from "@workspace/db";
 import { isKybdataConfigured, setKybdataToken, kybdataGetDataPlans } from "../lib/providers/kybdata";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, inArray, not } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
   AdminGetUsersQueryParams,
@@ -474,10 +474,12 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
   }
 
   function parseSize(name: string): string {
-    const m = name.match(/(\d+(?:\.\d+)?)\s*(TB|GB|G\b|MB|M\b)/i);
+    // Handles: "1.5GB", "500MB", "1.GB", "5.GB", "1 GB", "500 MB"
+    const m = name.match(/(\d+(?:\.\d+)?)\s*\.?\s*(TB|GB|G\b|MB|M\b)/i);
     if (!m) return "?";
+    const num = m[1].replace(/\.$/, "");
     const unit = m[2].toUpperCase().replace(/^G$/, "GB").replace(/^M$/, "MB");
-    return `${m[1]}${unit}`.slice(0, 20);
+    return `${num}${unit}`.slice(0, 20);
   }
 
   function parseValidity(name: string): string {
@@ -490,13 +492,15 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
     return `${n} Day${n > 1 ? "s" : ""}`;
   }
 
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, deactivated = 0;
   const errors: string[] = [];
 
   try {
     // Fetch raw from KYB Data — their actual field names are: id, name, amount, category, available
     const raw = await kybdataGetDataPlans() as unknown as Array<Record<string, unknown>>;
     req.log?.info({ count: raw.length }, "KYB Data sync: fetched plans");
+
+    const kybProviderCodes = new Set<string>();
 
     for (const p of raw) {
       const id = p.id ?? p.plan_id;
@@ -511,6 +515,7 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
       if (!network) continue;
 
       const providerCode = String(id);
+      kybProviderCodes.add(providerCode);
       const size = parseSize(name);
       const validity = parseValidity(name);
       const costPrice = (price * 0.97).toFixed(2);
@@ -521,7 +526,7 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
 
       if (existing.length > 0) {
         await db.update(dataPlansTable)
-          .set({ name: name.slice(0, 100), size, validity, price: price.toString(), costPrice, updatedAt: new Date() })
+          .set({ name: name.slice(0, 100), size, validity, price: price.toString(), costPrice, isActive: true, updatedAt: new Date() })
           .where(eq(dataPlansTable.providerCode, providerCode));
         updated++;
       } else {
@@ -537,13 +542,45 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
         added++;
       }
     }
+
+    // Deactivate any plans in DB whose providerCode no longer exists on KYB
+    if (kybProviderCodes.size > 0) {
+      const codes = Array.from(kybProviderCodes);
+      const result = await db.update(dataPlansTable)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(not(inArray(dataPlansTable.providerCode, codes)));
+      deactivated = (result as any).rowCount ?? 0;
+    }
+
+    // Deduplicate: for same network+size+validity keep only cheapest, deactivate the rest
+    const allActive = await db.select().from(dataPlansTable).where(eq(dataPlansTable.isActive, true));
+    const seen = new Map<string, { id: string; price: number }>();
+    const toDeactivate: string[] = [];
+    for (const plan of allActive) {
+      const key = `${plan.network}|${plan.size}|${plan.validity}`;
+      const price = parseFloat(plan.price);
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, { id: plan.id, price });
+      } else if (price < existing.price) {
+        toDeactivate.push(existing.id);
+        seen.set(key, { id: plan.id, price });
+      } else {
+        toDeactivate.push(plan.id);
+      }
+    }
+    if (toDeactivate.length > 0) {
+      await db.update(dataPlansTable).set({ isActive: false, updatedAt: new Date() }).where(inArray(dataPlansTable.id, toDeactivate));
+      deactivated += toDeactivate.length;
+    }
+
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     errors.push(msg);
     req.log?.error({ err }, "KYB Data sync error");
   }
 
-  res.json({ added, updated, errors });
+  res.json({ added, updated, deactivated, errors });
 });
 
 // POST /admin/clear-data-plans — wipe all data plans so admin can re-add for a new provider
