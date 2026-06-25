@@ -5,8 +5,7 @@
  * Auth: UserID (e.g. CK101280559) + APIKey as query params on every request
  */
 
-const BALANCE_URL = "https://www.clubkonnect.com/APIWalletBalance.asp";
-const BASE        = "https://www.nellobytesystems.com";
+const BASE = "https://www.nellobytesystems.com";
 
 let _userId = process.env.CLUBKONNECT_PHONE ?? "";   // env var name kept for backwards compat
 let _apiKey = process.env.CLUBKONNECT_APIKEY ?? "";
@@ -77,7 +76,7 @@ function cableCode(name: string): string {
 
 // ── Balance (used to test connection) ─────────────────────────────────────────
 export async function clubkonnectGetBalance(): Promise<{ balance?: number; message?: string }> {
-  const r = await ckGet(BALANCE_URL);
+  const r = await ckGet(`${BASE}/APIWalletBalance.asp`);
   const bal = parseFloat(r.balance ?? r.Balance ?? "NaN");
   return { balance: isNaN(bal) ? undefined : bal, message: r.status };
 }
