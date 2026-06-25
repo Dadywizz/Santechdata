@@ -61,7 +61,7 @@ export default function Login() {
         setLogoutReason(null);
         setAuth(data);
         toast({ title: "Welcome back", description: "You have successfully logged in." });
-        if (returnTo) navigate(returnTo);
+        navigate(returnTo || (data.user.role === "admin" ? "/admin" : "/dashboard"));
       },
       onError: (error) => {
         toast({
@@ -80,7 +80,7 @@ export default function Login() {
       const data = await loginWithFingerprint(fingerprintEmail);
       setAuth(data);
       toast({ title: "Welcome back!", description: "Signed in with fingerprint." });
-      if (returnTo) navigate(returnTo);
+      navigate(returnTo || (data.user?.role === "admin" ? "/admin" : "/dashboard"));
     } catch (err: any) {
       const msg = err?.message ?? "";
       if (msg.includes("cancel") || msg.includes("not allowed") || msg.includes("abort")) {
