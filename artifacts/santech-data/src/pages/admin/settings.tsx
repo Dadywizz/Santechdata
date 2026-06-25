@@ -8,12 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
   ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
-  AlertCircle, Link, Zap, Eye, EyeOff, GraduationCap,
+  AlertCircle, Link, Eye, EyeOff,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
@@ -43,10 +42,7 @@ async function adminPost(path: string, body?: unknown): Promise<any> {
   return res.json();
 }
 
-type ProviderName = "kyb" | "clubkonnect" | "gsubz";
-
-const NETWORKS   = ["MTN", "AIRTEL", "GLO", "9MOBILE"] as const;
-const EXAM_TYPES = ["WAEC", "NECO", "JAMB", "NABTEB"] as const;
+type ProviderName = "kyb";
 
 type ProviderDef = {
   id: ProviderName;
@@ -59,17 +55,6 @@ const PROVIDERS: ProviderDef[] = [
   {
     id: "kyb", label: "KYB Data", desc: "kybdatassub.com.ng",
     fields: [{ credKey: "kybdata_api_token", label: "API Token", hint: "Paste your KYB Data API token" }],
-  },
-  {
-    id: "clubkonnect", label: "Clubkonnect", desc: "clubkonnect.com",
-    fields: [
-      { credKey: "clubkonnect_api_key", label: "API Key",     hint: "Your Clubkonnect API key" },
-      { credKey: "clubkonnect_user_id", label: "UserID", hint: "Your Clubkonnect UserID (e.g. CK101280559)" },
-    ],
-  },
-  {
-    id: "gsubz", label: "Gsubz", desc: "gsubz.com",
-    fields: [{ credKey: "gsubz_api_key", label: "API Key", hint: "Paste your Gsubz API key" }],
   },
 ];
 
@@ -195,38 +180,6 @@ function ProviderCard({
   );
 }
 
-function RoutingRow({
-  icon, name, subtitle, value, linkedProviders, saving, onSave,
-}: {
-  icon: string; name: string; subtitle: string;
-  value: ProviderName; linkedProviders: ProviderDef[];
-  saving: boolean; onSave: (v: ProviderName) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center">
-          <span className="text-xs font-bold text-slate-600">{icon}</span>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-800">{name}</p>
-          <p className="text-xs text-slate-400">{subtitle}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {saving && <Loader2 size={13} className="animate-spin text-blue-500" />}
-        <Select value={value} onValueChange={(v) => onSave(v as ProviderName)}>
-          <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {linkedProviders.map((p) => (
-              <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-}
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -253,10 +206,7 @@ export default function AdminSettings() {
   const [minFunding, setMinFunding] = useState("100");
 
   // Provider state
-  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, clubkonnect: false, gsubz: false });
-  const [networkMap, setNetworkMap] = useState<Record<string, ProviderName>>({ MTN: "kyb", AIRTEL: "kyb", GLO: "kyb", "9MOBILE": "kyb" });
-  const [examMap, setExamMap] = useState<Record<string, ProviderName>>({ WAEC: "kyb", NECO: "kyb", JAMB: "kyb", NABTEB: "kyb" });
-  const [savingRow, setSavingRow] = useState<string | null>(null);
+  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false });
 
   const reload = async () => {
     const s = await fetchSettings();
@@ -275,24 +225,7 @@ export default function AdminSettings() {
     if (s.referralBonus)        setReferralBonus(s.referralBonus);
     if (s.minFunding)           setMinFunding(s.minFunding);
 
-    setConfigured({
-      kyb:         s.kyb_configured         === "true",
-      clubkonnect: s.clubkonnect_configured  === "true",
-      gsubz:       s.gsubz_configured        === "true",
-    });
-    const def = (s.activeProvider ?? "kyb") as ProviderName;
-    setNetworkMap({
-      MTN:      (s["net_provider_MTN"]      ?? def) as ProviderName,
-      AIRTEL:   (s["net_provider_AIRTEL"]   ?? def) as ProviderName,
-      GLO:      (s["net_provider_GLO"]      ?? def) as ProviderName,
-      "9MOBILE":(s["net_provider_9MOBILE"]  ?? def) as ProviderName,
-    });
-    setExamMap({
-      WAEC:  (s["exam_provider_WAEC"]   ?? def) as ProviderName,
-      NECO:  (s["exam_provider_NECO"]   ?? def) as ProviderName,
-      JAMB:  (s["exam_provider_JAMB"]   ?? def) as ProviderName,
-      NABTEB:(s["exam_provider_NABTEB"] ?? def) as ProviderName,
-    });
+    setConfigured({ kyb: s.kyb_configured === "true" });
     setLoading(false);
   };
 
@@ -307,22 +240,6 @@ export default function AdminSettings() {
       return r as { ok: boolean; message: string; balance?: number };
     } catch {
       return { ok: false, message: "Failed to link — please try again" };
-    }
-  };
-
-  const handleRoutingChange = async (type: "net" | "exam", key: string, provider: ProviderName) => {
-    setSavingRow(`${type}_${key}`);
-    const settingKey = type === "net" ? `net_provider_${key}` : `exam_provider_${key}`;
-    try {
-      await patchSettings({ [settingKey]: provider });
-      if (type === "net") setNetworkMap((prev) => ({ ...prev, [key]: provider }));
-      else                setExamMap((prev) => ({ ...prev, [key]: provider }));
-      const label = PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
-      toast({ title: `${key} → ${label}`, description: "Routing updated." });
-    } catch {
-      toast({ title: "Failed to save", variant: "destructive" });
-    } finally {
-      setSavingRow(null);
     }
   };
 
@@ -356,11 +273,6 @@ export default function AdminSettings() {
       </AdminLayout>
     );
   }
-
-  const linkedProviders = PROVIDERS.filter((p) => configured[p.id]);
-
-  const netIcons: Record<string, string> = { MTN: "MTN", AIRTEL: "AIR", GLO: "GLO", "9MOBILE": "9M" };
-  const examIcons: Record<string, string> = { WAEC: "WA", NECO: "NE", JAMB: "JA", NABTEB: "NA" };
 
   return (
     <AdminLayout>
@@ -396,58 +308,6 @@ export default function AdminSettings() {
             {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
             {syncing ? "Syncing..." : "Sync KYB Plans"}
           </Button>
-        </SectionCard>
-
-        {/* Network Routing */}
-        <SectionCard icon={Zap} title="Network Routing (Data & Airtime)">
-          <p className="text-xs text-slate-500 -mt-1">
-            Choose which provider handles Data and Airtime purchases per network. Link a provider above first.
-          </p>
-          {linkedProviders.length === 0
-            ? <p className="text-center py-4 text-xs text-slate-400">No providers linked yet.</p>
-            : (
-              <div className="space-y-2">
-                {NETWORKS.map((net) => (
-                  <RoutingRow
-                    key={net}
-                    icon={netIcons[net] ?? net.slice(0, 3)}
-                    name={net}
-                    subtitle="Data & Airtime"
-                    value={networkMap[net] ?? "kyb"}
-                    linkedProviders={linkedProviders}
-                    saving={savingRow === `net_${net}`}
-                    onSave={(v) => handleRoutingChange("net", net, v)}
-                  />
-                ))}
-              </div>
-            )
-          }
-        </SectionCard>
-
-        {/* Exam Routing */}
-        <SectionCard icon={GraduationCap} title="Exam Pin Routing">
-          <p className="text-xs text-slate-500 -mt-1">
-            Choose which provider handles each exam type. Different providers may have better prices.
-          </p>
-          {linkedProviders.length === 0
-            ? <p className="text-center py-4 text-xs text-slate-400">No providers linked yet.</p>
-            : (
-              <div className="space-y-2">
-                {EXAM_TYPES.map((exam) => (
-                  <RoutingRow
-                    key={exam}
-                    icon={examIcons[exam] ?? exam.slice(0, 2)}
-                    name={exam}
-                    subtitle="Exam Scratch Cards"
-                    value={examMap[exam] ?? "kyb"}
-                    linkedProviders={linkedProviders}
-                    saving={savingRow === `exam_${exam}`}
-                    onSave={(v) => handleRoutingChange("exam", exam, v)}
-                  />
-                ))}
-              </div>
-            )
-          }
         </SectionCard>
 
         {/* Exam Types */}
