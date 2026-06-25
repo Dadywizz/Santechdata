@@ -124,53 +124,91 @@ export async function testProviderConnection(name: ProviderName): Promise<{ ok: 
 function byNetwork(network: string): ProviderName { return getNetworkProviderName(network); }
 function byExam(exam: string): ProviderName        { return getExamProviderName(exam); }
 
-export function activePurchaseData(opts: { plan: number | string; mobile_number: string; network?: string }) {
+// KYB Data is the primary production provider.
+// Non-KYB providers are wrapped with automatic KYB fallback so a mis-routing
+// or unconfigured secondary provider never blocks a customer purchase.
+
+export async function activePurchaseData(opts: { plan: number | string; mobile_number: string; network?: string }) {
   const p = byNetwork(opts.network ?? "");
-  if (p === "clubkonnect") return clubkonnectPurchaseData(opts);
-  if (p === "gsubz")       return gsubzPurchaseData(opts);
+  if (p === "kyb") return kybdataPurchaseData(opts);
+  try {
+    if (p === "clubkonnect") return await clubkonnectPurchaseData(opts);
+    if (p === "gsubz")       return await gsubzPurchaseData(opts);
+  } catch {
+    return kybdataPurchaseData(opts);
+  }
   return kybdataPurchaseData(opts);
 }
 
-export function activePurchaseAirtime(opts: { network: string; amount: number; mobile_number: string }) {
+export async function activePurchaseAirtime(opts: { network: string; amount: number; mobile_number: string }) {
   const p = byNetwork(opts.network);
-  if (p === "clubkonnect") return clubkonnectPurchaseAirtime(opts);
-  if (p === "gsubz")       return gsubzPurchaseAirtime(opts);
+  if (p === "kyb") return kybdataPurchaseAirtime(opts);
+  try {
+    if (p === "clubkonnect") return await clubkonnectPurchaseAirtime(opts);
+    if (p === "gsubz")       return await gsubzPurchaseAirtime(opts);
+  } catch {
+    return kybdataPurchaseAirtime(opts);
+  }
   return kybdataPurchaseAirtime(opts);
 }
 
-export function activePurchaseExam(opts: { examid: number | string; quantity: number; examCode?: string }) {
+export async function activePurchaseExam(opts: { examid: number | string; quantity: number; examCode?: string }) {
   const p = byExam(opts.examCode ?? "");
-  if (p === "clubkonnect") return clubkonnectPurchaseExam({ examCode: opts.examCode ?? "", quantity: opts.quantity });
-  if (p === "gsubz")       return gsubzPurchaseExam(opts);
+  if (p === "kyb") return kybdataPurchaseExam(opts);
+  try {
+    if (p === "clubkonnect") return await clubkonnectPurchaseExam({ examCode: opts.examCode ?? "", quantity: opts.quantity });
+    if (p === "gsubz")       return await gsubzPurchaseExam(opts);
+  } catch {
+    return kybdataPurchaseExam(opts);
+  }
   return kybdataPurchaseExam(opts);
 }
 
-export function activePurchaseElectricity(opts: { discoid: number | string; MeterType: string; meter_number: string; amount: number }) {
-  if (_default === "clubkonnect") return clubkonnectPurchaseElectricity(opts);
-  if (_default === "gsubz")       return gsubzPurchaseElectricity(opts);
+export async function activePurchaseElectricity(opts: { discoid: number | string; MeterType: string; meter_number: string; amount: number }) {
+  if (_default === "kyb") return kybdataPurchaseElectricity(opts);
+  try {
+    if (_default === "clubkonnect") return await clubkonnectPurchaseElectricity(opts);
+    if (_default === "gsubz")       return await gsubzPurchaseElectricity(opts);
+  } catch {
+    return kybdataPurchaseElectricity(opts);
+  }
   return kybdataPurchaseElectricity(opts);
 }
 
-export function activePurchaseCable(opts: { plan_id: number | string; smart_card_number: string; cable_name?: string }) {
-  if (_default === "clubkonnect") return clubkonnectPurchaseCable(opts);
-  if (_default === "gsubz")       return gsubzPurchaseCable(opts);
+export async function activePurchaseCable(opts: { plan_id: number | string; smart_card_number: string; cable_name?: string }) {
+  if (_default === "kyb") return kybdataPurchaseCable(opts);
+  try {
+    if (_default === "clubkonnect") return await clubkonnectPurchaseCable(opts);
+    if (_default === "gsubz")       return await gsubzPurchaseCable(opts);
+  } catch {
+    return kybdataPurchaseCable(opts);
+  }
   return kybdataPurchaseCable(opts);
 }
 
-export function activeVerifyMeter(opts: { meter_number: string; discoid: number | string; meter_type: string }) {
-  if (_default === "clubkonnect") return clubkonnectVerifyMeter(opts);
-  if (_default === "gsubz")       return gsubzVerifyMeter(opts);
+export async function activeVerifyMeter(opts: { meter_number: string; discoid: number | string; meter_type: string }) {
+  if (_default === "kyb") return kybdataVerifyMeter(opts);
+  try {
+    if (_default === "clubkonnect") return await clubkonnectVerifyMeter(opts);
+    if (_default === "gsubz")       return await gsubzVerifyMeter(opts);
+  } catch {
+    return kybdataVerifyMeter(opts);
+  }
   return kybdataVerifyMeter(opts);
 }
 
-export function activeVerifySmartcard(opts: { smart_card_number: string; cable_name: string }) {
-  if (_default === "clubkonnect") return clubkonnectVerifySmartcard(opts);
-  if (_default === "gsubz")       return gsubzVerifySmartcard(opts);
+export async function activeVerifySmartcard(opts: { smart_card_number: string; cable_name: string }) {
+  if (_default === "kyb") return kybdataVerifySmartcard(opts);
+  try {
+    if (_default === "clubkonnect") return await clubkonnectVerifySmartcard(opts);
+    if (_default === "gsubz")       return await gsubzVerifySmartcard(opts);
+  } catch {
+    return kybdataVerifySmartcard(opts);
+  }
   return kybdataVerifySmartcard(opts);
 }
 
 export function activeGetDataPlans() {
-  if (_default === "clubkonnect") return kybdataGetDataPlans(); // Clubkonnect uses KYB plans for now
-  if (_default === "gsubz")       return gsubzGetDataPlans();
+  if (_default === "gsubz") return gsubzGetDataPlans();
   return kybdataGetDataPlans();
 }
