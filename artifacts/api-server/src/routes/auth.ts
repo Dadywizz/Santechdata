@@ -6,8 +6,15 @@ import {
   walletsTable,
   otpsTable,
   notificationsTable,
+  webauthnCredentialsTable,
 } from "@workspace/db";
 import { eq, and, gt, sql } from "drizzle-orm";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
 import { authenticate, signToken, type AuthRequest } from "../middlewares/auth";
 import {
   RegisterBody,
@@ -23,6 +30,21 @@ import { monnifyCreateReservedAccount } from "../lib/providers/gateways";
 import { sendOtpEmail } from "../lib/email";
 
 const router: IRouter = Router();
+
+// ── WebAuthn in-memory challenge store (short-lived, 5 min TTL) ──────────────
+const registrationChallenges = new Map<string, { challenge: string; expiry: number }>();
+const loginChallenges        = new Map<string, { challenge: string; userId: string; expiry: number }>();
+const FIVE_MIN = 5 * 60 * 1000;
+
+function getRpFromOrigin(origin: string | undefined): { rpId: string; rpOrigin: string } {
+  try {
+    if (origin) {
+      const u = new URL(origin);
+      return { rpId: u.hostname, rpOrigin: origin };
+    }
+  } catch {}
+  return { rpId: "localhost", rpOrigin: "http://localhost" };
+}
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -331,6 +353,181 @@ router.patch("/auth/profile", authenticate, async (req: AuthRequest, res): Promi
     referredBy: user.referredBy,
     createdAt: user.createdAt,
   });
+});
+
+// ── WebAuthn — Register: Begin ────────────────────────────────────────────────
+router.post("/auth/webauthn/register/begin", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const { rpId, rpOrigin } = getRpFromOrigin(req.headers.origin as string | undefined);
+
+  // Exclude credentials already registered on this user
+  const existing = await db.select().from(webauthnCredentialsTable).where(eq(webauthnCredentialsTable.userId, user.id));
+
+  const options = await generateRegistrationOptions({
+    rpName: "SanTech Data",
+    rpID: rpId,
+    userID: Buffer.from(user.id),
+    userName: user.email,
+    userDisplayName: user.fullName,
+    attestationType: "none",
+    excludeCredentials: existing.map((c) => ({ id: c.credentialId, type: "public-key" as const })),
+    authenticatorSelection: {
+      residentKey: "discouraged",
+      userVerification: "required",
+      authenticatorAttachment: "platform",
+    },
+  });
+
+  // Store challenge temporarily (keyed by userId)
+  registrationChallenges.set(user.id, { challenge: options.challenge, expiry: Date.now() + FIVE_MIN });
+
+  req.log?.info({ userId: user.id, rpId, rpOrigin }, "WebAuthn registration challenge generated");
+  res.json(options);
+});
+
+// ── WebAuthn — Register: Finish ───────────────────────────────────────────────
+router.post("/auth/webauthn/register/finish", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const stored = registrationChallenges.get(user.id);
+  if (!stored || stored.expiry < Date.now()) {
+    res.status(400).json({ error: "Registration challenge expired. Please try again." }); return;
+  }
+  registrationChallenges.delete(user.id);
+
+  const { rpId, rpOrigin } = getRpFromOrigin(req.headers.origin as string | undefined);
+
+  let verified = false;
+  let credentialId = "";
+  let publicKey = "";
+  let counter = 0;
+
+  try {
+    const result = await verifyRegistrationResponse({
+      response: req.body,
+      expectedChallenge: stored.challenge,
+      expectedOrigin: rpOrigin,
+      expectedRPID: rpId,
+      requireUserVerification: true,
+    });
+    verified = result.verified;
+    if (result.registrationInfo) {
+      credentialId = result.registrationInfo.credential.id;
+      publicKey = Buffer.from(result.registrationInfo.credential.publicKey).toString("base64url");
+      counter = result.registrationInfo.credential.counter;
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "WebAuthn registration verification failed");
+    res.status(400).json({ error: err?.message ?? "Fingerprint verification failed" }); return;
+  }
+
+  if (!verified) { res.status(400).json({ error: "Fingerprint verification failed" }); return; }
+
+  // Replace any previous registration from this user (one device per user for simplicity)
+  await db.delete(webauthnCredentialsTable).where(eq(webauthnCredentialsTable.userId, user.id));
+  await db.insert(webauthnCredentialsTable).values({
+    userId: user.id,
+    credentialId,
+    publicKey,
+    counter,
+    deviceName: "My Device",
+  });
+
+  req.log?.info({ userId: user.id }, "WebAuthn credential registered");
+  res.json({ verified: true });
+});
+
+// ── WebAuthn — Login: Begin ───────────────────────────────────────────────────
+router.post("/auth/webauthn/login/begin", async (req, res): Promise<void> => {
+  const email = (req.body?.email ?? "").trim().toLowerCase();
+  if (!email) { res.status(400).json({ error: "Email is required" }); return; }
+
+  const [user] = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${email}`);
+  if (!user) { res.status(401).json({ error: "No account found with this email" }); return; }
+  if (user.status === "suspended") { res.status(401).json({ error: "Account suspended" }); return; }
+
+  const credentials = await db.select().from(webauthnCredentialsTable).where(eq(webauthnCredentialsTable.userId, user.id));
+  if (credentials.length === 0) {
+    res.status(400).json({ error: "No fingerprint registered for this account. Please set it up in Profile → Fingerprint Login." }); return;
+  }
+
+  const { rpId } = getRpFromOrigin(req.headers.origin as string | undefined);
+
+  const options = await generateAuthenticationOptions({
+    rpID: rpId,
+    allowCredentials: credentials.map((c) => ({ id: c.credentialId, type: "public-key" as const })),
+    userVerification: "required",
+  });
+
+  loginChallenges.set(email, { challenge: options.challenge, userId: user.id, expiry: Date.now() + FIVE_MIN });
+
+  res.json(options);
+});
+
+// ── WebAuthn — Login: Finish ──────────────────────────────────────────────────
+router.post("/auth/webauthn/login/finish", async (req, res): Promise<void> => {
+  const email = (req.body?.email ?? "").trim().toLowerCase();
+  const response = req.body?.response;
+  if (!email || !response) { res.status(400).json({ error: "Missing email or response" }); return; }
+
+  const stored = loginChallenges.get(email);
+  if (!stored || stored.expiry < Date.now()) {
+    res.status(400).json({ error: "Challenge expired. Please try again." }); return;
+  }
+  loginChallenges.delete(email);
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, stored.userId));
+  if (!user) { res.status(401).json({ error: "User not found" }); return; }
+
+  // Find the matching credential
+  const credId = response.id ?? response.rawId;
+  const [credential] = await db.select().from(webauthnCredentialsTable)
+    .where(eq(webauthnCredentialsTable.credentialId, credId));
+  if (!credential) { res.status(401).json({ error: "Unrecognised fingerprint. Please use your password." }); return; }
+
+  const { rpId, rpOrigin } = getRpFromOrigin(req.headers.origin as string | undefined);
+
+  let verified = false;
+  let newCounter = credential.counter;
+  try {
+    const result = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: stored.challenge,
+      expectedOrigin: rpOrigin,
+      expectedRPID: rpId,
+      requireUserVerification: true,
+      credential: {
+        id: credential.credentialId,
+        publicKey: new Uint8Array(Buffer.from(credential.publicKey, "base64url")),
+        counter: credential.counter,
+      },
+    });
+    verified = result.verified;
+    if (result.authenticationInfo) newCounter = result.authenticationInfo.newCounter;
+  } catch (err: any) {
+    res.status(401).json({ error: err?.message ?? "Fingerprint verification failed" }); return;
+  }
+
+  if (!verified) { res.status(401).json({ error: "Fingerprint verification failed" }); return; }
+
+  // Update counter (replay attack protection)
+  await db.update(webauthnCredentialsTable).set({ counter: newCounter }).where(eq(webauthnCredentialsTable.id, credential.id));
+  db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id)).execute().catch(() => {});
+
+  const token = signToken(user.id, user.role);
+  res.json({
+    token,
+    user: { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone, role: user.role, status: user.status, emailVerified: user.emailVerified, referralCode: user.referralCode, referredBy: user.referredBy, createdAt: user.createdAt },
+  });
+});
+
+// ── WebAuthn — Remove ─────────────────────────────────────────────────────────
+router.post("/auth/webauthn/remove", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  await db.delete(webauthnCredentialsTable).where(eq(webauthnCredentialsTable.userId, req.userId!));
+  res.json({ removed: true });
 });
 
 export default router;

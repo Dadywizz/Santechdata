@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUpdateProfile, useChangePassword } from "@workspace/api-client-react";
-import { User, Lock, Save, Copy, CheckCircle2 } from "lucide-react";
+import { User, Lock, Save, Copy, CheckCircle2, Fingerprint, Loader2, ShieldCheck, ShieldX } from "lucide-react";
+import { registerFingerprint, removeFingerprint, hasFingerprintRegistered } from "@/hooks/useWebAuthn";
 
 function shortId(id: string | undefined): string {
   if (!id) return "—";
@@ -27,6 +28,13 @@ export default function Profile() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [fingerprintEmail, setFingerprintEmail] = useState<string | null>(null);
+  const [fingerprintLoading, setFingerprintLoading] = useState(false);
+
+  useEffect(() => {
+    setFingerprintEmail(hasFingerprintRegistered());
+  }, []);
 
   const profileMutation = useUpdateProfile({
     mutation: {
@@ -56,6 +64,40 @@ export default function Profile() {
     if (newPassword !== confirmPassword) { toast({ title: "Passwords do not match", variant: "destructive" }); return; }
     if (newPassword.length < 8) { toast({ title: "Password must be at least 8 characters", variant: "destructive" }); return; }
     passwordMutation.mutate({ data: { currentPassword, newPassword } });
+  };
+
+  const handleEnableFingerprint = async () => {
+    if (!user?.email) return;
+    setFingerprintLoading(true);
+    try {
+      await registerFingerprint(user.email);
+      setFingerprintEmail(user.email);
+      toast({ title: "Fingerprint enabled!", description: "You can now sign in with your fingerprint." });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("cancel") || msg.includes("not allowed") || msg.includes("abort")) {
+        toast({ title: "Cancelled", description: "Fingerprint setup was cancelled." });
+      } else if (msg.includes("supported") || msg.includes("available")) {
+        toast({ title: "Not supported", description: "Your device or browser doesn't support fingerprint login.", variant: "destructive" });
+      } else {
+        toast({ title: "Setup failed", description: msg || "Please try again.", variant: "destructive" });
+      }
+    } finally {
+      setFingerprintLoading(false);
+    }
+  };
+
+  const handleRemoveFingerprint = async () => {
+    setFingerprintLoading(true);
+    try {
+      await removeFingerprint();
+      setFingerprintEmail(null);
+      toast({ title: "Fingerprint removed", description: "You'll need to use your password to sign in." });
+    } catch (err: any) {
+      toast({ title: "Failed to remove", description: err?.message, variant: "destructive" });
+    } finally {
+      setFingerprintLoading(false);
+    }
   };
 
   return (
@@ -130,6 +172,69 @@ export default function Profile() {
               <Save className="mr-2 h-4 w-4" />
               {profileMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Fingerprint / Biometric Login */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/10 text-blue-600 p-3 rounded-xl">
+                <Fingerprint size={22} />
+              </div>
+              <div>
+                <CardTitle>Fingerprint Login</CardTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">Sign in faster with your fingerprint or face ID</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {fingerprintEmail ? (
+              <div className="rounded-xl border-2 border-green-200 bg-green-50 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={20} className="text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Fingerprint is enabled</p>
+                    <p className="text-xs text-slate-500 mt-0.5">This device is registered for <strong>{fingerprintEmail}</strong></p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 border-red-200 text-red-600 hover:bg-red-50"
+                  onClick={handleRemoveFingerprint}
+                  disabled={fingerprintLoading}
+                >
+                  {fingerprintLoading
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <ShieldX className="h-4 w-4" />
+                  }
+                  {fingerprintLoading ? "Removing..." : "Remove Fingerprint"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center space-y-2">
+                  <div className="flex justify-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
+                      <Fingerprint size={22} className="text-slate-400" />
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500">No fingerprint registered on this device yet.</p>
+                  <p className="text-xs text-slate-400">Works with Touch ID, Face ID, Android fingerprint, and Windows Hello.</p>
+                </div>
+                <Button
+                  className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleEnableFingerprint}
+                  disabled={fingerprintLoading}
+                >
+                  {fingerprintLoading
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting up...</>
+                    : <><Fingerprint className="h-4 w-4" /> Enable Fingerprint Login</>
+                  }
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
