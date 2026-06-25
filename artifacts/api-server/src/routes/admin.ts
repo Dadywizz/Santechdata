@@ -13,11 +13,12 @@ import {
   examTypesTable,
 } from "@workspace/db";
 import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
-import { setHusmodataApiKey, isHusmodataConfigured } from "../lib/providers/husmodata";
+import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
 import {
   setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
+  setExamProvider, getAllExamMappings, EXAM_TYPES,
 } from "../lib/providers/activeProvider";
 import { eq, sql, desc, inArray, not } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
@@ -433,14 +434,16 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const settings = await db.select().from(settingsTable);
   const obj: Record<string, string> = {};
   for (const s of settings) obj[s.key] = s.value;
-  // Inject live provider statuses + network mappings from memory
+  // Inject live provider statuses + network/exam mappings from memory
   const statuses = getAllProviderStatuses();
   const netMap   = getAllNetworkMappings();
-  obj.activeProvider        = getActiveProviderName();
-  obj.kyb_configured        = String(statuses.kyb);
-  obj.husmodata_configured  = String(statuses.husmodata);
-  obj.gsubz_configured      = String(statuses.gsubz);
-  for (const net of NETWORKS) obj[`net_provider_${net}`] = netMap[net];
+  const examMap  = getAllExamMappings();
+  obj.activeProvider          = getActiveProviderName();
+  obj.kyb_configured          = String(statuses.kyb);
+  obj.clubkonnect_configured  = String(statuses.clubkonnect);
+  obj.gsubz_configured        = String(statuses.gsubz);
+  for (const net  of NETWORKS)    obj[`net_provider_${net}`]  = netMap[net];
+  for (const exam of EXAM_TYPES)  obj[`exam_provider_${exam}`] = examMap[exam];
   res.json(obj);
 });
 
@@ -449,11 +452,13 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
   const entries = Object.entries(req.body as Record<string, string>);
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    if (key === "kybdata_api_token"  && value) setKybdataToken(value);
-    if (key === "husmodata_api_key"  && value) setHusmodataApiKey(value);
-    if (key === "gsubz_api_key"      && value) setGsubzApiKey(value);
-    if (key === "activeProvider"     && value) setActiveProvider(value);
-    if (key.startsWith("net_provider_"))       setNetworkProvider(key.replace("net_provider_", ""), value);
+    if (key === "kybdata_api_token"    && value) setKybdataToken(value);
+    if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
+    if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
+    if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);
+    if (key === "activeProvider"       && value) setActiveProvider(value);
+    if (key.startsWith("net_provider_"))        setNetworkProvider(key.replace("net_provider_", ""), value);
+    if (key.startsWith("exam_provider_"))       setExamProvider(key.replace("exam_provider_", ""), value);
   }
   res.json({ updated: entries.length });
 });

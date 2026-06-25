@@ -1,18 +1,21 @@
 ---
-name: Clubkonnect — Dead Provider
-description: All Clubkonnect VTU endpoints are broken; do not use
+name: Clubkonnect Provider
+description: Clubkonnect integration status and credential format
 ---
 
-## Status: Do not use
+## Status: Integrated (credentials may need user to verify account)
 
-All tested endpoints return 404 or INVALID_CREDENTIALS:
-- Airtime: 404
-- Cable: 404
-- Electricity verify: 404
-- NECO/NABTEB: 404
-- Data: rejects password
-- Electricity purchase: INVALID_CREDENTIALS
-- WAEC: INVALID_CREDENTIALS
-- JAMB: INVALID_CREDENTIALS
+Clubkonnect is now provider slot 2 in the active provider system (replaced Husmodata stub).
 
-**Why:** Extensively tested in earlier sessions. The credentials are set (CLUBKONNECT_APIKEY, PASSWORD, PHONE) but the API doesn't accept them. Not worth debugging.
+**Credentials required:**
+- `clubkonnect_api_key` — API key from Clubkonnect dashboard  
+- `clubkonnect_user_id` — registered phone number (UserID)
+
+**API format:**
+- Base: `https://www.clubkonnect.com/api/v2/`
+- Auth: `UserID` + `APIKey` in POST body on every request
+- Exam endpoints: separate paths per type `/waec/`, `/neco/`, `/jamb/`, `/nabteb/`
+
+**Previous failure reason:** INVALID_CREDENTIALS / 404 errors in earlier tests — likely because the account was not yet verified for API/reseller access on Clubkonnect. Once the user is approved for API access, the integration should work.
+
+**How to link:** Admin → Settings → Clubkonnect card — enter API Key + Phone, press "Link Provider"

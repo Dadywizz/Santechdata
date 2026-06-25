@@ -13,14 +13,14 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
   ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
-  AlertCircle, Link, Zap, Eye, EyeOff,
+  AlertCircle, Link, Zap, Eye, EyeOff, GraduationCap,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
-const token = () => sessionStorage.getItem("santech_token") ?? "";
+const tok = () => sessionStorage.getItem("santech_token") ?? "";
 
 async function fetchSettings(): Promise<Record<string, string>> {
-  const res = await fetch(API, { headers: { Authorization: `Bearer ${token()}` } });
+  const res = await fetch(API, { headers: { Authorization: `Bearer ${tok()}` } });
   if (!res.ok) return {};
   return res.json();
 }
@@ -28,23 +28,49 @@ async function fetchSettings(): Promise<Record<string, string>> {
 async function patchSettings(data: Record<string, string>): Promise<void> {
   const res = await fetch(API, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to save");
 }
 
-async function callAdminAction(path: string): Promise<any> {
-  const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token()}` } });
+async function adminPost(path: string, body?: unknown): Promise<any> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+    body: body ? JSON.stringify(body) : undefined,
+  });
   return res.json();
 }
 
-type ProviderName = "kyb" | "husmodata" | "gsubz";
-const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"] as const;
-const PROVIDERS: Array<{ id: ProviderName; label: string; desc: string; credKey: string; credLabel: string }> = [
-  { id: "kyb",       label: "KYB Data",  desc: "kybdatassub.com.ng",  credKey: "kybdata_api_token", credLabel: "API Token" },
-  { id: "husmodata", label: "Husmodata", desc: "husmodata.com",        credKey: "husmodata_api_key", credLabel: "API Key"   },
-  { id: "gsubz",     label: "Gsubz",     desc: "gsubz.com",            credKey: "gsubz_api_key",     credLabel: "API Key"   },
+type ProviderName = "kyb" | "clubkonnect" | "gsubz";
+
+const NETWORKS   = ["MTN", "AIRTEL", "GLO", "9MOBILE"] as const;
+const EXAM_TYPES = ["WAEC", "NECO", "JAMB", "NABTEB"] as const;
+
+type ProviderDef = {
+  id: ProviderName;
+  label: string;
+  desc: string;
+  fields: Array<{ credKey: string; label: string; hint: string }>;
+};
+
+const PROVIDERS: ProviderDef[] = [
+  {
+    id: "kyb", label: "KYB Data", desc: "kybdatassub.com.ng",
+    fields: [{ credKey: "kybdata_api_token", label: "API Token", hint: "Paste your KYB Data API token" }],
+  },
+  {
+    id: "clubkonnect", label: "Clubkonnect", desc: "clubkonnect.com",
+    fields: [
+      { credKey: "clubkonnect_api_key", label: "API Key",     hint: "Your Clubkonnect API key" },
+      { credKey: "clubkonnect_user_id", label: "Phone (UserID)", hint: "Your registered Clubkonnect phone e.g. 08012345678" },
+    ],
+  },
+  {
+    id: "gsubz", label: "Gsubz", desc: "gsubz.com",
+    fields: [{ credKey: "gsubz_api_key", label: "API Key", hint: "Paste your Gsubz API key" }],
+  },
 ];
 
 function SectionCard({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
@@ -63,26 +89,55 @@ function SectionCard({ icon: Icon, title, children }: { icon: React.ElementType;
   );
 }
 
+function FieldInput({ label, hint, value, onChange, onEnter }: {
+  label: string; hint: string; value: string;
+  onChange: (v: string) => void; onEnter?: () => void;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <Label className="text-xs font-semibold text-slate-600 mb-1 block">{label}</Label>
+      <div className="relative">
+        <Input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
+          placeholder={hint}
+          className="h-9 text-sm pr-9 font-mono"
+        />
+        <button type="button" onClick={() => setShow(!show)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+          {show ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProviderCard({
   provider, configured, onLink,
 }: {
-  provider: typeof PROVIDERS[0];
+  provider: ProviderDef;
   configured: boolean;
-  onLink: (key: string, value: string) => Promise<{ ok: boolean; message: string; balance?: number }>;
+  onLink: (fields: Record<string, string>) => Promise<{ ok: boolean; message: string; balance?: number }>;
 }) {
-  const [cred, setCred] = useState("");
-  const [show, setShow] = useState(false);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(provider.fields.map((f) => [f.credKey, ""]))
+  );
   const [linking, setLinking] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string; balance?: number } | null>(null);
 
+  const allFilled = provider.fields.every((f) => !!fieldValues[f.credKey]?.trim());
+
   const handleLink = async () => {
-    if (!cred.trim()) return;
+    if (!allFilled) return;
     setLinking(true);
     setResult(null);
     try {
-      const r = await onLink(provider.credKey, cred.trim());
+      const trimmed = Object.fromEntries(Object.entries(fieldValues).map(([k, v]) => [k, v.trim()]));
+      const r = await onLink(trimmed);
       setResult(r);
-      if (r.ok) setCred("");
+      if (r.ok) setFieldValues(Object.fromEntries(provider.fields.map((f) => [f.credKey, ""])));
     } finally {
       setLinking(false);
     }
@@ -106,25 +161,28 @@ function ProviderCard({
         }
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Input
-            type={show ? "text" : "password"}
-            value={cred}
-            onChange={(e) => setCred(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLink()}
-            placeholder={configured ? `Update ${provider.credLabel}` : `Paste your ${provider.credLabel}`}
-            className="h-9 text-sm pr-9 font-mono"
+      <div className="space-y-2">
+        {provider.fields.map((f) => (
+          <FieldInput
+            key={f.credKey}
+            label={f.label}
+            hint={configured ? `Update ${f.label}` : f.hint}
+            value={fieldValues[f.credKey] ?? ""}
+            onChange={(v) => setFieldValues((prev) => ({ ...prev, [f.credKey]: v }))}
+            onEnter={provider.fields.indexOf(f) === provider.fields.length - 1 ? handleLink : undefined}
           />
-          <button type="button" onClick={() => setShow(!show)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-            {show ? <EyeOff size={13} /> : <Eye size={13} />}
-          </button>
-        </div>
-        <Button size="sm" onClick={handleLink} disabled={!cred.trim() || linking} className="h-9 px-4 gap-1.5 text-xs">
-          {linking ? <Loader2 size={12} className="animate-spin" /> : <Link size={12} />}
-          {linking ? "Linking..." : "Link"}
-        </Button>
+        ))}
       </div>
+
+      <Button
+        size="sm"
+        onClick={handleLink}
+        disabled={!allFilled || linking}
+        className="mt-3 h-9 px-4 gap-1.5 text-xs w-full"
+      >
+        {linking ? <Loader2 size={12} className="animate-spin" /> : <Link size={12} />}
+        {linking ? "Linking..." : configured ? "Update & Re-link" : "Link Provider"}
+      </Button>
 
       {result && (
         <div className={`mt-2 text-xs font-medium flex items-center gap-1.5 ${result.ok ? "text-green-600" : "text-red-500"}`}>
@@ -137,6 +195,39 @@ function ProviderCard({
   );
 }
 
+function RoutingRow({
+  icon, name, subtitle, value, linkedProviders, saving, onSave,
+}: {
+  icon: string; name: string; subtitle: string;
+  value: ProviderName; linkedProviders: ProviderDef[];
+  saving: boolean; onSave: (v: ProviderName) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center">
+          <span className="text-xs font-bold text-slate-600">{icon}</span>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{name}</p>
+          <p className="text-xs text-slate-400">{subtitle}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {saving && <Loader2 size={13} className="animate-spin text-blue-500" />}
+        <Select value={value} onValueChange={(v) => onSave(v as ProviderName)}>
+          <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {linkedProviders.map((p) => (
+              <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -145,6 +236,7 @@ export default function AdminSettings() {
   const [testingMonnify, setTestingMonnify] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  // General settings
   const [supportEmail, setSupportEmail] = useState("santechdata@gmail.com");
   const [supportPhone, setSupportPhone] = useState("09026329296");
   const [whatsapp, setWhatsapp] = useState("09026329296");
@@ -160,50 +252,57 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, husmodata: false, gsubz: false });
+  // Provider state
+  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, clubkonnect: false, gsubz: false });
   const [networkMap, setNetworkMap] = useState<Record<string, ProviderName>>({ MTN: "kyb", AIRTEL: "kyb", GLO: "kyb", "9MOBILE": "kyb" });
-  const [savingNetwork, setSavingNetwork] = useState<string | null>(null);
+  const [examMap, setExamMap] = useState<Record<string, ProviderName>>({ WAEC: "kyb", NECO: "kyb", JAMB: "kyb", NABTEB: "kyb" });
+  const [savingRow, setSavingRow] = useState<string | null>(null);
 
   const reload = async () => {
     const s = await fetchSettings();
-    if (s.supportEmail) setSupportEmail(s.supportEmail);
-    if (s.supportPhone) setSupportPhone(s.supportPhone);
-    if (s.whatsapp) setWhatsapp(s.whatsapp);
-    if (s.announcement) setAnnouncement(s.announcement);
+    if (s.supportEmail)         setSupportEmail(s.supportEmail);
+    if (s.supportPhone)         setSupportPhone(s.supportPhone);
+    if (s.whatsapp)             setWhatsapp(s.whatsapp);
+    if (s.announcement)         setAnnouncement(s.announcement);
     if (s.announcementActive !== undefined) setAnnouncementActive(s.announcementActive === "true");
     if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
-    if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
+    if (s.monnifyActive !== undefined)  setMonnifyActive(s.monnifyActive === "true");
     if (s.airtimeToCashActive !== undefined) setAirtimeToCashActive(s.airtimeToCashActive === "true");
-    if (s.bankTransferActive !== undefined) setBankTransferActive(s.bankTransferActive === "true");
-    if (s.bankAccountNumber) setBankAccountNumber(s.bankAccountNumber);
-    if (s.bankAccountName) setBankAccountName(s.bankAccountName);
-    if (s.bankName) setBankName(s.bankName);
-    if (s.referralBonus) setReferralBonus(s.referralBonus);
-    if (s.minFunding) setMinFunding(s.minFunding);
-    setConfigured({ kyb: s.kyb_configured === "true", husmodata: s.husmodata_configured === "true", gsubz: s.gsubz_configured === "true" });
+    if (s.bankTransferActive !== undefined)  setBankTransferActive(s.bankTransferActive === "true");
+    if (s.bankAccountNumber)    setBankAccountNumber(s.bankAccountNumber);
+    if (s.bankAccountName)      setBankAccountName(s.bankAccountName);
+    if (s.bankName)             setBankName(s.bankName);
+    if (s.referralBonus)        setReferralBonus(s.referralBonus);
+    if (s.minFunding)           setMinFunding(s.minFunding);
+
+    setConfigured({
+      kyb:         s.kyb_configured         === "true",
+      clubkonnect: s.clubkonnect_configured  === "true",
+      gsubz:       s.gsubz_configured        === "true",
+    });
+    const def = (s.activeProvider ?? "kyb") as ProviderName;
     setNetworkMap({
-      MTN:      (s["net_provider_MTN"]     ?? s.activeProvider ?? "kyb") as ProviderName,
-      AIRTEL:   (s["net_provider_AIRTEL"]  ?? s.activeProvider ?? "kyb") as ProviderName,
-      GLO:      (s["net_provider_GLO"]     ?? s.activeProvider ?? "kyb") as ProviderName,
-      "9MOBILE":(s["net_provider_9MOBILE"] ?? s.activeProvider ?? "kyb") as ProviderName,
+      MTN:      (s["net_provider_MTN"]      ?? def) as ProviderName,
+      AIRTEL:   (s["net_provider_AIRTEL"]   ?? def) as ProviderName,
+      GLO:      (s["net_provider_GLO"]      ?? def) as ProviderName,
+      "9MOBILE":(s["net_provider_9MOBILE"]  ?? def) as ProviderName,
+    });
+    setExamMap({
+      WAEC:  (s["exam_provider_WAEC"]   ?? def) as ProviderName,
+      NECO:  (s["exam_provider_NECO"]   ?? def) as ProviderName,
+      JAMB:  (s["exam_provider_JAMB"]   ?? def) as ProviderName,
+      NABTEB:(s["exam_provider_NABTEB"] ?? def) as ProviderName,
     });
     setLoading(false);
   };
 
   useEffect(() => { reload(); }, []);
 
-  const handleLink = async (credKey: string, value: string) => {
+  const handleLink = async (fields: Record<string, string>) => {
     try {
-      await patchSettings({ [credKey]: value });
-      const providerId = PROVIDERS.find((p) => p.credKey === credKey)?.id ?? "kyb";
-      // Test connection
-      const testRes = await fetch(`/api/admin/link-provider`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ provider: providerId }),
-      });
-      const r = await testRes.json();
-      // Refresh statuses
+      await patchSettings(fields);
+      const providerId = PROVIDERS.find((p) => p.fields.some((f) => f.credKey in fields))?.id ?? "kyb";
+      const r = await adminPost("/api/admin/link-provider", { provider: providerId });
       await reload();
       return r as { ok: boolean; message: string; balance?: number };
     } catch {
@@ -211,16 +310,19 @@ export default function AdminSettings() {
     }
   };
 
-  const handleNetworkChange = async (network: string, provider: ProviderName) => {
-    setSavingNetwork(network);
+  const handleRoutingChange = async (type: "net" | "exam", key: string, provider: ProviderName) => {
+    setSavingRow(`${type}_${key}`);
+    const settingKey = type === "net" ? `net_provider_${key}` : `exam_provider_${key}`;
     try {
-      await patchSettings({ [`net_provider_${network}`]: provider });
-      setNetworkMap((prev) => ({ ...prev, [network]: provider }));
-      toast({ title: `${network} → ${PROVIDERS.find((p) => p.id === provider)?.label}`, description: "Purchases for this network will now use this provider." });
+      await patchSettings({ [settingKey]: provider });
+      if (type === "net") setNetworkMap((prev) => ({ ...prev, [key]: provider }));
+      else                setExamMap((prev) => ({ ...prev, [key]: provider }));
+      const label = PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
+      toast({ title: `${key} → ${label}`, description: "Routing updated." });
     } catch {
       toast({ title: "Failed to save", variant: "destructive" });
     } finally {
-      setSavingNetwork(null);
+      setSavingRow(null);
     }
   };
 
@@ -257,6 +359,9 @@ export default function AdminSettings() {
 
   const linkedProviders = PROVIDERS.filter((p) => configured[p.id]);
 
+  const netIcons: Record<string, string> = { MTN: "MTN", AIRTEL: "AIR", GLO: "GLO", "9MOBILE": "9M" };
+  const examIcons: Record<string, string> = { WAEC: "WA", NECO: "NE", JAMB: "JA", NABTEB: "NA" };
+
   return (
     <AdminLayout>
       <div className="flex items-start justify-between mb-6">
@@ -269,80 +374,85 @@ export default function AdminSettings() {
 
       <div className="space-y-5 max-w-xl">
 
-        {/* VTU Providers — Link */}
+        {/* VTU Providers */}
         <SectionCard icon={Link} title="VTU Providers">
           <p className="text-xs text-slate-500 -mt-1">
-            Paste your API key for each provider and press <strong>Link</strong> to connect instantly.
+            Fill in your credentials and press <strong>Link Provider</strong> to connect instantly.
           </p>
           <div className="space-y-3">
             {PROVIDERS.map((p) => (
               <ProviderCard key={p.id} provider={p} configured={!!configured[p.id]} onLink={handleLink} />
             ))}
           </div>
-          <div className="flex gap-2 pt-1">
-            <Button variant="outline" size="sm" onClick={async () => {
-              setSyncing(true);
-              try {
-                const r = await callAdminAction("/api/admin/sync-kyb-plans");
-                if (r.errors?.length) toast({ title: "Sync error", description: r.errors[0], variant: "destructive" });
-                else toast({ title: "Plans synced!", description: `+${r.added} added · ${r.updated} updated · ${r.deactivated} removed` });
-              } catch { toast({ title: "Sync failed", variant: "destructive" }); }
-              finally { setSyncing(false); }
-            }} disabled={syncing} className="gap-2">
-              {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-              {syncing ? "Syncing..." : "Sync KYB Plans"}
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={async () => {
+            setSyncing(true);
+            try {
+              const r = await adminPost("/api/admin/sync-kyb-plans");
+              if (r.errors?.length) toast({ title: "Sync error", description: r.errors[0], variant: "destructive" });
+              else toast({ title: "Plans synced!", description: `+${r.added} added · ${r.updated} updated · ${r.deactivated} removed` });
+            } catch { toast({ title: "Sync failed", variant: "destructive" }); }
+            finally { setSyncing(false); }
+          }} disabled={syncing} className="gap-2">
+            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {syncing ? "Syncing..." : "Sync KYB Plans"}
+          </Button>
         </SectionCard>
 
         {/* Network Routing */}
-        <SectionCard icon={Zap} title="Network Routing">
+        <SectionCard icon={Zap} title="Network Routing (Data & Airtime)">
           <p className="text-xs text-slate-500 -mt-1">
-            Choose which provider handles each network. Link a provider above first to make it available here.
+            Choose which provider handles Data and Airtime purchases per network. Link a provider above first.
           </p>
-          {linkedProviders.length === 0 && (
-            <div className="text-center py-4 text-xs text-slate-400">
-              No providers linked yet. Link at least one above to configure routing.
-            </div>
-          )}
-          {linkedProviders.length > 0 && (
-            <div className="space-y-2">
-              {NETWORKS.map((net) => (
-                <div key={net} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center">
-                      <span className="text-xs font-bold text-slate-600">{net === "9MOBILE" ? "9M" : net.slice(0, 3)}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{net}</p>
-                      <p className="text-xs text-slate-400">Data & Airtime</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {savingNetwork === net && <Loader2 size={13} className="animate-spin text-blue-500" />}
-                    <Select
-                      value={networkMap[net] ?? "kyb"}
-                      onValueChange={(v) => handleNetworkChange(net, v as ProviderName)}
-                    >
-                      <SelectTrigger className="w-36 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {linkedProviders.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {linkedProviders.length === 0
+            ? <p className="text-center py-4 text-xs text-slate-400">No providers linked yet.</p>
+            : (
+              <div className="space-y-2">
+                {NETWORKS.map((net) => (
+                  <RoutingRow
+                    key={net}
+                    icon={netIcons[net] ?? net.slice(0, 3)}
+                    name={net}
+                    subtitle="Data & Airtime"
+                    value={networkMap[net] ?? "kyb"}
+                    linkedProviders={linkedProviders}
+                    saving={savingRow === `net_${net}`}
+                    onSave={(v) => handleRoutingChange("net", net, v)}
+                  />
+                ))}
+              </div>
+            )
+          }
+        </SectionCard>
+
+        {/* Exam Routing */}
+        <SectionCard icon={GraduationCap} title="Exam Pin Routing">
+          <p className="text-xs text-slate-500 -mt-1">
+            Choose which provider handles each exam type. Different providers may have better prices.
+          </p>
+          {linkedProviders.length === 0
+            ? <p className="text-center py-4 text-xs text-slate-400">No providers linked yet.</p>
+            : (
+              <div className="space-y-2">
+                {EXAM_TYPES.map((exam) => (
+                  <RoutingRow
+                    key={exam}
+                    icon={examIcons[exam] ?? exam.slice(0, 2)}
+                    name={exam}
+                    subtitle="Exam Scratch Cards"
+                    value={examMap[exam] ?? "kyb"}
+                    linkedProviders={linkedProviders}
+                    saving={savingRow === `exam_${exam}`}
+                    onSave={(v) => handleRoutingChange("exam", exam, v)}
+                  />
+                ))}
+              </div>
+            )
+          }
         </SectionCard>
 
         {/* Exam Types */}
-        <SectionCard icon={BookOpen} title="Exam Types">
-          <p className="text-xs text-slate-500 -mt-1">Ensure WAEC, NECO, JAMB and NABTEB are available for customers.</p>
+        <SectionCard icon={BookOpen} title="Available Exam Types">
+          <p className="text-xs text-slate-500 -mt-1">Ensure these are seeded in the database for customers to purchase.</p>
           <div className="grid grid-cols-4 gap-2 text-center">
             {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
               <div key={code} className="p-3 rounded-xl border border-slate-200 bg-slate-50">
@@ -353,7 +463,7 @@ export default function AdminSettings() {
           <Button variant="outline" size="sm" onClick={async () => {
             setSeedingExams(true);
             try {
-              const r = await callAdminAction("/api/admin/seed-exam-types");
+              const r = await adminPost("/api/admin/seed-exam-types");
               toast({ title: "Exam types synced", description: r.message });
             } catch { toast({ title: "Sync failed", variant: "destructive" }); }
             finally { setSeedingExams(false); }
@@ -381,7 +491,7 @@ export default function AdminSettings() {
           <Button variant="outline" size="sm" onClick={async () => {
             setTestingMonnify(true);
             try {
-              const r = await callAdminAction("/api/admin/debug-monnify");
+              const r = await adminPost("/api/admin/debug-monnify");
               if (r.authSuccess) toast({ title: "Monnify OK ✓", description: `Auth successful on ${r.baseUrl}` });
               else toast({ title: "Monnify issue", description: r.error ?? JSON.stringify(r.response), variant: "destructive" });
             } catch { toast({ title: "Test failed", variant: "destructive" }); }
@@ -450,9 +560,9 @@ export default function AdminSettings() {
         {/* Contact */}
         <SectionCard icon={Mail} title="Contact & Support">
           {[
-            { label: "Support Email", value: supportEmail, set: setSupportEmail, placeholder: "support@yourdomain.com" },
-            { label: "Support Phone", value: supportPhone, set: setSupportPhone, placeholder: "09026329296" },
-            { label: "WhatsApp Number", value: whatsapp, set: setWhatsapp, placeholder: "09026329296" },
+            { label: "Support Email",   value: supportEmail, set: setSupportEmail, placeholder: "support@yourdomain.com" },
+            { label: "Support Phone",   value: supportPhone, set: setSupportPhone, placeholder: "09026329296" },
+            { label: "WhatsApp Number", value: whatsapp,     set: setWhatsapp,     placeholder: "09026329296" },
           ].map(({ label, value, set, placeholder }) => (
             <div key={label}>
               <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">{label}</Label>
@@ -461,7 +571,7 @@ export default function AdminSettings() {
           ))}
         </SectionCard>
 
-        {/* Wallet Settings */}
+        {/* Wallet */}
         <SectionCard icon={Settings} title="Wallet Settings">
           <div>
             <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Minimum Funding Amount (₦)</Label>
@@ -470,7 +580,7 @@ export default function AdminSettings() {
           <div>
             <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Referral Bonus (₦)</Label>
             <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} placeholder="200" className="h-10" />
-            <p className="text-xs text-slate-400 mt-1">Credited to both users when a referral funds their wallet for the first time.</p>
+            <p className="text-xs text-slate-400 mt-1">Credited when a referral funds their wallet for the first time.</p>
           </div>
         </SectionCard>
 

@@ -4,9 +4,9 @@ import { startJobs } from "./lib/jobs";
 import { db, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { setKybdataToken } from "./lib/providers/kybdata";
-import { setHusmodataApiKey } from "./lib/providers/husmodata";
+import { setClubkonnectApiKey, setClubkonnectUserId } from "./lib/providers/clubkonnect";
 import { setGsubzApiKey } from "./lib/providers/gsubz";
-import { setActiveProvider, setNetworkProvider } from "./lib/providers/activeProvider";
+import { setActiveProvider, setNetworkProvider, setExamProvider } from "./lib/providers/activeProvider";
 
 const rawPort = process.env["PORT"];
 
@@ -32,12 +32,13 @@ app.listen(port, async (err) => {
   try {
     const rows = await db.select().from(settingsTable);
     for (const row of rows) {
-      if (row.key === "kybdata_api_token"  && row.value) setKybdataToken(row.value);
-      if (row.key === "husmodata_api_key"  && row.value) setHusmodataApiKey(row.value);
-      if (row.key === "gsubz_api_key"      && row.value) setGsubzApiKey(row.value);
-      if (row.key === "activeProvider"     && row.value) setActiveProvider(row.value);
-      // Per-network provider mappings e.g. "net_provider_MTN" = "husmodata"
-      if (row.key.startsWith("net_provider_"))            setNetworkProvider(row.key.replace("net_provider_", ""), row.value);
+      if (row.key === "kybdata_api_token"    && row.value) setKybdataToken(row.value);
+      if (row.key === "clubkonnect_api_key"  && row.value) setClubkonnectApiKey(row.value);
+      if (row.key === "clubkonnect_user_id"  && row.value) setClubkonnectUserId(row.value);
+      if (row.key === "gsubz_api_key"        && row.value) setGsubzApiKey(row.value);
+      if (row.key === "activeProvider"       && row.value) setActiveProvider(row.value);
+      if (row.key.startsWith("net_provider_"))  setNetworkProvider(row.key.replace("net_provider_", ""), row.value);
+      if (row.key.startsWith("exam_provider_")) setExamProvider(row.key.replace("exam_provider_", ""), row.value);
     }
     logger.info("Provider credentials loaded from DB settings");
   } catch (e) {

@@ -406,7 +406,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const r = await activePurchaseExam({ examid: kybExamId, quantity });
+    const r = await activePurchaseExam({ examid: kybExamId, quantity, examCode: examType.code });
     req.log?.info({ r }, "KYB Data exam response");
     // KYB returns { success: true/false, message, data }
     const success = (r as any).success === true;
