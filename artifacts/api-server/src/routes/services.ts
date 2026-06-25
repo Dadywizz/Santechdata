@@ -90,29 +90,43 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   await db.update(walletsTable).set({ balance: sql`balance - ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
   const reference = `DATA-${Date.now()}`;
   let delivered = false;
+  let providerError = "";
+  let rawResponse: any = null;
 
   try {
     const r = await activePurchaseData({ plan: plan.providerCode, mobile_number: phone, network: plan.network });
+    rawResponse = r;
     req.log?.info({ r }, "KYB Data purchase response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
     delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-  } catch (err) { req.log?.error({ err }, "Data purchase error"); }
+    if (!delivered) {
+      providerError = (r as any).data?.error_message?.api_response
+        || (r as any).error_message?.api_response
+        || r.message || "";
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "Data purchase error");
+    providerError = err?.message ?? "";
+  }
 
   if (!delivered) {
     await db.update(walletsTable).set({ balance: sql`balance + ${price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "data", status: "failed", amount: price.toString(),
       description: `${plan.network} ${plan.name} data for ${phone} — delivery failed`, reference,
-      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone },
+      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone, providerError, rawResponse },
     });
     await db.insert(notificationsTable).values({
       userId: req.userId!, title: "Data Purchase Failed",
       message: `Your ₦${price} data purchase failed. Your wallet has been refunded.`, type: "data",
     });
-    res.status(502).json({ error: "Data delivery failed. Your wallet has been refunded. Please try again or contact support." }); return;
+    const userMsg = providerError
+      ? `Data delivery failed: ${providerError}. Your wallet has been refunded.`
+      : "Data delivery failed. Your wallet has been refunded. Please try again or contact support.";
+    res.status(422).json({ error: userMsg }); return;
   }
 
   const [tx] = await db.insert(transactionsTable).values({
@@ -143,29 +157,43 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
   const reference = `AIRTIME-${Date.now()}`;
   let delivered = false;
+  let providerError = "";
+  let rawResponse: any = null;
 
   try {
     const r = await activePurchaseAirtime({ network, amount, mobile_number: phone });
+    rawResponse = r;
     req.log?.info({ r }, "KYB Data airtime response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
     delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-  } catch (err) { req.log?.error({ err }, "Airtime purchase error"); }
+    if (!delivered) {
+      providerError = (r as any).data?.error_message?.api_response
+        || (r as any).error_message?.api_response
+        || r.message || "";
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "Airtime purchase error");
+    providerError = err?.message ?? "";
+  }
 
   if (!delivered) {
     await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "airtime", status: "failed", amount: amount.toString(),
       description: `${network} ₦${amount} airtime for ${phone} — delivery failed`, reference,
-      metadata: { network, phone, amount },
+      metadata: { network, phone, amount, providerError, rawResponse },
     });
     await db.insert(notificationsTable).values({
       userId: req.userId!, title: "Airtime Purchase Failed",
       message: `₦${amount} ${network} airtime failed. Your wallet has been refunded.`, type: "airtime",
     });
-    res.status(502).json({ error: "Airtime delivery failed. Your wallet has been refunded. Please try again or contact support." }); return;
+    const userMsg = providerError
+      ? `Airtime delivery failed: ${providerError}. Your wallet has been refunded.`
+      : "Airtime delivery failed. Your wallet has been refunded. Please try again or contact support.";
+    res.status(422).json({ error: userMsg }); return;
   }
 
   const [tx] = await db.insert(transactionsTable).values({
@@ -228,10 +256,13 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const reference = `ELEC-${Date.now()}`;
   let elecToken = "";
   let delivered = false;
+  let providerError = "";
+  let rawResponse: any = null;
 
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
     const r = await activePurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
+    rawResponse = r;
     req.log?.info({ r }, "KYB Data electricity response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
@@ -239,20 +270,31 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
     elecToken = r.token ?? (r as any).data?.token ?? "";
-  } catch (err) { req.log?.error({ err }, "Electricity purchase error"); }
+    if (!delivered) {
+      providerError = (r as any).data?.error_message?.api_response
+        || (r as any).error_message?.api_response
+        || r.message || "";
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "Electricity purchase error");
+    providerError = err?.message ?? "";
+  }
 
   if (!delivered) {
     await db.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "electricity", status: "failed", amount: amount.toString(),
       description: `Electricity for meter ${meterNumber} — delivery failed`, reference,
-      metadata: { meterNumber, providerCode, meterType, phone },
+      metadata: { meterNumber, providerCode, meterType, phone, providerError, rawResponse },
     });
     await db.insert(notificationsTable).values({
       userId: req.userId!, title: "Electricity Purchase Failed",
       message: `Your ₦${amount} electricity purchase failed. Your wallet has been refunded.`, type: "electricity",
     });
-    res.status(502).json({ error: "Electricity token delivery failed. Your wallet has been refunded." }); return;
+    const userMsg = providerError
+      ? `Electricity delivery failed: ${providerError}. Your wallet has been refunded.`
+      : "Electricity token delivery failed. Your wallet has been refunded.";
+    res.status(422).json({ error: userMsg }); return;
   }
 
   const [tx] = await db.insert(transactionsTable).values({
@@ -335,29 +377,43 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   await db.update(walletsTable).set({ balance: sql`balance - ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
   const reference = `CABLE-${Date.now()}`;
   let delivered = false;
+  let providerError = "";
+  let rawResponse: any = null;
 
   try {
     const r = await activePurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
+    rawResponse = r;
     req.log?.info({ r }, "KYB Data cable response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
     delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-  } catch (err) { req.log?.error({ err }, "Cable subscribe error"); }
+    if (!delivered) {
+      providerError = (r as any).data?.error_message?.api_response
+        || (r as any).error_message?.api_response
+        || r.message || "";
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "Cable subscribe error");
+    providerError = err?.message ?? "";
+  }
 
   if (!delivered) {
     await db.update(walletsTable).set({ balance: sql`balance + ${plan.price}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "cable", status: "failed", amount: plan.price.toString(),
       description: `${plan.name} for ${smartcardNumber} — delivery failed`, reference,
-      metadata: { provider, planName: plan.name, smartcardNumber },
+      metadata: { provider, planName: plan.name, smartcardNumber, providerError, rawResponse },
     });
     await db.insert(notificationsTable).values({
       userId: req.userId!, title: "Cable Subscription Failed",
       message: `Your ${plan.name} subscription failed. Your wallet has been refunded.`, type: "cable",
     });
-    res.status(502).json({ error: "Cable subscription failed. Your wallet has been refunded." }); return;
+    const userMsg = providerError
+      ? `Cable subscription failed: ${providerError}. Your wallet has been refunded.`
+      : "Cable subscription failed. Your wallet has been refunded.";
+    res.status(422).json({ error: userMsg }); return;
   }
 
   const [tx] = await db.insert(transactionsTable).values({
@@ -404,33 +460,45 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   const reference = `EXAM-${Date.now()}`;
   let pins: Array<{ pin: string; serial: string }> = [];
   let delivered = false;
+  let providerError = "";
+  let rawResponse: any = null;
 
   try {
     const r = await activePurchaseExam({ examid: kybExamId, quantity, examCode: examType.code });
+    rawResponse = r;
     req.log?.info({ r }, "KYB Data exam response");
-    // KYB returns { success: true/false, message, data }
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
     delivered = success || st === "success" || st === "200" || st === "00"
       || msg.includes("success") || msg.includes("successful") || msg.includes("delivered");
-    // Extract pins from response: may be in r.pins, r.data.pins, or r.data
     const pinsRaw = r.pins ?? (r as any).data?.pins ?? (r as any).data ?? [];
     if (delivered && Array.isArray(pinsRaw)) pins = pinsRaw.map((p: any) => ({ pin: String(p.pin ?? p.token ?? p), serial: String(p.serial ?? p.sn ?? "") }));
-  } catch (err) { req.log?.error({ err }, "Exam purchase error"); }
+    if (!delivered) {
+      providerError = (r as any).data?.error_message?.api_response
+        || (r as any).error_message?.api_response
+        || r.message || "";
+    }
+  } catch (err: any) {
+    req.log?.error({ err }, "Exam purchase error");
+    providerError = err?.message ?? "";
+  }
 
   if (!delivered) {
     await db.update(walletsTable).set({ balance: sql`balance + ${totalCost}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
     await db.insert(transactionsTable).values({
       userId: req.userId!, type: "exam", status: "failed", amount: totalCost.toString(),
       description: `${quantity}x ${examType.name} token(s) — delivery failed`, reference,
-      metadata: { examType: examType.code, quantity, phone },
+      metadata: { examType: examType.code, quantity, phone, providerError, rawResponse },
     });
     await db.insert(notificationsTable).values({
       userId: req.userId!, title: "Exam Token Purchase Failed",
       message: `Your ${examType.name} token purchase failed. Your wallet has been refunded.`, type: "exam",
     });
-    res.status(502).json({ error: "Exam token delivery failed. Your wallet has been refunded. Please contact support." }); return;
+    const userMsg = providerError
+      ? `Exam token delivery failed: ${providerError}. Your wallet has been refunded.`
+      : "Exam token delivery failed. Your wallet has been refunded. Please contact support.";
+    res.status(422).json({ error: userMsg }); return;
   }
 
   const [tx] = await db.insert(transactionsTable).values({
