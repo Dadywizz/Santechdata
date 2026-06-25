@@ -64,7 +64,7 @@ const PROVIDERS: ProviderDef[] = [
     id: "clubkonnect", label: "Clubkonnect", desc: "clubkonnect.com",
     fields: [
       { credKey: "clubkonnect_api_key", label: "API Key",     hint: "Your Clubkonnect API key" },
-      { credKey: "clubkonnect_user_id", label: "Phone (UserID)", hint: "Your registered Clubkonnect phone e.g. 08012345678" },
+      { credKey: "clubkonnect_user_id", label: "UserID", hint: "Your Clubkonnect UserID (e.g. CK101280559)" },
     ],
   },
   {
