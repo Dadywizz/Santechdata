@@ -1,21 +1,25 @@
 ---
 name: Clubkonnect Provider
-description: Clubkonnect integration status and credential format
+description: Clubkonnect/Nellobyte integration status — DO NOT use
 ---
 
-## Status: Integrated (credentials may need user to verify account)
+## Status: DEAD — requires paid membership, do not pursue
 
-Clubkonnect is now provider slot 2 in the active provider system (replaced Husmodata stub).
+**Nellobyte Systems (nellobytesystems.com)** is the actual backend behind the "Clubkonnect" API.
+The VTU purchase endpoints (airtime, data, electricity, cable) require a paid reseller membership:
+- Reseller tier: ~₦30,000/year
+- Distributor tier: ₦100,000/year
 
-**Credentials required:**
-- `clubkonnect_api_key` — API key from Clubkonnect dashboard  
-- `clubkonnect_user_id` — registered phone number (UserID)
+**Test results (June 2026):**
+- Balance check (`/APIWalletBalance.asp`) → ✅ returns JSON, credentials valid
+- Airtime purchase (`/APIAirtimeVTU.asp`) → ❌ empty response body (service not activated)
+- Data purchase → ❌ empty/404 response
 
-**API format:**
-- Base: `https://www.clubkonnect.com/api/v2/`
-- Auth: `UserID` + `APIKey` in POST body on every request
-- Exam endpoints: separate paths per type `/waec/`, `/neco/`, `/jamb/`, `/nabteb/`
+**Root cause of all "Clubkonnect non-JSON: " errors** — the account has ₦997 balance but VTU services are locked behind the paid reseller activation.
 
-**Previous failure reason:** INVALID_CREDENTIALS / 404 errors in earlier tests — likely because the account was not yet verified for API/reseller access on Clubkonnect. Once the user is approved for API access, the integration should work.
+**Decision:** User chose NOT to pay the membership fee. KYB Data is the sole provider.
 
-**How to link:** Admin → Settings → Clubkonnect card — enter API Key + Phone, press "Link Provider"
+**Do NOT suggest Clubkonnect or Nellobyte as a future provider option** unless user explicitly brings it up and confirms they have paid the membership fee.
+
+**Correct API base URL** (for reference if ever needed): `https://www.nellobytesystems.com`  
+Auth: `UserID=CK101280559&APIKey=...` as GET query params on every request.
