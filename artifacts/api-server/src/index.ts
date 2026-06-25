@@ -4,6 +4,9 @@ import { startJobs } from "./lib/jobs";
 import { db, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { setKybdataToken } from "./lib/providers/kybdata";
+import { setHusmodataApiKey } from "./lib/providers/husmodata";
+import { setGsubzApiKey } from "./lib/providers/gsubz";
+import { setActiveProvider } from "./lib/providers/activeProvider";
 
 const rawPort = process.env["PORT"];
 
@@ -25,15 +28,18 @@ app.listen(port, async (err) => {
     process.exit(1);
   }
 
-  // Load KYB Data token from DB settings (overrides env var if set)
+  // Load all provider credentials + active provider from DB settings
   try {
-    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "kybdata_api_token"));
-    if (row?.value) {
-      setKybdataToken(row.value);
-      logger.info("KYB Data token loaded from DB settings");
+    const rows = await db.select().from(settingsTable);
+    for (const row of rows) {
+      if (row.key === "kybdata_api_token"  && row.value) setKybdataToken(row.value);
+      if (row.key === "husmodata_api_key"  && row.value) setHusmodataApiKey(row.value);
+      if (row.key === "gsubz_api_key"      && row.value) setGsubzApiKey(row.value);
+      if (row.key === "activeProvider"     && row.value) setActiveProvider(row.value);
     }
+    logger.info("Provider credentials loaded from DB settings");
   } catch (e) {
-    logger.warn({ err: e }, "Could not load KYB Data token from DB on startup");
+    logger.warn({ err: e }, "Could not load provider settings from DB on startup");
   }
 
   logger.info({ port }, "Server listening");

@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
-  ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle, AlertCircle,
+  ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
+  AlertCircle, Zap, Eye, EyeOff,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
@@ -65,12 +67,154 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
+type ProviderName = "kyb" | "husmodata" | "gsubz";
+
+const PROVIDERS: Array<{
+  id: ProviderName;
+  label: string;
+  description: string;
+  website: string;
+  credentialKey: string;
+  credentialLabel: string;
+  configuredKey: string;
+}> = [
+  {
+    id: "kyb", label: "KYB Data", description: "kybdatassub.com.ng",
+    website: "https://kybdatassub.com.ng", credentialKey: "kybdata_api_token",
+    credentialLabel: "API Token", configuredKey: "kyb_configured",
+  },
+  {
+    id: "husmodata", label: "Husmodata", description: "husmodata.com",
+    website: "https://husmodata.com", credentialKey: "husmodata_api_key",
+    credentialLabel: "API Key", configuredKey: "husmodata_configured",
+  },
+  {
+    id: "gsubz", label: "Gsubz", description: "gsubz.com",
+    website: "https://gsubz.com", credentialKey: "gsubz_api_key",
+    credentialLabel: "API Key", configuredKey: "gsubz_configured",
+  },
+];
+
+function ProviderCard({
+  provider, isActive, isConfigured, onSetActive, onSaveCredential,
+}: {
+  provider: typeof PROVIDERS[0];
+  isActive: boolean;
+  isConfigured: boolean;
+  onSetActive: () => void;
+  onSaveCredential: (key: string, value: string) => Promise<void>;
+}) {
+  const [credential, setCredential] = useState("");
+  const [showCred, setShowCred] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  const handleSaveCred = async () => {
+    if (!credential.trim()) return;
+    setSaving(true);
+    try {
+      await onSaveCredential(provider.credentialKey, credential.trim());
+      setCredential("");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetActive = async () => {
+    setActivating(true);
+    try { await onSetActive(); } finally { setActivating(false); }
+  };
+
+  return (
+    <div className={`rounded-xl border-2 p-4 transition-all ${
+      isActive
+        ? "border-blue-500 bg-blue-50"
+        : "border-slate-200 bg-slate-50"
+    }`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+            isActive ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
+          }`}>
+            {provider.label.slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-slate-800">{provider.label}</p>
+              {isActive && (
+                <Badge className="text-[10px] h-4 px-1.5 bg-blue-600 text-white rounded-full">
+                  ACTIVE
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">{provider.description}</p>
+          </div>
+        </div>
+        <StatusBadge ok={isConfigured} label={isConfigured ? "Configured" : "No credentials"} />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type={showCred ? "text" : "password"}
+              value={credential}
+              onChange={(e) => setCredential(e.target.value)}
+              placeholder={isConfigured ? `Update ${provider.credentialLabel}` : `Enter ${provider.credentialLabel}`}
+              className="h-9 text-sm pr-9 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCred(!showCred)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              {showCred ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSaveCred}
+            disabled={!credential.trim() || saving}
+            className="h-9 px-3 text-xs"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : "Save"}
+          </Button>
+        </div>
+
+        {!isActive && (
+          <Button
+            size="sm"
+            onClick={handleSetActive}
+            disabled={!isConfigured || activating}
+            className="w-full h-9 text-xs gap-1.5"
+            variant={isConfigured ? "default" : "outline"}
+          >
+            {activating ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Zap size={12} />
+            )}
+            {activating ? "Switching..." : isConfigured ? "Set as Active Provider" : "Save credentials first"}
+          </Button>
+        )}
+        {isActive && (
+          <p className="text-xs text-blue-600 font-medium flex items-center gap-1.5">
+            <CheckCircle size={12} /> All VTU purchases are routing through this provider
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [seedingExams, setSeedingExams] = useState(false);
   const [testingMonnify, setTestingMonnify] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [supportEmail, setSupportEmail] = useState("santechdata@gmail.com");
   const [supportPhone, setSupportPhone] = useState("09026329296");
@@ -87,7 +231,10 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  const [kybConfigured, setKybConfigured] = useState(false);
+  const [activeProvider, setActiveProviderState] = useState<ProviderName>("kyb");
+  const [providerStatuses, setProviderStatuses] = useState<Record<string, boolean>>({
+    kyb: false, husmodata: false, gsubz: false,
+  });
 
   useEffect(() => {
     fetchSettings().then((s) => {
@@ -105,10 +252,42 @@ export default function AdminSettings() {
       if (s.bankName) setBankName(s.bankName);
       if (s.referralBonus) setReferralBonus(s.referralBonus);
       if (s.minFunding) setMinFunding(s.minFunding);
-      setKybConfigured(s.kybdata_configured === "true");
+      if (s.activeProvider) setActiveProviderState(s.activeProvider as ProviderName);
+      setProviderStatuses({
+        kyb:       s.kyb_configured === "true",
+        husmodata: s.husmodata_configured === "true",
+        gsubz:     s.gsubz_configured === "true",
+      });
       setLoading(false);
     });
   }, []);
+
+  const handleSaveCredential = async (key: string, value: string) => {
+    try {
+      await saveSettings({ [key]: value });
+      // Refresh statuses after saving credential
+      const fresh = await fetchSettings();
+      setProviderStatuses({
+        kyb:       fresh.kyb_configured === "true",
+        husmodata: fresh.husmodata_configured === "true",
+        gsubz:     fresh.gsubz_configured === "true",
+      });
+      toast({ title: "Credential saved!", description: "Provider is now configured." });
+    } catch {
+      toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
+    }
+  };
+
+  const handleSetActiveProvider = async (name: ProviderName) => {
+    try {
+      await saveSettings({ activeProvider: name });
+      setActiveProviderState(name);
+      const info = PROVIDERS.find((p) => p.id === name);
+      toast({ title: `Switched to ${info?.label}`, description: "All purchases now route through this provider." });
+    } catch {
+      toast({ title: "Switch failed", description: "Please try again", variant: "destructive" });
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -159,6 +338,25 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSyncPlans = async () => {
+    setSyncing(true);
+    try {
+      const result = await callAdminAction("/api/admin/sync-kyb-plans");
+      if (result.errors?.length > 0) {
+        toast({ title: "Sync had errors", description: result.errors[0], variant: "destructive" });
+      } else {
+        toast({
+          title: "Plans synced!",
+          description: `+${result.added} added · ${result.updated} updated · ${result.deactivated} removed`,
+        });
+      }
+    } catch {
+      toast({ title: "Sync failed", description: "Please try again", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -181,20 +379,32 @@ export default function AdminSettings() {
 
       <div className="space-y-5 max-w-xl">
 
-        {/* Provider Status */}
-        <SectionCard icon={Settings} title="Service Providers">
+        {/* VTU Provider Switcher */}
+        <SectionCard icon={Zap} title="VTU Providers">
           <p className="text-xs text-slate-500 -mt-1">
-            Providers are configured via environment variables on the server. Contact your developer to update them.
+            Enter credentials for each provider. Switch the active one at any time — no restart needed.
           </p>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div>
-                <p className="text-sm font-semibold text-slate-800">KYB Data</p>
-                <p className="text-xs text-slate-500">Airtime · Data · Electricity · Cable TV · Exam Pins</p>
-              </div>
-              <StatusBadge ok={kybConfigured} label={kybConfigured ? "Active" : "Token needed"} />
-            </div>
+            {PROVIDERS.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                provider={provider}
+                isActive={activeProvider === provider.id}
+                isConfigured={!!providerStatuses[provider.id]}
+                onSetActive={() => handleSetActiveProvider(provider.id)}
+                onSaveCredential={handleSaveCredential}
+              />
+            ))}
           </div>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={handleSyncPlans} disabled={syncing} className="gap-2">
+              {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {syncing ? "Syncing..." : "Sync KYB Plans"}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400">
+            "Sync KYB Plans" pulls the latest data bundles from KYB Data and removes stale ones.
+          </p>
         </SectionCard>
 
         {/* Exam Types */}

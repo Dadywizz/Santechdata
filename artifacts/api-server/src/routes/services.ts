@@ -18,15 +18,15 @@ import {
   PurchaseExamTokenBody,
 } from "@workspace/api-zod";
 import {
-  isKybdataConfigured,
-  kybdataPurchaseAirtime,
-  kybdataPurchaseData,
-  kybdataVerifyMeter,
-  kybdataPurchaseElectricity,
-  kybdataPurchaseCable,
-  kybdataVerifySmartcard,
-  kybdataPurchaseExam,
-} from "../lib/providers/kybdata";
+  isActiveProviderConfigured,
+  activePurchaseData,
+  activePurchaseAirtime,
+  activeVerifyMeter,
+  activePurchaseElectricity,
+  activePurchaseCable,
+  activeVerifySmartcard,
+  activePurchaseExam,
+} from "../lib/providers/activeProvider";
 
 const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "ikeja-electric":        "28",
@@ -79,7 +79,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   const [plan] = await db.select().from(dataPlansTable).where(eq(dataPlansTable.id, planId));
   if (!plan || !plan.isActive) { res.status(404).json({ error: "Data plan not found or unavailable" }); return; }
   if (!plan.providerCode) { res.status(503).json({ error: "This data plan is not yet configured. Please contact support." }); return; }
-  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   const price = parseFloat(plan.price);
@@ -92,7 +92,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const r = await kybdataPurchaseData({ plan: plan.providerCode, mobile_number: phone });
+    const r = await activePurchaseData({ plan: plan.providerCode, mobile_number: phone });
     req.log?.info({ r }, "KYB Data purchase response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
@@ -133,7 +133,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { network, phone, amount } = parsed.data;
 
-  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
@@ -145,7 +145,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
 
   try {
-    const r = await kybdataPurchaseAirtime({ network, amount, mobile_number: phone });
+    const r = await activePurchaseAirtime({ network, amount, mobile_number: phone });
     req.log?.info({ r }, "KYB Data airtime response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
@@ -202,9 +202,9 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { meterNumber, providerCode, meterType } = parsed.data;
   try {
-    if (isKybdataConfigured()) {
+    if (isActiveProviderConfigured()) {
       const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-      const r = await kybdataVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
+      const r = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
       res.json({ meterNumber, name: r.customer_name || "Customer", address: r.address || "" }); return;
     }
   } catch (err) { req.log?.error({ err }, "Meter verify error"); }
@@ -217,7 +217,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const { meterNumber, providerCode, meterType, amount, phone } = parsed.data;
 
   if (amount < 500) { res.status(400).json({ error: "Minimum electricity purchase is ₦500" }); return; }
-  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
@@ -231,7 +231,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-    const r = await kybdataPurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
+    const r = await activePurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
     req.log?.info({ r }, "KYB Data electricity response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
@@ -310,8 +310,8 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { smartcardNumber, provider } = parsed.data as { smartcardNumber: string; provider?: string };
   try {
-    if (isKybdataConfigured() && provider) {
-      const r = await kybdataVerifySmartcard({ smart_card_number: smartcardNumber, cable_name: provider });
+    if (isActiveProviderConfigured() && provider) {
+      const r = await activeVerifySmartcard({ smart_card_number: smartcardNumber, cable_name: provider });
       res.json({ smartcardNumber, name: r.customer_name || "Customer", currentPlan: r.current_plan || "", dueDate: "" }); return;
     }
   } catch (err) { req.log?.error({ err }, "Smartcard verify error"); }
@@ -325,7 +325,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
 
   const plan = CABLE_PLANS.find((p) => p.id === planId);
   if (!plan) { res.status(404).json({ error: "Plan not found" }); return; }
-  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < plan.price) {
@@ -337,7 +337,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   let delivered = false;
 
   try {
-    const r = await kybdataPurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
+    const r = await activePurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
     req.log?.info({ r }, "KYB Data cable response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
@@ -385,7 +385,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
 
   const [examType] = await db.select().from(examTypesTable).where(eq(examTypesTable.id, examTypeId));
   if (!examType) { res.status(404).json({ error: "Exam type not found" }); return; }
-  if (!isKybdataConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   // KYB Data numeric IDs for exam types
   const KYB_EXAM_IDS: Record<string, number> = { NECO: 19, WAEC: 34 };
@@ -406,7 +406,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const r = await kybdataPurchaseExam({ examid: kybExamId, quantity });
+    const r = await activePurchaseExam({ examid: kybExamId, quantity });
     req.log?.info({ r }, "KYB Data exam response");
     // KYB returns { success: true/false, message, data }
     const success = (r as any).success === true;

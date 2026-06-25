@@ -12,7 +12,10 @@ import {
   settingsTable,
   examTypesTable,
 } from "@workspace/db";
-import { isKybdataConfigured, setKybdataToken, kybdataGetDataPlans } from "../lib/providers/kybdata";
+import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
+import { setHusmodataApiKey, isHusmodataConfigured } from "../lib/providers/husmodata";
+import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
+import { setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses } from "../lib/providers/activeProvider";
 import { eq, sql, desc, inArray, not } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -427,8 +430,12 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const settings = await db.select().from(settingsTable);
   const obj: Record<string, string> = {};
   for (const s of settings) obj[s.key] = s.value;
-  // Inject live provider status (from env/memory, not DB)
-  obj.kybdata_configured = String(isKybdataConfigured());
+  // Inject live provider statuses from memory
+  const statuses = getAllProviderStatuses();
+  obj.activeProvider        = getActiveProviderName();
+  obj.kyb_configured        = String(statuses.kyb);
+  obj.husmodata_configured  = String(statuses.husmodata);
+  obj.gsubz_configured      = String(statuses.gsubz);
   res.json(obj);
 });
 
@@ -436,20 +443,13 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
 router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const entries = Object.entries(req.body as Record<string, string>);
 
-  // Check if dataProvider is changing — if so, clear all data plans
-  const dataProviderEntry = entries.find(([k]) => k === "dataProvider");
-  if (dataProviderEntry) {
-    const [, newProvider] = dataProviderEntry;
-    const [existing] = await db.select().from(settingsTable).where(eq(settingsTable.key, "dataProvider"));
-    if (existing && existing.value !== newProvider) {
-      await db.delete(dataPlansTable);
-    }
-  }
-
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    // Hot-reload KYB Data token without restart
-    if (key === "kybdata_api_token" && value) setKybdataToken(value);
+    // Hot-reload provider tokens without restart
+    if (key === "kybdata_api_token"  && value) setKybdataToken(value);
+    if (key === "husmodata_api_key"  && value) setHusmodataApiKey(value);
+    if (key === "gsubz_api_key"      && value) setGsubzApiKey(value);
+    if (key === "activeProvider"     && value) setActiveProvider(value);
   }
 
   res.json({ updated: entries.length });
