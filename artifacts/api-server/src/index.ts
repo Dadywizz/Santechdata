@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { setKybdataToken } from "./lib/providers/kybdata";
 import { setHusmodataApiKey } from "./lib/providers/husmodata";
 import { setGsubzApiKey } from "./lib/providers/gsubz";
-import { setActiveProvider } from "./lib/providers/activeProvider";
+import { setActiveProvider, setNetworkProvider } from "./lib/providers/activeProvider";
 
 const rawPort = process.env["PORT"];
 
@@ -36,6 +36,8 @@ app.listen(port, async (err) => {
       if (row.key === "husmodata_api_key"  && row.value) setHusmodataApiKey(row.value);
       if (row.key === "gsubz_api_key"      && row.value) setGsubzApiKey(row.value);
       if (row.key === "activeProvider"     && row.value) setActiveProvider(row.value);
+      // Per-network provider mappings e.g. "net_provider_MTN" = "husmodata"
+      if (row.key.startsWith("net_provider_"))            setNetworkProvider(row.key.replace("net_provider_", ""), row.value);
     }
     logger.info("Provider credentials loaded from DB settings");
   } catch (e) {

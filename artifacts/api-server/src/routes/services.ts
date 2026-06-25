@@ -92,7 +92,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
 
   try {
-    const r = await activePurchaseData({ plan: plan.providerCode, mobile_number: phone });
+    const r = await activePurchaseData({ plan: plan.providerCode, mobile_number: phone, network: plan.network });
     req.log?.info({ r }, "KYB Data purchase response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();

@@ -15,7 +15,10 @@ import {
 import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
 import { setHusmodataApiKey, isHusmodataConfigured } from "../lib/providers/husmodata";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
-import { setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses } from "../lib/providers/activeProvider";
+import {
+  setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
+  setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
+} from "../lib/providers/activeProvider";
 import { eq, sql, desc, inArray, not } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
@@ -430,29 +433,39 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const settings = await db.select().from(settingsTable);
   const obj: Record<string, string> = {};
   for (const s of settings) obj[s.key] = s.value;
-  // Inject live provider statuses from memory
+  // Inject live provider statuses + network mappings from memory
   const statuses = getAllProviderStatuses();
+  const netMap   = getAllNetworkMappings();
   obj.activeProvider        = getActiveProviderName();
   obj.kyb_configured        = String(statuses.kyb);
   obj.husmodata_configured  = String(statuses.husmodata);
   obj.gsubz_configured      = String(statuses.gsubz);
+  for (const net of NETWORKS) obj[`net_provider_${net}`] = netMap[net];
   res.json(obj);
 });
 
 // PATCH /admin/settings
 router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
   const entries = Object.entries(req.body as Record<string, string>);
-
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    // Hot-reload provider tokens without restart
     if (key === "kybdata_api_token"  && value) setKybdataToken(value);
     if (key === "husmodata_api_key"  && value) setHusmodataApiKey(value);
     if (key === "gsubz_api_key"      && value) setGsubzApiKey(value);
     if (key === "activeProvider"     && value) setActiveProvider(value);
+    if (key.startsWith("net_provider_"))       setNetworkProvider(key.replace("net_provider_", ""), value);
   }
-
   res.json({ updated: entries.length });
+});
+
+// POST /admin/link-provider — save credential + test connection
+router.post("/admin/link-provider", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const { provider } = req.body as { provider: string };
+  if (!provider || !(provider in PROVIDER_INFO)) {
+    res.status(400).json({ ok: false, message: "Unknown provider" }); return;
+  }
+  const result = await testProviderConnection(provider as any);
+  res.json(result);
 });
 
 // POST /admin/sync-kyb-plans — fetch data plans from KYB Data and upsert into DB

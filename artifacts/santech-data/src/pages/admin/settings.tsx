@@ -8,41 +8,46 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
   ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
-  AlertCircle, Zap, Eye, EyeOff,
+  AlertCircle, Link, Zap, Eye, EyeOff,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
+const token = () => sessionStorage.getItem("santech_token") ?? "";
 
 async function fetchSettings(): Promise<Record<string, string>> {
-  const token = sessionStorage.getItem("santech_token");
-  const res = await fetch(API, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(API, { headers: { Authorization: `Bearer ${token()}` } });
   if (!res.ok) return {};
   return res.json();
 }
 
-async function saveSettings(data: Record<string, string>): Promise<void> {
-  const token = sessionStorage.getItem("santech_token");
+async function patchSettings(data: Record<string, string>): Promise<void> {
   const res = await fetch(API, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to save settings");
+  if (!res.ok) throw new Error("Failed to save");
 }
 
 async function callAdminAction(path: string): Promise<any> {
-  const token = sessionStorage.getItem("santech_token");
-  const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token()}` } });
   return res.json();
 }
 
-function SectionCard({ icon: Icon, title, children }: {
-  icon: React.ElementType; title: string; children: React.ReactNode;
-}) {
+type ProviderName = "kyb" | "husmodata" | "gsubz";
+const NETWORKS = ["MTN", "AIRTEL", "GLO", "9MOBILE"] as const;
+const PROVIDERS: Array<{ id: ProviderName; label: string; desc: string; credKey: string; credLabel: string }> = [
+  { id: "kyb",       label: "KYB Data",  desc: "kybdatassub.com.ng",  credKey: "kybdata_api_token", credLabel: "API Token" },
+  { id: "husmodata", label: "Husmodata", desc: "husmodata.com",        credKey: "husmodata_api_key", credLabel: "API Key"   },
+  { id: "gsubz",     label: "Gsubz",     desc: "gsubz.com",            credKey: "gsubz_api_key",     credLabel: "API Key"   },
+];
+
+function SectionCard({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader className="pb-3 border-b border-slate-100">
@@ -58,152 +63,76 @@ function SectionCard({ icon: Icon, title, children }: {
   );
 }
 
-function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <div className={`flex items-center gap-1.5 text-xs font-semibold ${ok ? "text-green-600" : "text-amber-600"}`}>
-      {ok ? <CheckCircle size={13} className="text-green-500" /> : <AlertCircle size={13} className="text-amber-500" />}
-      {label}
-    </div>
-  );
-}
-
-type ProviderName = "kyb" | "husmodata" | "gsubz";
-
-const PROVIDERS: Array<{
-  id: ProviderName;
-  label: string;
-  description: string;
-  website: string;
-  credentialKey: string;
-  credentialLabel: string;
-  configuredKey: string;
-}> = [
-  {
-    id: "kyb", label: "KYB Data", description: "kybdatassub.com.ng",
-    website: "https://kybdatassub.com.ng", credentialKey: "kybdata_api_token",
-    credentialLabel: "API Token", configuredKey: "kyb_configured",
-  },
-  {
-    id: "husmodata", label: "Husmodata", description: "husmodata.com",
-    website: "https://husmodata.com", credentialKey: "husmodata_api_key",
-    credentialLabel: "API Key", configuredKey: "husmodata_configured",
-  },
-  {
-    id: "gsubz", label: "Gsubz", description: "gsubz.com",
-    website: "https://gsubz.com", credentialKey: "gsubz_api_key",
-    credentialLabel: "API Key", configuredKey: "gsubz_configured",
-  },
-];
-
 function ProviderCard({
-  provider, isActive, isConfigured, onSetActive, onSaveCredential,
+  provider, configured, onLink,
 }: {
   provider: typeof PROVIDERS[0];
-  isActive: boolean;
-  isConfigured: boolean;
-  onSetActive: () => void;
-  onSaveCredential: (key: string, value: string) => Promise<void>;
+  configured: boolean;
+  onLink: (key: string, value: string) => Promise<{ ok: boolean; message: string; balance?: number }>;
 }) {
-  const [credential, setCredential] = useState("");
-  const [showCred, setShowCred] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [activating, setActivating] = useState(false);
+  const [cred, setCred] = useState("");
+  const [show, setShow] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string; balance?: number } | null>(null);
 
-  const handleSaveCred = async () => {
-    if (!credential.trim()) return;
-    setSaving(true);
+  const handleLink = async () => {
+    if (!cred.trim()) return;
+    setLinking(true);
+    setResult(null);
     try {
-      await onSaveCredential(provider.credentialKey, credential.trim());
-      setCredential("");
+      const r = await onLink(provider.credKey, cred.trim());
+      setResult(r);
+      if (r.ok) setCred("");
     } finally {
-      setSaving(false);
+      setLinking(false);
     }
   };
 
-  const handleSetActive = async () => {
-    setActivating(true);
-    try { await onSetActive(); } finally { setActivating(false); }
-  };
-
   return (
-    <div className={`rounded-xl border-2 p-4 transition-all ${
-      isActive
-        ? "border-blue-500 bg-blue-50"
-        : "border-slate-200 bg-slate-50"
-    }`}>
-      <div className="flex items-start justify-between mb-3">
+    <div className={`rounded-xl border-2 p-4 transition-all ${configured ? "border-green-200 bg-green-50" : "border-slate-200 bg-slate-50"}`}>
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-            isActive ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"
-          }`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${configured ? "bg-green-600 text-white" : "bg-slate-200 text-slate-500"}`}>
             {provider.label.slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-slate-800">{provider.label}</p>
-              {isActive && (
-                <Badge className="text-[10px] h-4 px-1.5 bg-blue-600 text-white rounded-full">
-                  ACTIVE
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-slate-500">{provider.description}</p>
+            <p className="text-sm font-bold text-slate-800">{provider.label}</p>
+            <p className="text-xs text-slate-500">{provider.desc}</p>
           </div>
         </div>
-        <StatusBadge ok={isConfigured} label={isConfigured ? "Configured" : "No credentials"} />
+        {configured
+          ? <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] gap-1"><CheckCircle size={10} /> Linked</Badge>
+          : <Badge variant="outline" className="text-slate-400 text-[10px] gap-1"><AlertCircle size={10} /> Not linked</Badge>
+        }
       </div>
 
-      <div className="space-y-2">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              type={showCred ? "text" : "password"}
-              value={credential}
-              onChange={(e) => setCredential(e.target.value)}
-              placeholder={isConfigured ? `Update ${provider.credentialLabel}` : `Enter ${provider.credentialLabel}`}
-              className="h-9 text-sm pr-9 font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowCred(!showCred)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              {showCred ? <EyeOff size={13} /> : <Eye size={13} />}
-            </button>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSaveCred}
-            disabled={!credential.trim() || saving}
-            className="h-9 px-3 text-xs"
-          >
-            {saving ? <Loader2 size={12} className="animate-spin" /> : "Save"}
-          </Button>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Input
+            type={show ? "text" : "password"}
+            value={cred}
+            onChange={(e) => setCred(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleLink()}
+            placeholder={configured ? `Update ${provider.credLabel}` : `Paste your ${provider.credLabel}`}
+            className="h-9 text-sm pr-9 font-mono"
+          />
+          <button type="button" onClick={() => setShow(!show)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            {show ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
         </div>
-
-        {!isActive && (
-          <Button
-            size="sm"
-            onClick={handleSetActive}
-            disabled={!isConfigured || activating}
-            className="w-full h-9 text-xs gap-1.5"
-            variant={isConfigured ? "default" : "outline"}
-          >
-            {activating ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Zap size={12} />
-            )}
-            {activating ? "Switching..." : isConfigured ? "Set as Active Provider" : "Save credentials first"}
-          </Button>
-        )}
-        {isActive && (
-          <p className="text-xs text-blue-600 font-medium flex items-center gap-1.5">
-            <CheckCircle size={12} /> All VTU purchases are routing through this provider
-          </p>
-        )}
+        <Button size="sm" onClick={handleLink} disabled={!cred.trim() || linking} className="h-9 px-4 gap-1.5 text-xs">
+          {linking ? <Loader2 size={12} className="animate-spin" /> : <Link size={12} />}
+          {linking ? "Linking..." : "Link"}
+        </Button>
       </div>
+
+      {result && (
+        <div className={`mt-2 text-xs font-medium flex items-center gap-1.5 ${result.ok ? "text-green-600" : "text-red-500"}`}>
+          {result.ok ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+          {result.message}
+          {result.balance !== undefined && ` — Balance: ₦${result.balance.toLocaleString()}`}
+        </div>
+      )}
     </div>
   );
 }
@@ -231,68 +160,74 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
 
-  const [activeProvider, setActiveProviderState] = useState<ProviderName>("kyb");
-  const [providerStatuses, setProviderStatuses] = useState<Record<string, boolean>>({
-    kyb: false, husmodata: false, gsubz: false,
-  });
+  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, husmodata: false, gsubz: false });
+  const [networkMap, setNetworkMap] = useState<Record<string, ProviderName>>({ MTN: "kyb", AIRTEL: "kyb", GLO: "kyb", "9MOBILE": "kyb" });
+  const [savingNetwork, setSavingNetwork] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchSettings().then((s) => {
-      if (s.supportEmail) setSupportEmail(s.supportEmail);
-      if (s.supportPhone) setSupportPhone(s.supportPhone);
-      if (s.whatsapp) setWhatsapp(s.whatsapp);
-      if (s.announcement) setAnnouncement(s.announcement);
-      if (s.announcementActive !== undefined) setAnnouncementActive(s.announcementActive === "true");
-      if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
-      if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
-      if (s.airtimeToCashActive !== undefined) setAirtimeToCashActive(s.airtimeToCashActive === "true");
-      if (s.bankTransferActive !== undefined) setBankTransferActive(s.bankTransferActive === "true");
-      if (s.bankAccountNumber) setBankAccountNumber(s.bankAccountNumber);
-      if (s.bankAccountName) setBankAccountName(s.bankAccountName);
-      if (s.bankName) setBankName(s.bankName);
-      if (s.referralBonus) setReferralBonus(s.referralBonus);
-      if (s.minFunding) setMinFunding(s.minFunding);
-      if (s.activeProvider) setActiveProviderState(s.activeProvider as ProviderName);
-      setProviderStatuses({
-        kyb:       s.kyb_configured === "true",
-        husmodata: s.husmodata_configured === "true",
-        gsubz:     s.gsubz_configured === "true",
-      });
-      setLoading(false);
+  const reload = async () => {
+    const s = await fetchSettings();
+    if (s.supportEmail) setSupportEmail(s.supportEmail);
+    if (s.supportPhone) setSupportPhone(s.supportPhone);
+    if (s.whatsapp) setWhatsapp(s.whatsapp);
+    if (s.announcement) setAnnouncement(s.announcement);
+    if (s.announcementActive !== undefined) setAnnouncementActive(s.announcementActive === "true");
+    if (s.paystackActive !== undefined) setPaystackActive(s.paystackActive === "true");
+    if (s.monnifyActive !== undefined) setMonnifyActive(s.monnifyActive === "true");
+    if (s.airtimeToCashActive !== undefined) setAirtimeToCashActive(s.airtimeToCashActive === "true");
+    if (s.bankTransferActive !== undefined) setBankTransferActive(s.bankTransferActive === "true");
+    if (s.bankAccountNumber) setBankAccountNumber(s.bankAccountNumber);
+    if (s.bankAccountName) setBankAccountName(s.bankAccountName);
+    if (s.bankName) setBankName(s.bankName);
+    if (s.referralBonus) setReferralBonus(s.referralBonus);
+    if (s.minFunding) setMinFunding(s.minFunding);
+    setConfigured({ kyb: s.kyb_configured === "true", husmodata: s.husmodata_configured === "true", gsubz: s.gsubz_configured === "true" });
+    setNetworkMap({
+      MTN:      (s["net_provider_MTN"]     ?? s.activeProvider ?? "kyb") as ProviderName,
+      AIRTEL:   (s["net_provider_AIRTEL"]  ?? s.activeProvider ?? "kyb") as ProviderName,
+      GLO:      (s["net_provider_GLO"]     ?? s.activeProvider ?? "kyb") as ProviderName,
+      "9MOBILE":(s["net_provider_9MOBILE"] ?? s.activeProvider ?? "kyb") as ProviderName,
     });
-  }, []);
+    setLoading(false);
+  };
 
-  const handleSaveCredential = async (key: string, value: string) => {
+  useEffect(() => { reload(); }, []);
+
+  const handleLink = async (credKey: string, value: string) => {
     try {
-      await saveSettings({ [key]: value });
-      // Refresh statuses after saving credential
-      const fresh = await fetchSettings();
-      setProviderStatuses({
-        kyb:       fresh.kyb_configured === "true",
-        husmodata: fresh.husmodata_configured === "true",
-        gsubz:     fresh.gsubz_configured === "true",
+      await patchSettings({ [credKey]: value });
+      const providerId = PROVIDERS.find((p) => p.credKey === credKey)?.id ?? "kyb";
+      // Test connection
+      const testRes = await fetch(`/api/admin/link-provider`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ provider: providerId }),
       });
-      toast({ title: "Credential saved!", description: "Provider is now configured." });
+      const r = await testRes.json();
+      // Refresh statuses
+      await reload();
+      return r as { ok: boolean; message: string; balance?: number };
     } catch {
-      toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
+      return { ok: false, message: "Failed to link — please try again" };
     }
   };
 
-  const handleSetActiveProvider = async (name: ProviderName) => {
+  const handleNetworkChange = async (network: string, provider: ProviderName) => {
+    setSavingNetwork(network);
     try {
-      await saveSettings({ activeProvider: name });
-      setActiveProviderState(name);
-      const info = PROVIDERS.find((p) => p.id === name);
-      toast({ title: `Switched to ${info?.label}`, description: "All purchases now route through this provider." });
+      await patchSettings({ [`net_provider_${network}`]: provider });
+      setNetworkMap((prev) => ({ ...prev, [network]: provider }));
+      toast({ title: `${network} → ${PROVIDERS.find((p) => p.id === provider)?.label}`, description: "Purchases for this network will now use this provider." });
     } catch {
-      toast({ title: "Switch failed", description: "Please try again", variant: "destructive" });
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSavingNetwork(null);
     }
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveSettings({
+      await patchSettings({
         supportEmail, supportPhone, whatsapp, announcement,
         announcementActive: String(announcementActive),
         paystackActive: String(paystackActive),
@@ -302,58 +237,11 @@ export default function AdminSettings() {
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding,
       });
-      toast({ title: "Settings saved!", description: "All changes applied." });
+      toast({ title: "Settings saved!" });
     } catch {
-      toast({ title: "Failed to save", description: "Please try again", variant: "destructive" });
+      toast({ title: "Failed to save", variant: "destructive" });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSeedExams = async () => {
-    setSeedingExams(true);
-    try {
-      const result = await callAdminAction("/api/admin/seed-exam-types");
-      toast({ title: "Exam types synced", description: result.message ?? `${result.added} type(s) added` });
-    } catch {
-      toast({ title: "Sync failed", description: "Please try again", variant: "destructive" });
-    } finally {
-      setSeedingExams(false);
-    }
-  };
-
-  const handleTestMonnify = async () => {
-    setTestingMonnify(true);
-    try {
-      const result = await callAdminAction("/api/admin/debug-monnify");
-      if (result.authSuccess) {
-        toast({ title: "Monnify OK ✓", description: `Auth successful on ${result.baseUrl}` });
-      } else {
-        toast({ title: "Monnify connection issue", description: result.error ?? JSON.stringify(result.response), variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Test failed", variant: "destructive" });
-    } finally {
-      setTestingMonnify(false);
-    }
-  };
-
-  const handleSyncPlans = async () => {
-    setSyncing(true);
-    try {
-      const result = await callAdminAction("/api/admin/sync-kyb-plans");
-      if (result.errors?.length > 0) {
-        toast({ title: "Sync had errors", description: result.errors[0], variant: "destructive" });
-      } else {
-        toast({
-          title: "Plans synced!",
-          description: `+${result.added} added · ${result.updated} updated · ${result.deactivated} removed`,
-        });
-      }
-    } catch {
-      toast({ title: "Sync failed", description: "Please try again", variant: "destructive" });
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -367,6 +255,8 @@ export default function AdminSettings() {
     );
   }
 
+  const linkedProviders = PROVIDERS.filter((p) => configured[p.id]);
+
   return (
     <AdminLayout>
       <div className="flex items-start justify-between mb-6">
@@ -379,39 +269,80 @@ export default function AdminSettings() {
 
       <div className="space-y-5 max-w-xl">
 
-        {/* VTU Provider Switcher */}
-        <SectionCard icon={Zap} title="VTU Providers">
+        {/* VTU Providers — Link */}
+        <SectionCard icon={Link} title="VTU Providers">
           <p className="text-xs text-slate-500 -mt-1">
-            Enter credentials for each provider. Switch the active one at any time — no restart needed.
+            Paste your API key for each provider and press <strong>Link</strong> to connect instantly.
           </p>
           <div className="space-y-3">
-            {PROVIDERS.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                isActive={activeProvider === provider.id}
-                isConfigured={!!providerStatuses[provider.id]}
-                onSetActive={() => handleSetActiveProvider(provider.id)}
-                onSaveCredential={handleSaveCredential}
-              />
+            {PROVIDERS.map((p) => (
+              <ProviderCard key={p.id} provider={p} configured={!!configured[p.id]} onLink={handleLink} />
             ))}
           </div>
           <div className="flex gap-2 pt-1">
-            <Button variant="outline" size="sm" onClick={handleSyncPlans} disabled={syncing} className="gap-2">
+            <Button variant="outline" size="sm" onClick={async () => {
+              setSyncing(true);
+              try {
+                const r = await callAdminAction("/api/admin/sync-kyb-plans");
+                if (r.errors?.length) toast({ title: "Sync error", description: r.errors[0], variant: "destructive" });
+                else toast({ title: "Plans synced!", description: `+${r.added} added · ${r.updated} updated · ${r.deactivated} removed` });
+              } catch { toast({ title: "Sync failed", variant: "destructive" }); }
+              finally { setSyncing(false); }
+            }} disabled={syncing} className="gap-2">
               {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
               {syncing ? "Syncing..." : "Sync KYB Plans"}
             </Button>
           </div>
-          <p className="text-xs text-slate-400">
-            "Sync KYB Plans" pulls the latest data bundles from KYB Data and removes stale ones.
+        </SectionCard>
+
+        {/* Network Routing */}
+        <SectionCard icon={Zap} title="Network Routing">
+          <p className="text-xs text-slate-500 -mt-1">
+            Choose which provider handles each network. Link a provider above first to make it available here.
           </p>
+          {linkedProviders.length === 0 && (
+            <div className="text-center py-4 text-xs text-slate-400">
+              No providers linked yet. Link at least one above to configure routing.
+            </div>
+          )}
+          {linkedProviders.length > 0 && (
+            <div className="space-y-2">
+              {NETWORKS.map((net) => (
+                <div key={net} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center">
+                      <span className="text-xs font-bold text-slate-600">{net === "9MOBILE" ? "9M" : net.slice(0, 3)}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{net}</p>
+                      <p className="text-xs text-slate-400">Data & Airtime</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {savingNetwork === net && <Loader2 size={13} className="animate-spin text-blue-500" />}
+                    <Select
+                      value={networkMap[net] ?? "kyb"}
+                      onValueChange={(v) => handleNetworkChange(net, v as ProviderName)}
+                    >
+                      <SelectTrigger className="w-36 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linkedProviders.map((p) => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         {/* Exam Types */}
         <SectionCard icon={BookOpen} title="Exam Types">
-          <p className="text-xs text-slate-500 -mt-1">
-            Ensure WAEC, NECO, JAMB and NABTEB are available for customers.
-          </p>
+          <p className="text-xs text-slate-500 -mt-1">Ensure WAEC, NECO, JAMB and NABTEB are available for customers.</p>
           <div className="grid grid-cols-4 gap-2 text-center">
             {["WAEC", "NECO", "JAMB", "NABTEB"].map((code) => (
               <div key={code} className="p-3 rounded-xl border border-slate-200 bg-slate-50">
@@ -419,7 +350,14 @@ export default function AdminSettings() {
               </div>
             ))}
           </div>
-          <Button variant="outline" size="sm" onClick={handleSeedExams} disabled={seedingExams} className="gap-2">
+          <Button variant="outline" size="sm" onClick={async () => {
+            setSeedingExams(true);
+            try {
+              const r = await callAdminAction("/api/admin/seed-exam-types");
+              toast({ title: "Exam types synced", description: r.message });
+            } catch { toast({ title: "Sync failed", variant: "destructive" }); }
+            finally { setSeedingExams(false); }
+          }} disabled={seedingExams} className="gap-2">
             {seedingExams ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
             {seedingExams ? "Syncing..." : "Sync Exam Types"}
           </Button>
@@ -440,7 +378,15 @@ export default function AdminSettings() {
               <Switch checked={value} onCheckedChange={set} />
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={handleTestMonnify} disabled={testingMonnify} className="gap-2">
+          <Button variant="outline" size="sm" onClick={async () => {
+            setTestingMonnify(true);
+            try {
+              const r = await callAdminAction("/api/admin/debug-monnify");
+              if (r.authSuccess) toast({ title: "Monnify OK ✓", description: `Auth successful on ${r.baseUrl}` });
+              else toast({ title: "Monnify issue", description: r.error ?? JSON.stringify(r.response), variant: "destructive" });
+            } catch { toast({ title: "Test failed", variant: "destructive" }); }
+            finally { setTestingMonnify(false); }
+          }} disabled={testingMonnify} className="gap-2">
             {testingMonnify ? <Loader2 size={13} className="animate-spin" /> : <Bug size={13} />}
             {testingMonnify ? "Testing..." : "Test Monnify"}
           </Button>
@@ -482,11 +428,6 @@ export default function AdminSettings() {
             </div>
             <Switch checked={airtimeToCashActive} onCheckedChange={setAirtimeToCashActive} />
           </div>
-          {!airtimeToCashActive && (
-            <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-              ⚠️ Service is currently <strong>paused</strong> — customers cannot submit new requests.
-            </p>
-          )}
         </SectionCard>
 
         {/* Announcement */}
@@ -500,33 +441,28 @@ export default function AdminSettings() {
           </div>
           <div>
             <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Message</Label>
-            <Textarea
-              value={announcement}
-              onChange={(e) => setAnnouncement(e.target.value)}
+            <Textarea value={announcement} onChange={(e) => setAnnouncement(e.target.value)}
               placeholder="e.g. Service is running smoothly. Enjoy fast data delivery!"
-              className="resize-none min-h-[80px] text-sm"
-            />
+              className="resize-none min-h-[80px] text-sm" />
           </div>
         </SectionCard>
 
         {/* Contact */}
         <SectionCard icon={Mail} title="Contact & Support">
-          <div>
-            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Support Email</Label>
-            <Input value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@yourdomain.com" className="h-10" />
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Support Phone</Label>
-            <Input value={supportPhone} onChange={(e) => setSupportPhone(e.target.value)} placeholder="e.g. 09026329296" className="h-10" />
-          </div>
-          <div>
-            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">WhatsApp Number</Label>
-            <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="e.g. 09026329296" className="h-10" />
-          </div>
+          {[
+            { label: "Support Email", value: supportEmail, set: setSupportEmail, placeholder: "support@yourdomain.com" },
+            { label: "Support Phone", value: supportPhone, set: setSupportPhone, placeholder: "09026329296" },
+            { label: "WhatsApp Number", value: whatsapp, set: setWhatsapp, placeholder: "09026329296" },
+          ].map(({ label, value, set, placeholder }) => (
+            <div key={label}>
+              <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">{label}</Label>
+              <Input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="h-10" />
+            </div>
+          ))}
         </SectionCard>
 
         {/* Wallet Settings */}
-        <SectionCard icon={CreditCard} title="Wallet Settings">
+        <SectionCard icon={Settings} title="Wallet Settings">
           <div>
             <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Minimum Funding Amount (₦)</Label>
             <Input type="number" value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="100" className="h-10" />
