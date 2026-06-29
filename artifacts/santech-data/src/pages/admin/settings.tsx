@@ -107,10 +107,11 @@ function FieldInput({ label, hint, value, onChange, onEnter }: {
 }
 
 function ProviderCard({
-  provider, configured, onLink,
+  provider, configured, verified: initVerified, onLink,
 }: {
   provider: ProviderDef;
   configured: boolean;
+  verified: boolean;
   onLink: (fields: Record<string, string>) => Promise<{ ok: boolean; message: string; balance?: number }>;
 }) {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
@@ -118,7 +119,12 @@ function ProviderCard({
   );
   const [linking, setLinking] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string; balance?: number } | null>(null);
+  const [localVerified, setLocalVerified] = useState(initVerified);
 
+  // Sync when parent reloads
+  if (initVerified !== localVerified && result === null) setLocalVerified(initVerified);
+
+  const isLinked = localVerified;
   const allFilled = provider.fields.every((f) => !!fieldValues[f.credKey]?.trim());
 
   const handleLink = async () => {
@@ -129,6 +135,7 @@ function ProviderCard({
       const trimmed = Object.fromEntries(Object.entries(fieldValues).map(([k, v]) => [k, v.trim()]));
       const r = await onLink(trimmed);
       setResult(r);
+      setLocalVerified(r.ok);
       if (r.ok) setFieldValues(Object.fromEntries(provider.fields.map((f) => [f.credKey, ""])));
     } finally {
       setLinking(false);
@@ -136,10 +143,10 @@ function ProviderCard({
   };
 
   return (
-    <div className={`rounded-xl border-2 p-4 transition-all ${configured ? "border-green-200 bg-green-50" : "border-slate-200 bg-slate-50"}`}>
+    <div className={`rounded-xl border-2 p-4 transition-all ${isLinked ? "border-green-200 bg-green-50" : "border-slate-200 bg-slate-50"}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${configured ? "bg-green-600 text-white" : "bg-slate-200 text-slate-500"}`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${isLinked ? "bg-green-600 text-white" : "bg-slate-200 text-slate-500"}`}>
             {provider.label.slice(0, 2).toUpperCase()}
           </div>
           <div>
@@ -147,7 +154,7 @@ function ProviderCard({
             <p className="text-xs text-slate-500">{provider.desc}</p>
           </div>
         </div>
-        {configured
+        {isLinked
           ? <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] gap-1"><CheckCircle size={10} /> Linked</Badge>
           : <Badge variant="outline" className="text-slate-400 text-[10px] gap-1"><AlertCircle size={10} /> Not linked</Badge>
         }
@@ -158,7 +165,7 @@ function ProviderCard({
           <FieldInput
             key={f.credKey}
             label={f.label}
-            hint={configured ? `Update ${f.label}` : f.hint}
+            hint={isLinked ? `Update ${f.label}` : f.hint}
             value={fieldValues[f.credKey] ?? ""}
             onChange={(v) => setFieldValues((prev) => ({ ...prev, [f.credKey]: v }))}
             onEnter={provider.fields.indexOf(f) === provider.fields.length - 1 ? handleLink : undefined}
@@ -173,7 +180,7 @@ function ProviderCard({
         className="mt-3 h-9 px-4 gap-1.5 text-xs w-full"
       >
         {linking ? <Loader2 size={12} className="animate-spin" /> : <Link size={12} />}
-        {linking ? "Linking..." : configured ? "Update & Re-link" : "Link Provider"}
+        {linking ? "Linking..." : isLinked ? "Update & Re-link" : "Link Provider"}
       </Button>
 
       {result && (
@@ -219,6 +226,7 @@ export default function AdminSettings() {
 
   // Provider state
   const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
+  const [verified, setVerified] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
 
   const reload = async () => {
     const s = await fetchSettings();
@@ -243,6 +251,7 @@ export default function AdminSettings() {
     if (s.resellerPromoText)          setResellerPromoText(s.resellerPromoText);
 
     setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
+    setVerified({ kyb: s.kyb_verified === "true", bigisub: s.bigisub_verified === "true" });
     setLoading(false);
   };
 
@@ -312,7 +321,7 @@ export default function AdminSettings() {
           </p>
           <div className="space-y-3">
             {PROVIDERS.map((p) => (
-              <ProviderCard key={p.id} provider={p} configured={!!configured[p.id]} onLink={handleLink} />
+              <ProviderCard key={p.id} provider={p} configured={!!configured[p.id]} verified={!!verified[p.id]} onLink={handleLink} />
             ))}
           </div>
           <Button variant="outline" size="sm" onClick={async () => {

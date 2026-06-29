@@ -445,6 +445,9 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   obj.bigisub_base_url        = getBigisubBaseUrl();
   obj.kyb_configured          = String(statuses.kyb);
   obj.bigisub_configured      = String(statuses.bigisub);
+  // Verified = token is present AND last link test passed
+  obj.kyb_verified            = statuses.kyb     ? (obj["kyb_verified"]     ?? "false") : "false";
+  obj.bigisub_verified        = statuses.bigisub  ? (obj["bigisub_verified"] ?? "false") : "false";
   obj.clubkonnect_configured  = String(statuses.clubkonnect);
   obj.gsubz_configured        = String(statuses.gsubz);
   for (const net  of NETWORKS)    obj[`net_provider_${net}`]  = netMap[net];
@@ -477,6 +480,10 @@ router.post("/admin/link-provider", authenticate, requireAdmin, async (req: Auth
     res.status(400).json({ ok: false, message: "Unknown provider" }); return;
   }
   const result = await testProviderConnection(provider as any);
+  // Persist the actual verification status so the badge reflects reality
+  const verifiedKey = `${provider}_verified`;
+  await db.insert(settingsTable).values({ key: verifiedKey, value: String(result.ok) })
+    .onConflictDoUpdate({ target: settingsTable.key, set: { value: String(result.ok), updatedAt: new Date() } });
   res.json(result);
 });
 
