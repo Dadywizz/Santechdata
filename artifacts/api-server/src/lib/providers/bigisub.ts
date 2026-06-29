@@ -8,7 +8,7 @@
  * or falls back to the BIGISUB_API_TOKEN environment variable.
  */
 
-let _base = process.env.BIGISUB_BASE_URL ?? "https://api.bigisub.ng";
+let _base = process.env.BIGISUB_BASE_URL ?? "https://api.bigisub.ng/api/v2";
 let _token = process.env.BIGISUB_API_TOKEN ?? "";
 
 export function setBigisubToken(token: string): void {
@@ -68,15 +68,15 @@ async function bigisubFetch(path: string, opts: RequestInit = {}) {
 // ─── Account ─────────────────────────────────────────────────────────────────
 
 export async function bigisubGetBalance(): Promise<{ balance?: number; message?: string }> {
-  const res = await bigisubFetch("/balance");
-  return { balance: res?.data?.balance ?? res?.balance, message: res?.message };
+  const res = await bigisubFetch("/balance/");
+  return { balance: res?.data?.balance ?? res?.balance ?? res?.data?.wallet_balance, message: res?.message };
 }
 
 // ─── Data Plans ───────────────────────────────────────────────────────────────
 
 export async function bigisubGetDataVariations(network: string): Promise<Array<{ id: string; name: string; price: number; validity?: string }>> {
-  const res = await bigisubFetch(`/variations/data?service_id=${encodeURIComponent(network.toLowerCase())}`);
-  return Array.isArray(res) ? res : (res?.data ?? res?.variations ?? []);
+  const res = await bigisubFetch(`/data/?service_id=${encodeURIComponent(network.toLowerCase())}`);
+  return Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : (res?.data ?? res?.variations ?? []));
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -86,19 +86,19 @@ export async function bigisubVerifyMeter(opts: {
   disco: string;
   meter_type: string;
 }): Promise<{ customer_name?: string; address?: string; message?: string; status?: string }> {
-  const res = await bigisubFetch("/verify-customer", {
+  const res = await bigisubFetch("/electricity/verify/", {
     method: "POST",
     body: JSON.stringify({
       service_id: opts.disco.toLowerCase(),
       meter_number: opts.meter_number,
-      variation_id: opts.meter_type.toLowerCase(),
+      meter_type: opts.meter_type.toLowerCase(),
     }),
   });
   return {
     customer_name: res?.data?.customer_name ?? res?.customer_name,
     address: res?.data?.address ?? res?.address,
     message: res?.message,
-    status: res?.code ?? res?.status,
+    status: res?.success === true ? "success" : (res?.code ?? res?.status),
   };
 }
 
@@ -106,7 +106,7 @@ export async function bigisubVerifySmartcard(opts: {
   smart_card_number: string;
   cable_name: string;
 }): Promise<{ customer_name?: string; current_plan?: string; message?: string; status?: string }> {
-  const res = await bigisubFetch("/verify-customer", {
+  const res = await bigisubFetch("/cabletv/verify/", {
     method: "POST",
     body: JSON.stringify({
       service_id: opts.cable_name.toLowerCase(),
@@ -115,9 +115,9 @@ export async function bigisubVerifySmartcard(opts: {
   });
   return {
     customer_name: res?.data?.customer_name ?? res?.customer_name,
-    current_plan: res?.data?.current_bouquet_description ?? res?.current_plan,
+    current_plan: res?.data?.current_bouquet_description ?? res?.data?.current_plan ?? res?.current_plan,
     message: res?.message,
-    status: res?.code ?? res?.status,
+    status: res?.success === true ? "success" : (res?.code ?? res?.status),
   };
 }
 
@@ -153,7 +153,7 @@ export async function bigisubPurchaseAirtime(opts: {
   network: string; amount: number; mobile_number: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const network = BIGISUB_NETWORK_MAP[opts.network] ?? opts.network.toLowerCase();
-  const res = await bigisubFetch("/airtime", {
+  const res = await bigisubFetch("/airtime/", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -169,13 +169,13 @@ export async function bigisubPurchaseData(opts: {
   plan: number | string; mobile_number: string; network?: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const network = BIGISUB_NETWORK_MAP[opts.network ?? ""] ?? (opts.network ?? "mtn").toLowerCase();
-  const res = await bigisubFetch("/data", {
+  const res = await bigisubFetch("/data/", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
       phone: opts.mobile_number,
       service_id: network,
-      variation_id: String(opts.plan),
+      plan_id: String(opts.plan),
     }),
   });
   return normaliseResponse(res);
@@ -185,13 +185,13 @@ export async function bigisubPurchaseElectricity(opts: {
   discoid: number | string; MeterType: string; meter_number: string; amount: number;
 }): Promise<{ status?: string; message?: string; token?: string; transaction_id?: string }> {
   const disco = BIGISUB_DISCO_MAP[String(opts.discoid)] ?? String(opts.discoid).toLowerCase();
-  const res = await bigisubFetch("/electricity", {
+  const res = await bigisubFetch("/electricity/", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
       service_id: disco,
       meter_number: opts.meter_number,
-      variation_id: opts.MeterType.toLowerCase(),
+      meter_type: opts.MeterType.toLowerCase(),
       amount: opts.amount,
     }),
   });
@@ -203,13 +203,13 @@ export async function bigisubPurchaseCable(opts: {
   plan_id: number | string; smart_card_number: string; cable_name?: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const cable = BIGISUB_CABLE_MAP[opts.cable_name ?? ""] ?? (opts.cable_name ?? "dstv").toLowerCase();
-  const res = await bigisubFetch("/cable-tv", {
+  const res = await bigisubFetch("/cabletv/", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
       service_id: cable,
       smartcard_number: opts.smart_card_number,
-      variation_id: String(opts.plan_id),
+      plan_id: String(opts.plan_id),
     }),
   });
   return normaliseResponse(res);
@@ -222,7 +222,7 @@ export async function bigisubPurchaseExam(opts: {
     WAEC: "waec", NECO: "neco", JAMB: "jamb", NABTEB: "nabteb",
   };
   const service = examMap[opts.examCode?.toUpperCase() ?? ""] ?? String(opts.examid);
-  const res = await bigisubFetch("/exam", {
+  const res = await bigisubFetch("/education/", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -237,9 +237,10 @@ export async function bigisubPurchaseExam(opts: {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function normaliseResponse(res: any): { status?: string; message?: string; transaction_id?: string } {
+  const success = res?.success === true;
   return {
-    status: res?.code ?? res?.status,
+    status: success ? "success" : (res?.code ?? res?.status ?? (res?.success === false ? "failed" : undefined)),
     message: res?.message,
-    transaction_id: res?.data?.transaction_id ?? res?.transaction_id,
+    transaction_id: res?.data?.transaction_id ?? res?.data?.id ?? res?.transaction_id,
   };
 }
