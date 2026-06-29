@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
   ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
-  AlertCircle, Link, Eye, EyeOff,
+  AlertCircle, Link, Eye, EyeOff, Crown,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
@@ -209,6 +209,10 @@ export default function AdminSettings() {
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
   const [resellerCommissionRate, setResellerCommissionRate] = useState("3");
+  const [resellerPromoActive, setResellerPromoActive] = useState(false);
+  const [resellerPromoEndDate, setResellerPromoEndDate] = useState("");
+  const [resellerPromoTitle, setResellerPromoTitle] = useState("Become a Reseller — Limited Offer!");
+  const [resellerPromoText, setResellerPromoText] = useState("Activate your reseller account for just ₦500 and earn commission on every referral purchase. Offer ends soon!");
 
   // Provider state
   const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
@@ -230,6 +234,10 @@ export default function AdminSettings() {
     if (s.referralBonus)              setReferralBonus(s.referralBonus);
     if (s.minFunding)                 setMinFunding(s.minFunding);
     if (s.resellerCommissionRate)     setResellerCommissionRate(s.resellerCommissionRate);
+    if (s.resellerPromoActive !== undefined) setResellerPromoActive(s.resellerPromoActive === "true");
+    if (s.resellerPromoEndDate)       setResellerPromoEndDate(s.resellerPromoEndDate);
+    if (s.resellerPromoTitle)         setResellerPromoTitle(s.resellerPromoTitle);
+    if (s.resellerPromoText)          setResellerPromoText(s.resellerPromoText);
 
     setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
     setLoading(false);
@@ -261,6 +269,8 @@ export default function AdminSettings() {
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
         referralBonus, minFunding, resellerCommissionRate,
+        resellerPromoActive: String(resellerPromoActive),
+        resellerPromoEndDate, resellerPromoTitle, resellerPromoText,
       });
       toast({ title: "Settings saved!" });
     } catch {
@@ -404,6 +414,52 @@ export default function AdminSettings() {
             </div>
             <Switch checked={airtimeToCashActive} onCheckedChange={setAirtimeToCashActive} />
           </div>
+        </SectionCard>
+
+        {/* Reseller Promo Banner */}
+        <SectionCard icon={Crown} title="Reseller Promo Banner">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Show promo banner to customers</p>
+              <p className="text-xs text-slate-500">Displays on dashboard for non-resellers only</p>
+            </div>
+            <Switch checked={resellerPromoActive} onCheckedChange={setResellerPromoActive} />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Offer End Date</Label>
+            <Input type="date" value={resellerPromoEndDate} onChange={(e) => setResellerPromoEndDate(e.target.value)} className="h-10" />
+            <p className="text-xs text-slate-400 mt-1">A countdown timer will show on the banner. Leave blank for no countdown.</p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Banner Title</Label>
+            <Input value={resellerPromoTitle} onChange={(e) => setResellerPromoTitle(e.target.value)} placeholder="Become a Reseller — Limited Offer!" className="h-10" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Banner Text</Label>
+            <Textarea value={resellerPromoText} onChange={(e) => setResellerPromoText(e.target.value)}
+              placeholder="Activate your reseller account for just ₦500 and earn commission on every referral purchase."
+              className="resize-none min-h-[70px] text-sm" />
+          </div>
+          {resellerPromoActive && (
+            <div className="rounded-xl overflow-hidden border border-indigo-200">
+              <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide px-3 pt-2 pb-1 bg-indigo-50">Preview</p>
+              <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <Crown size={18} className="text-amber-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold leading-tight truncate">{resellerPromoTitle || "Become a Reseller — Limited Offer!"}</p>
+                  <p className="text-[11px] text-blue-200 leading-tight mt-0.5 line-clamp-1">{resellerPromoText || "Activate for just ₦500…"}</p>
+                </div>
+                {resellerPromoEndDate && (
+                  <div className="text-center shrink-0">
+                    <p className="text-lg font-black leading-none">{Math.max(0, Math.ceil((new Date(resellerPromoEndDate).getTime() - Date.now()) / 86400000))}</p>
+                    <p className="text-[9px] text-blue-200 uppercase tracking-wide">days left</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </SectionCard>
 
         {/* Announcement */}

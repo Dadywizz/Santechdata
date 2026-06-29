@@ -101,6 +101,10 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     bankAccountNumber: obj.bankAccountNumber ?? "",
     bankAccountName: obj.bankAccountName ?? "",
     bankName: obj.bankName ?? "",
+    resellerPromoActive: obj.resellerPromoActive === "true",
+    resellerPromoEndDate: obj.resellerPromoEndDate ?? "",
+    resellerPromoTitle: obj.resellerPromoTitle ?? "Become a Reseller — Limited Offer!",
+    resellerPromoText: obj.resellerPromoText ?? "Activate your reseller account for just ₦500 and earn commission on every referral purchase. Offer ends soon!",
   });
 });
 
