@@ -55,8 +55,7 @@ const PROVIDERS: ProviderDef[] = [
   {
     id: "bigisub", label: "BigISub", desc: "bigisub.ng",
     fields: [
-      { credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token" },
-      { credKey: "bigisub_base_url",  label: "API Base URL", hint: "e.g. https://api.bigisub.ng/api/v2" },
+      { credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token from Settings → API Documentation" },
     ],
   },
   {

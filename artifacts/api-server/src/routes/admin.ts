@@ -463,7 +463,7 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
     if (key === "kybdata_api_token"    && value) setKybdataToken(value);
     if (key === "bigisub_api_token"    && value) setBigisubToken(value);
-    if (key === "bigisub_base_url"              ) setBigisubBaseUrl(value);
+    if (key === "bigisub_base_url"     && value) setBigisubBaseUrl(value);
     if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
     if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
     if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);
