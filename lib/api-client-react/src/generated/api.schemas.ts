@@ -66,6 +66,7 @@ export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 export const UserRole = {
   customer: 'customer',
+  reseller: 'reseller',
   admin: 'admin',
 } as const;
 
@@ -191,6 +192,8 @@ export interface DataPlan {
   size: string;
   validity: string;
   price: number;
+  /** @nullable */
+  resellerPrice?: number | null;
   /** @nullable */
   costPrice?: number | null;
   /** @nullable */

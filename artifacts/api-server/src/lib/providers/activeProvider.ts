@@ -20,8 +20,13 @@ import {
   gsubzPurchaseElectricity, gsubzPurchaseCable, gsubzPurchaseExam,
   gsubzVerifyMeter, gsubzVerifySmartcard, gsubzGetDataPlans,
 } from "./gsubz";
+import {
+  isBigisubConfigured, bigisubPurchaseData, bigisubPurchaseAirtime,
+  bigisubPurchaseElectricity, bigisubPurchaseCable, bigisubPurchaseExam,
+  bigisubVerifyMeter, bigisubVerifySmartcard, bigisubGetBalance,
+} from "./bigisub";
 
-export type ProviderName = "kyb" | "clubkonnect" | "gsubz";
+export type ProviderName = "kyb" | "bigisub" | "clubkonnect" | "gsubz";
 export type NetworkName  = "MTN" | "AIRTEL" | "GLO" | "9MOBILE";
 export type ExamName     = "WAEC" | "NECO" | "JAMB" | "NABTEB";
 
@@ -29,6 +34,7 @@ export const PROVIDER_INFO: Record<ProviderName, {
   label: string; description: string; credentialKey: string; credentialLabel: string;
 }> = {
   kyb:          { label: "KYB Data",    description: "kybdatassub.com.ng",   credentialKey: "kybdata_api_token",   credentialLabel: "API Token" },
+  bigisub:      { label: "BigISub",     description: "bigisub.ng",            credentialKey: "bigisub_api_token",   credentialLabel: "API Token" },
   clubkonnect:  { label: "Clubkonnect", description: "clubkonnect.com",       credentialKey: "clubkonnect_api_key", credentialLabel: "API Key"   },
   gsubz:        { label: "Gsubz",       description: "gsubz.com",             credentialKey: "gsubz_api_key",       credentialLabel: "API Key"   },
 };
@@ -86,6 +92,7 @@ export function getActiveProviderName(): ProviderName { return _default; }
 export function isActiveProviderConfigured(): boolean { return isProviderConfigured(_default); }
 export function isProviderConfigured(name: ProviderName): boolean {
   if (name === "kyb")         return isKybdataConfigured();
+  if (name === "bigisub")     return isBigisubConfigured();
   if (name === "clubkonnect") return isClubkonnectConfigured();
   if (name === "gsubz")       return isGsubzConfigured();
   return false;
@@ -94,6 +101,7 @@ export function isProviderConfigured(name: ProviderName): boolean {
 export function getAllProviderStatuses(): Record<ProviderName, boolean> {
   return {
     kyb:         isKybdataConfigured(),
+    bigisub:     isBigisubConfigured(),
     clubkonnect: isClubkonnectConfigured(),
     gsubz:       isGsubzConfigured(),
   };
@@ -104,6 +112,12 @@ export async function testProviderConnection(name: ProviderName): Promise<{ ok: 
   try {
     if (name === "kyb") {
       const r = await kybdataGetBalance();
+      const ok = r.balance !== undefined;
+      return { ok, message: ok ? "Connected successfully" : (r.message ?? "Connection failed"), balance: r.balance };
+    }
+    if (name === "bigisub") {
+      if (!isBigisubConfigured()) return { ok: false, message: "API token not set" };
+      const r = await bigisubGetBalance();
       const ok = r.balance !== undefined;
       return { ok, message: ok ? "Connected successfully" : (r.message ?? "Connection failed"), balance: r.balance };
     }
@@ -124,86 +138,114 @@ export async function testProviderConnection(name: ProviderName): Promise<{ ok: 
 function byNetwork(network: string): ProviderName { return getNetworkProviderName(network); }
 function byExam(exam: string): ProviderName        { return getExamProviderName(exam); }
 
-// KYB Data is the primary production provider.
-// Non-KYB providers are wrapped with automatic KYB fallback so a mis-routing
+// KYB Data and BigISub are the primary production providers.
+// Non-primary providers are wrapped with automatic KYB fallback so a mis-routing
 // or unconfigured secondary provider never blocks a customer purchase.
+
+function primaryFallback(): ProviderName {
+  if (_default === "kyb" || _default === "bigisub") return _default;
+  return isKybdataConfigured() ? "kyb" : "bigisub";
+}
+
+async function fallback<T>(fn: () => Promise<T>): Promise<T> {
+  const fb = primaryFallback();
+  if (fb === "bigisub") return bigisubPurchaseData as any;
+  return kybdataPurchaseData as any;
+}
 
 export async function activePurchaseData(opts: { plan: number | string; mobile_number: string; network?: string }) {
   const p = byNetwork(opts.network ?? "");
-  if (p === "kyb") return kybdataPurchaseData(opts);
+  if (p === "kyb")     return kybdataPurchaseData(opts);
+  if (p === "bigisub") return bigisubPurchaseData(opts);
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseData(opts);
     if (p === "gsubz")       return await gsubzPurchaseData(opts);
   } catch {
+    if (_default === "bigisub") return bigisubPurchaseData(opts);
     return kybdataPurchaseData(opts);
   }
+  if (_default === "bigisub") return bigisubPurchaseData(opts);
   return kybdataPurchaseData(opts);
 }
 
 export async function activePurchaseAirtime(opts: { network: string; amount: number; mobile_number: string }) {
   const p = byNetwork(opts.network);
-  if (p === "kyb") return kybdataPurchaseAirtime(opts);
+  if (p === "kyb")     return kybdataPurchaseAirtime(opts);
+  if (p === "bigisub") return bigisubPurchaseAirtime(opts);
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseAirtime(opts);
     if (p === "gsubz")       return await gsubzPurchaseAirtime(opts);
   } catch {
+    if (_default === "bigisub") return bigisubPurchaseAirtime(opts);
     return kybdataPurchaseAirtime(opts);
   }
+  if (_default === "bigisub") return bigisubPurchaseAirtime(opts);
   return kybdataPurchaseAirtime(opts);
 }
 
 export async function activePurchaseExam(opts: { examid: number | string; quantity: number; examCode?: string }) {
   const p = byExam(opts.examCode ?? "");
-  if (p === "kyb") return kybdataPurchaseExam(opts);
+  if (p === "kyb")     return kybdataPurchaseExam(opts);
+  if (p === "bigisub") return bigisubPurchaseExam(opts);
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseExam({ examCode: opts.examCode ?? "", quantity: opts.quantity });
     if (p === "gsubz")       return await gsubzPurchaseExam(opts);
   } catch {
+    if (_default === "bigisub") return bigisubPurchaseExam(opts);
     return kybdataPurchaseExam(opts);
   }
+  if (_default === "bigisub") return bigisubPurchaseExam(opts);
   return kybdataPurchaseExam(opts);
 }
 
 export async function activePurchaseElectricity(opts: { discoid: number | string; MeterType: string; meter_number: string; amount: number }) {
-  if (_default === "kyb") return kybdataPurchaseElectricity(opts);
+  if (_default === "kyb")     return kybdataPurchaseElectricity(opts);
+  if (_default === "bigisub") return bigisubPurchaseElectricity(opts);
   try {
     if (_default === "clubkonnect") return await clubkonnectPurchaseElectricity(opts);
     if (_default === "gsubz")       return await gsubzPurchaseElectricity(opts);
   } catch {
-    return kybdataPurchaseElectricity(opts);
+    if (isKybdataConfigured()) return kybdataPurchaseElectricity(opts);
+    return bigisubPurchaseElectricity(opts);
   }
   return kybdataPurchaseElectricity(opts);
 }
 
 export async function activePurchaseCable(opts: { plan_id: number | string; smart_card_number: string; cable_name?: string }) {
-  if (_default === "kyb") return kybdataPurchaseCable(opts);
+  if (_default === "kyb")     return kybdataPurchaseCable(opts);
+  if (_default === "bigisub") return bigisubPurchaseCable(opts);
   try {
     if (_default === "clubkonnect") return await clubkonnectPurchaseCable(opts);
     if (_default === "gsubz")       return await gsubzPurchaseCable(opts);
   } catch {
-    return kybdataPurchaseCable(opts);
+    if (isKybdataConfigured()) return kybdataPurchaseCable(opts);
+    return bigisubPurchaseCable(opts);
   }
   return kybdataPurchaseCable(opts);
 }
 
 export async function activeVerifyMeter(opts: { meter_number: string; discoid: number | string; meter_type: string }) {
-  if (_default === "kyb") return kybdataVerifyMeter(opts);
+  if (_default === "kyb")     return kybdataVerifyMeter(opts);
+  if (_default === "bigisub") return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: String(opts.discoid), meter_type: opts.meter_type });
   try {
     if (_default === "clubkonnect") return await clubkonnectVerifyMeter(opts);
     if (_default === "gsubz")       return await gsubzVerifyMeter(opts);
   } catch {
-    return kybdataVerifyMeter(opts);
+    if (isKybdataConfigured()) return kybdataVerifyMeter(opts);
+    return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: String(opts.discoid), meter_type: opts.meter_type });
   }
   return kybdataVerifyMeter(opts);
 }
 
 export async function activeVerifySmartcard(opts: { smart_card_number: string; cable_name: string }) {
-  if (_default === "kyb") return kybdataVerifySmartcard(opts);
+  if (_default === "kyb")     return kybdataVerifySmartcard(opts);
+  if (_default === "bigisub") return bigisubVerifySmartcard(opts);
   try {
     if (_default === "clubkonnect") return await clubkonnectVerifySmartcard(opts);
     if (_default === "gsubz")       return await gsubzVerifySmartcard(opts);
   } catch {
-    return kybdataVerifySmartcard(opts);
+    if (isKybdataConfigured()) return kybdataVerifySmartcard(opts);
+    return bigisubVerifySmartcard(opts);
   }
   return kybdataVerifySmartcard(opts);
 }

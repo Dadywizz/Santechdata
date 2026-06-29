@@ -42,7 +42,7 @@ async function adminPost(path: string, body?: unknown): Promise<any> {
   return res.json();
 }
 
-type ProviderName = "kyb";
+type ProviderName = "kyb" | "bigisub";
 
 type ProviderDef = {
   id: ProviderName;
@@ -52,6 +52,10 @@ type ProviderDef = {
 };
 
 const PROVIDERS: ProviderDef[] = [
+  {
+    id: "bigisub", label: "BigISub", desc: "bigisub.ng",
+    fields: [{ credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token" }],
+  },
   {
     id: "kyb", label: "KYB Data", desc: "kybdatassub.com.ng",
     fields: [{ credKey: "kybdata_api_token", label: "API Token", hint: "Paste your KYB Data API token" }],
@@ -206,7 +210,7 @@ export default function AdminSettings() {
   const [minFunding, setMinFunding] = useState("100");
 
   // Provider state
-  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false });
+  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
 
   const reload = async () => {
     const s = await fetchSettings();
@@ -225,7 +229,7 @@ export default function AdminSettings() {
     if (s.referralBonus)        setReferralBonus(s.referralBonus);
     if (s.minFunding)           setMinFunding(s.minFunding);
 
-    setConfigured({ kyb: s.kyb_configured === "true" });
+    setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
     setLoading(false);
   };
 

@@ -1,4 +1,5 @@
 - [VTpass provider](vtpass-provider.md) — purchases fail: VTPASS_API_KEY = "null" string; public-key/secret-key work for read-only only
 - [Payment gateways](payment-gateways.md) — Paystack ✅ Flutterwave ✅ (account activated, both shown in Fund Wallet); Monnify VA broken (KYC incomplete), removed from UI
 - [Clubkonnect](clubkonnect-dead.md) — all VTU endpoints broken (404/INVALID_CREDENTIALS); do not use
-- [EasyAccess API](easyaccess-api.md) — active VTU provider for data/electricity/cable/exam; airtime not supported (still uses VTpass)
+- [BigISub provider](bigisub-provider.md) — primary VTU provider; token stored in DB as `bigisub_api_token` or BIGISUB_API_TOKEN env; configurable via Admin → Settings
+- [Reseller system](reseller-system.md) — ₦500 one-time upgrade; `reseller` role in users enum; resellerPrice on data_plans; admin can suspend/activate/revoke

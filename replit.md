@@ -53,12 +53,21 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - Contact number for support: 09026329296
 - Services: data, airtime, electricity, cable TV (DStv/GOtv/StarTimes), exam tokens (WAEC/NECO/JAMB/NABTEB)
 - Payment gateways: Paystack, Flutterwave, Monnify
-- VTU provider: **KYB Data only** (kybdatassub.com.ng) — handles ALL services: airtime, data, electricity, cable TV, exam pins
+- VTU provider: **BigISub** (bigisub.ng) — primary provider for all services. KYB Data also available.
 - DO NOT use VTpass, EasyAccess, Clubkonnect, or Nellobyte
 
 ## Provider Setup
 
+- **BigISub** — token loaded from `bigisub_api_token` DB setting (set via Admin → Settings) or `BIGISUB_API_TOKEN` env var. Shown first in Settings UI.
 - **KYB Data** — token loaded from `kybdata_api_token` DB setting (set via Admin → Settings) or `KYBDATA_API_TOKEN` env var. Admin can update via the Settings page without restarting the server.
+
+## Reseller Programme
+
+- Customers pay ₦500 one-time to become resellers (deducted from wallet)
+- Resellers get wholesale prices (`resellerPrice` column on `data_plans`)
+- If a plan has no `resellerPrice` set, resellers pay the regular price
+- Admin manages resellers at `/admin/resellers` (suspend, activate, revoke)
+- Customer upgrade page: `/become-reseller`
 
 ## Gotchas
 

@@ -31,6 +31,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
     size: plan?.size || "",
     validity: plan?.validity || "30 Days",
     price: plan?.price?.toString() || "",
+    resellerPrice: plan?.resellerPrice?.toString() || "",
     costPrice: plan?.costPrice?.toString() || "",
     providerCode: plan?.providerCode || "",
   });
@@ -63,6 +64,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
         id: plan.id,
         data: {
           price: parseFloat(form.price),
+          resellerPrice: form.resellerPrice ? parseFloat(form.resellerPrice) : null,
           costPrice: parseFloat(form.costPrice),
           name: form.name,
           providerCode: form.providerCode,
@@ -76,6 +78,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
           size: form.size,
           validity: form.validity,
           price: parseFloat(form.price),
+          resellerPrice: form.resellerPrice ? parseFloat(form.resellerPrice) : null,
           costPrice: parseFloat(form.costPrice),
           providerCode: form.providerCode,
         } as any,
@@ -123,6 +126,17 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
           <Label className="font-semibold mb-2 block">Cost Price (₦)</Label>
           <Input type="number" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm(f => ({ ...f, costPrice: e.target.value }))} className="h-12" />
         </div>
+      </div>
+      <div>
+        <Label className="font-semibold mb-2 block">Reseller Price (₦) <span className="text-xs font-normal text-slate-400">— optional</span></Label>
+        <Input
+          type="number"
+          placeholder="Leave blank to use selling price"
+          value={form.resellerPrice}
+          onChange={(e) => setForm(f => ({ ...f, resellerPrice: e.target.value }))}
+          className="h-12"
+        />
+        <p className="text-xs text-muted-foreground mt-1">Resellers will be charged this price instead of the selling price.</p>
       </div>
       <div>
         <Label className="font-semibold mb-2 block">KYB Data Plan ID</Label>

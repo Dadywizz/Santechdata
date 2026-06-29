@@ -15,6 +15,7 @@ import {
 import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
 import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
+import { setBigisubToken, isBigisubConfigured } from "../lib/providers/bigisub";
 import {
   setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
@@ -52,7 +53,9 @@ function txToJson(tx: typeof transactionsTable.$inferSelect) {
 function planToJson(p: typeof dataPlansTable.$inferSelect) {
   return {
     id: p.id, network: p.network, name: p.name, size: p.size,
-    validity: p.validity, price: parseFloat(p.price), costPrice: parseFloat(p.costPrice),
+    validity: p.validity, price: parseFloat(p.price),
+    resellerPrice: p.resellerPrice != null ? parseFloat(p.resellerPrice) : null,
+    costPrice: parseFloat(p.costPrice),
     providerCode: p.providerCode, isActive: p.isActive,
   };
 }
@@ -440,6 +443,7 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const examMap  = getAllExamMappings();
   obj.activeProvider          = getActiveProviderName();
   obj.kyb_configured          = String(statuses.kyb);
+  obj.bigisub_configured      = String(statuses.bigisub);
   obj.clubkonnect_configured  = String(statuses.clubkonnect);
   obj.gsubz_configured        = String(statuses.gsubz);
   for (const net  of NETWORKS)    obj[`net_provider_${net}`]  = netMap[net];
@@ -453,6 +457,7 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
     if (key === "kybdata_api_token"    && value) setKybdataToken(value);
+    if (key === "bigisub_api_token"    && value) setBigisubToken(value);
     if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
     if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
     if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);
@@ -599,6 +604,44 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
   }
 
   res.json({ added, updated, deactivated, errors });
+});
+
+// GET /admin/resellers — list all reseller accounts
+router.get("/admin/resellers", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const resellers = await db.select().from(usersTable).where(eq(usersTable.role, "reseller"));
+  const withWallets = await Promise.all(
+    resellers.map(async (u) => {
+      const [wallet] = await db.select({ balance: walletsTable.balance }).from(walletsTable).where(eq(walletsTable.userId, u.id));
+      const txCount = await db.select({ count: sql<number>`count(*)` }).from(transactionsTable)
+        .where(eq(transactionsTable.userId, u.id));
+      return {
+        id: u.id, fullName: u.fullName, email: u.email, phone: u.phone,
+        status: u.status, resellerSince: u.resellerSince,
+        walletBalance: wallet ? parseFloat(wallet.balance) : 0,
+        transactionCount: Number(txCount[0]?.count ?? 0),
+      };
+    })
+  );
+  res.json({ resellers: withWallets, total: withWallets.length });
+});
+
+// PATCH /admin/resellers/:id — update reseller (status or revoke reseller role)
+router.patch("/admin/resellers/:id", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { action } = req.body as { action: "suspend" | "activate" | "revoke" };
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!user || user.role !== "reseller") { res.status(404).json({ error: "Reseller not found" }); return; }
+
+  if (action === "revoke") {
+    await db.update(usersTable).set({ role: "customer", resellerSince: null, updatedAt: new Date() }).where(eq(usersTable.id, id));
+    res.json({ message: "Reseller access revoked. Account downgraded to customer." }); return;
+  }
+  if (action === "suspend" || action === "activate") {
+    const status = action === "suspend" ? "suspended" : "active";
+    await db.update(usersTable).set({ status, updatedAt: new Date() }).where(eq(usersTable.id, id));
+    res.json({ message: `Reseller account ${status}.` }); return;
+  }
+  res.status(400).json({ error: "Unknown action. Use suspend, activate, or revoke." });
 });
 
 // POST /admin/clear-data-plans — wipe all data plans so admin can re-add for a new provider

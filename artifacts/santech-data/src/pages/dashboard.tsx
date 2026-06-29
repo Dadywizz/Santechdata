@@ -4,7 +4,7 @@ import { WalletCard } from "@/components/WalletCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Phone, Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Phone, Wifi, Zap, Tv, BookOpen, CreditCard, History, ArrowUpRight, CheckCircle, XCircle, Clock, Crown, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 
 const SERVICES = [
@@ -56,6 +56,36 @@ export default function Dashboard() {
           </div>
           <span className="text-xs text-slate-400 shrink-0">Download free →</span>
         </a>
+      )}
+
+      {/* Reseller promo banner — only for non-resellers */}
+      {user && (user as any).role !== "reseller" && (user as any).role !== "admin" && (
+        <Link href="/become-reseller">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl px-4 py-3 mb-5 transition-colors cursor-pointer">
+            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <Crown size={18} className="text-amber-300" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold leading-tight">Become a Reseller</p>
+              <p className="text-[11px] text-blue-200 leading-tight mt-0.5">Get wholesale data prices for just ₦500 one-time</p>
+            </div>
+            <ArrowRight size={16} className="text-blue-200 shrink-0" />
+          </div>
+        </Link>
+      )}
+
+      {/* Reseller badge — for active resellers */}
+      {user && (user as any).role === "reseller" && (
+        <div className="flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl px-4 py-3 mb-5">
+          <Crown size={18} className="text-amber-300 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-bold leading-tight">Reseller Account Active</p>
+            <p className="text-[11px] text-green-200 leading-tight mt-0.5">You enjoy exclusive wholesale data prices</p>
+          </div>
+          <Link href="/buy-data">
+            <span className="text-xs text-green-200 underline">Buy Data →</span>
+          </Link>
+        </div>
       )}
 
       {/* Wallet Card */}

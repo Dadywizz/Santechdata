@@ -9,6 +9,7 @@ import referralsRouter from "./referrals";
 import supportRouter from "./support";
 import adminRouter from "./admin";
 import airtimeToCashRouter from "./airtime-to-cash";
+import resellerRouter from "./reseller";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(referralsRouter);
 router.use(supportRouter);
 router.use(adminRouter);
 router.use(airtimeToCashRouter);
+router.use(resellerRouter);
 
 export default router;

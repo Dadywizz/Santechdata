@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
 import {
-  dataPlansTable, transactionsTable, walletsTable, notificationsTable,
+  usersTable, dataPlansTable, transactionsTable, walletsTable, notificationsTable,
   examTypesTable, settingsTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
@@ -67,6 +67,7 @@ router.get("/data/plans", async (req: Request, res): Promise<void> => {
   res.json(filtered.map((p) => ({
     id: p.id, network: p.network, name: p.name, size: p.size,
     validity: p.validity, price: parseFloat(p.price),
+    resellerPrice: p.resellerPrice != null ? parseFloat(p.resellerPrice) : null,
     costPrice: parseFloat(p.costPrice), providerCode: p.providerCode, isActive: p.isActive,
   })));
 });
@@ -81,8 +82,13 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   if (!plan.providerCode) { res.status(503).json({ error: "This data plan is not yet configured. Please contact support." }); return; }
   if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
+  const [user] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, req.userId!));
+  const isReseller = user?.role === "reseller";
+  const price = isReseller && plan.resellerPrice != null
+    ? parseFloat(plan.resellerPrice)
+    : parseFloat(plan.price);
+
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
-  const price = parseFloat(plan.price);
   if (parseFloat(wallet.balance) < price) {
     res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." }); return;
   }

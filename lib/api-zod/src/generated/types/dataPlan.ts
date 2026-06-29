@@ -15,6 +15,8 @@ export interface DataPlan {
   validity: string;
   price: number;
   /** @nullable */
+  resellerPrice?: number | null;
+  /** @nullable */
   costPrice?: number | null;
   /** @nullable */
   providerCode?: string | null;

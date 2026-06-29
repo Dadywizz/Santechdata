@@ -33,6 +33,8 @@ import AdminAnalytics from "@/pages/admin/analytics";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
+import AdminResellers from "@/pages/admin/resellers";
+import BecomeReseller from "@/pages/become-reseller";
 import BuyAirtime from "@/pages/buy-airtime";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import AirtimeToCash from "@/pages/airtime-to-cash";
@@ -75,6 +77,7 @@ function Router() {
       <Route path="/payment/callback" component={PaymentCallback} />
       <Route path="/airtime-to-cash" component={AirtimeToCash} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/become-reseller" component={BecomeReseller} />
 
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/users" component={AdminUsers} />
@@ -85,6 +88,7 @@ function Router() {
       <Route path="/admin/notifications" component={AdminNotifications} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/failed-payments" component={AdminFailedPayments} />
+      <Route path="/admin/resellers" component={AdminResellers} />
 
       <Route component={NotFound} />
     </Switch>
