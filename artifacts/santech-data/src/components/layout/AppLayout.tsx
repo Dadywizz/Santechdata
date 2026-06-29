@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Wifi, Zap, Tv, BookOpen, CreditCard, History,
-  Users, Bell, MessageSquare, User, LogOut, Phone, ChevronRight,
+  Users, Bell, MessageSquare, User, LogOut, Phone, ChevronRight, Crown,
 } from "lucide-react";
 import { useGetNotifications } from "@workspace/api-client-react";
 
@@ -16,7 +16,8 @@ const NAV_ITEMS = [
   { href: "/buy-exam",       label: "Exam Pins",      icon: BookOpen        },
   { href: "/fund-wallet",    label: "Fund Wallet",    icon: CreditCard      },
   { href: "/transactions",   label: "Transactions",   icon: History         },
-  { href: "/referrals",      label: "Referrals",      icon: Users           },
+  { href: "/referrals",        label: "Referrals",      icon: Users           },
+  { href: "/become-reseller", label: "Reseller Hub",   icon: Crown           },
   { href: "/notifications",  label: "Notifications",  icon: Bell            },
   { href: "/support",        label: "Support",        icon: MessageSquare   },
   { href: "/profile",        label: "Profile",        icon: User            },

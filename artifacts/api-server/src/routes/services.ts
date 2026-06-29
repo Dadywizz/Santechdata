@@ -40,6 +40,53 @@ const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "benin-electric":        "6",
 };
 
+// ── RESELLER COMMISSION HELPER ────────────────────────────────────────────────
+async function creditResellerCommission(
+  userId: string,
+  purchaseAmount: number,
+  purchaseDesc: string,
+  log?: any
+): Promise<void> {
+  try {
+    const [buyer] = await db.select({ referredBy: usersTable.referredBy })
+      .from(usersTable).where(eq(usersTable.id, userId));
+    if (!buyer?.referredBy) return;
+
+    const [referrer] = await db.select({ id: usersTable.id, role: usersTable.role })
+      .from(usersTable).where(eq(usersTable.id, buyer.referredBy));
+    if (!referrer || referrer.role !== "reseller") return;
+
+    const [rateSetting] = await db.select({ value: settingsTable.value })
+      .from(settingsTable).where(eq(settingsTable.key, "resellerCommissionRate"));
+    const rate = parseFloat(rateSetting?.value ?? "3");
+    const commission = Math.floor(purchaseAmount * rate / 100);
+    if (commission < 1) return;
+
+    await db.update(walletsTable)
+      .set({ balance: sql`balance + ${commission}`, updatedAt: new Date() })
+      .where(eq(walletsTable.userId, referrer.id));
+
+    await db.insert(transactionsTable).values({
+      userId: referrer.id,
+      type: "commission" as any,
+      status: "success",
+      amount: commission.toString(),
+      description: `Commission: ${purchaseDesc}`,
+      reference: `COMM-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      metadata: { fromUserId: userId, purchaseAmount, rate },
+    });
+
+    await db.insert(notificationsTable).values({
+      userId: referrer.id,
+      title: "💰 Commission Earned!",
+      message: `You earned ₦${commission.toLocaleString()} commission from a referral's ${purchaseDesc}.`,
+      type: "general",
+    });
+  } catch (err: any) {
+    log?.error({ err }, "Commission credit error");
+  }
+}
+
 const router: IRouter = Router();
 
 // ── PUBLIC SETTINGS ───────────────────────────────────────────────────────────
@@ -144,6 +191,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     userId: req.userId!, title: "Data Purchase Successful",
     message: `${plan.network} ${plan.size} data has been sent to ${phone}.`, type: "data",
   });
+  void creditResellerCommission(req.userId!, price, `${plan.network} ${plan.name} data`, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -211,6 +259,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     userId: req.userId!, title: "Airtime Purchase Successful",
     message: `₦${amount} ${network} airtime has been sent to ${phone}.`, type: "airtime",
   });
+  void creditResellerCommission(req.userId!, amount, `${network} airtime`, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -312,6 +361,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     userId: req.userId!, title: "Electricity Token Purchased",
     message: `Token: ${elecToken} for meter ${meterNumber}`, type: "electricity",
   });
+  void creditResellerCommission(req.userId!, amount, "electricity token", req.log);
   res.json({ id: tx.id, status: "success", token: elecToken, amount, meterNumber, createdAt: tx.createdAt });
 });
 
@@ -431,6 +481,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     userId: req.userId!, title: "Cable Subscription Successful",
     message: `${plan.name} activated for smartcard ${smartcardNumber}.`, type: "cable",
   });
+  void creditResellerCommission(req.userId!, plan.price, `${plan.name} cable`, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -516,6 +567,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
     userId: req.userId!, title: "Exam Token Purchase Successful",
     message: `${quantity} ${examType.name} PIN(s) purchased successfully.`, type: "exam",
   });
+  void creditResellerCommission(req.userId!, totalCost, `${examType.name} exam token`, req.log);
   res.json({ id: tx.id, status: "success", pins, examType: examType.code, amount: totalCost, createdAt: tx.createdAt });
 });
 

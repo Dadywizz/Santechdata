@@ -7,7 +7,7 @@ export const transactionsTable = pgTable("transactions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => usersTable.id),
   type: text("type", {
-    enum: ["data", "airtime", "electricity", "cable", "exam", "wallet_fund", "wallet_transfer"],
+    enum: ["data", "airtime", "electricity", "cable", "exam", "wallet_fund", "wallet_transfer", "commission"],
   }).notNull(),
   status: text("status", { enum: ["pending", "success", "failed"] }).notNull().default("pending"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),

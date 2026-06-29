@@ -208,6 +208,7 @@ export default function AdminSettings() {
   const [bankName, setBankName] = useState("");
   const [referralBonus, setReferralBonus] = useState("200");
   const [minFunding, setMinFunding] = useState("100");
+  const [resellerCommissionRate, setResellerCommissionRate] = useState("3");
 
   // Provider state
   const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
@@ -226,8 +227,9 @@ export default function AdminSettings() {
     if (s.bankAccountNumber)    setBankAccountNumber(s.bankAccountNumber);
     if (s.bankAccountName)      setBankAccountName(s.bankAccountName);
     if (s.bankName)             setBankName(s.bankName);
-    if (s.referralBonus)        setReferralBonus(s.referralBonus);
-    if (s.minFunding)           setMinFunding(s.minFunding);
+    if (s.referralBonus)              setReferralBonus(s.referralBonus);
+    if (s.minFunding)                 setMinFunding(s.minFunding);
+    if (s.resellerCommissionRate)     setResellerCommissionRate(s.resellerCommissionRate);
 
     setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
     setLoading(false);
@@ -258,7 +260,7 @@ export default function AdminSettings() {
         airtimeToCashActive: String(airtimeToCashActive),
         bankTransferActive: String(bankTransferActive),
         bankAccountNumber, bankAccountName, bankName,
-        referralBonus, minFunding,
+        referralBonus, minFunding, resellerCommissionRate,
       });
       toast({ title: "Settings saved!" });
     } catch {
@@ -445,6 +447,11 @@ export default function AdminSettings() {
             <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Referral Bonus (₦)</Label>
             <Input type="number" value={referralBonus} onChange={(e) => setReferralBonus(e.target.value)} placeholder="200" className="h-10" />
             <p className="text-xs text-slate-400 mt-1">Credited when a referral funds their wallet for the first time.</p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Reseller Commission Rate (%)</Label>
+            <Input type="number" min="0" max="50" step="0.5" value={resellerCommissionRate} onChange={(e) => setResellerCommissionRate(e.target.value)} placeholder="3" className="h-10" />
+            <p className="text-xs text-slate-400 mt-1">Percentage of each purchase credited to the referring reseller. Default: 3%.</p>
           </div>
         </SectionCard>
 
