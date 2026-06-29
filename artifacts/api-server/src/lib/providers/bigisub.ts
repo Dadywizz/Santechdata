@@ -154,7 +154,7 @@ export async function bigisubPurchaseAirtime(opts: {
   network: string; amount: number; mobile_number: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const network = BIGISUB_NETWORK_MAP[opts.network] ?? opts.network.toLowerCase();
-  const res = await bigisubFetch(`${BASE}/airtime`, {
+  const res = await bigisubFetch("/airtime", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -170,7 +170,7 @@ export async function bigisubPurchaseData(opts: {
   plan: number | string; mobile_number: string; network?: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const network = BIGISUB_NETWORK_MAP[opts.network ?? ""] ?? (opts.network ?? "mtn").toLowerCase();
-  const res = await bigisubFetch(`${BASE}/data`, {
+  const res = await bigisubFetch("/data", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -186,7 +186,7 @@ export async function bigisubPurchaseElectricity(opts: {
   discoid: number | string; MeterType: string; meter_number: string; amount: number;
 }): Promise<{ status?: string; message?: string; token?: string; transaction_id?: string }> {
   const disco = BIGISUB_DISCO_MAP[String(opts.discoid)] ?? String(opts.discoid).toLowerCase();
-  const res = await bigisubFetch(`${BASE}/electricity`, {
+  const res = await bigisubFetch("/electricity", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -204,7 +204,7 @@ export async function bigisubPurchaseCable(opts: {
   plan_id: number | string; smart_card_number: string; cable_name?: string;
 }): Promise<{ status?: string; message?: string; transaction_id?: string }> {
   const cable = BIGISUB_CABLE_MAP[opts.cable_name ?? ""] ?? (opts.cable_name ?? "dstv").toLowerCase();
-  const res = await bigisubFetch(`${BASE}/cable-tv`, {
+  const res = await bigisubFetch("/cable-tv", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),
@@ -223,7 +223,7 @@ export async function bigisubPurchaseExam(opts: {
     WAEC: "waec", NECO: "neco", JAMB: "jamb", NABTEB: "nabteb",
   };
   const service = examMap[opts.examCode?.toUpperCase() ?? ""] ?? String(opts.examid);
-  const res = await bigisubFetch(`${BASE}/exam`, {
+  const res = await bigisubFetch("/exam", {
     method: "POST",
     body: JSON.stringify({
       request_id: requestId(),

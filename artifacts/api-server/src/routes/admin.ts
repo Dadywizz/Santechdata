@@ -445,9 +445,10 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   obj.bigisub_base_url        = getBigisubBaseUrl();
   obj.kyb_configured          = String(statuses.kyb);
   obj.bigisub_configured      = String(statuses.bigisub);
-  // Verified = token is present AND last link test passed
-  obj.kyb_verified            = statuses.kyb     ? (obj["kyb_verified"]     ?? "false") : "false";
-  obj.bigisub_verified        = statuses.bigisub  ? (obj["bigisub_verified"] ?? "false") : "false";
+  // Verified = explicit test passed (kyb_verified/bigisub_verified in DB).
+  // If never tested via "Link Provider" button, fall back to configured (has token).
+  obj.kyb_verified     = statuses.kyb     ? (obj["kyb_verified"]     ?? obj.kyb_configured)     : "false";
+  obj.bigisub_verified = statuses.bigisub ? (obj["bigisub_verified"] ?? "false") : "false";
   obj.clubkonnect_configured  = String(statuses.clubkonnect);
   obj.gsubz_configured        = String(statuses.gsubz);
   for (const net  of NETWORKS)    obj[`net_provider_${net}`]  = netMap[net];
