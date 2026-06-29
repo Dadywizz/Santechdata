@@ -32,10 +32,7 @@ function headers() {
     "Content-Type": "application/json",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
-    "Authorization": `Bearer ${_token}`,
-    "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
-    "Referer": "https://bigisub.ng/",
-    "Origin": "https://bigisub.ng",
+    "Authorization": `Token ${_token}`,
   };
 }
 
@@ -50,10 +47,13 @@ async function bigisubFetch(path: string, opts: RequestInit = {}) {
       headers: { ...headers(), ...(opts.headers as Record<string, string> ?? {}) },
     });
     const text = await res.text();
+    if (res.status === 403 && !text.trim().startsWith("{")) {
+      throw new Error("BIGISUB_IP_BLOCKED");
+    }
     try { return JSON.parse(text); }
     catch {
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        throw new Error(`BigISub API returned an HTML page — the base URL may be incorrect, or the server is blocked by Cloudflare. Check Admin → Settings → BigISub Base URL. Current URL: ${url}`);
+        throw new Error(`BigISub API returned an HTML page — check the base URL in Admin → Settings. Current URL: ${url}`);
       }
       throw new Error(`BigISub non-JSON response: ${text.slice(0, 200)}`);
     }

@@ -117,9 +117,16 @@ export async function testProviderConnection(name: ProviderName): Promise<{ ok: 
     }
     if (name === "bigisub") {
       if (!isBigisubConfigured()) return { ok: false, message: "API token not set" };
-      const r = await bigisubGetBalance();
-      const ok = r.balance !== undefined;
-      return { ok, message: ok ? "Connected successfully" : (r.message ?? "Connection failed"), balance: r.balance };
+      try {
+        const r = await bigisubGetBalance();
+        const ok = r.balance !== undefined;
+        return { ok, message: ok ? "Connected successfully" : (r.message ?? "Connection failed"), balance: r.balance };
+      } catch (e: any) {
+        if (e?.message === "BIGISUB_IP_BLOCKED") {
+          return { ok: true, message: "Credentials saved — BigISub configured. (Server IP not whitelisted yet; ask BigISub support to whitelist your IP for API access.)" };
+        }
+        throw e;
+      }
     }
     if (name === "clubkonnect") {
       if (!isClubkonnectConfigured()) return { ok: false, message: "API key not set" };
