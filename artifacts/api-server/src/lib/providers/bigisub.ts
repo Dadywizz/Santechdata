@@ -1,15 +1,14 @@
 /**
  * BigISub (bigisub.ng) Integration Layer
  *
- * API is WordPress-based using standard Nigerian VTU platform pattern.
- * Base URL: https://bigisub.ng/wp-json/api/v2
+ * Base URL: https://api.bigisub.ng
  * Auth: Bearer token in Authorization header
  *
  * Token is loaded from the `bigisub_api_token` DB setting (set via Admin → Settings)
  * or falls back to the BIGISUB_API_TOKEN environment variable.
  */
 
-let _base = process.env.BIGISUB_BASE_URL ?? "https://bigisub.ng/api/v1";
+let _base = process.env.BIGISUB_BASE_URL ?? "https://api.bigisub.ng";
 let _token = process.env.BIGISUB_API_TOKEN ?? "";
 
 export function setBigisubToken(token: string): void {
