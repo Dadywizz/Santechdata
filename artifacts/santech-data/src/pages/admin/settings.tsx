@@ -54,7 +54,10 @@ type ProviderDef = {
 const PROVIDERS: ProviderDef[] = [
   {
     id: "bigisub", label: "BigISub", desc: "bigisub.ng",
-    fields: [{ credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token" }],
+    fields: [
+      { credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token" },
+      { credKey: "bigisub_base_url",  label: "API Base URL", hint: "e.g. https://bigisub.ng/wp-json/api/v2" },
+    ],
   },
   {
     id: "kyb", label: "KYB Data", desc: "kybdatassub.com.ng",

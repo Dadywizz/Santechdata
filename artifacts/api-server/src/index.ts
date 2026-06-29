@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { setKybdataToken } from "./lib/providers/kybdata";
 import { setClubkonnectApiKey, setClubkonnectUserId } from "./lib/providers/clubkonnect";
 import { setGsubzApiKey } from "./lib/providers/gsubz";
+import { setBigisubToken, setBigisubBaseUrl } from "./lib/providers/bigisub";
 import { setActiveProvider, setNetworkProvider, setExamProvider } from "./lib/providers/activeProvider";
 
 const rawPort = process.env["PORT"];
@@ -32,6 +33,8 @@ app.listen(port, async (err) => {
   try {
     const rows = await db.select().from(settingsTable);
     for (const row of rows) {
+      if (row.key === "bigisub_api_token"    && row.value) setBigisubToken(row.value);
+      if (row.key === "bigisub_base_url"               ) setBigisubBaseUrl(row.value);
       if (row.key === "kybdata_api_token"    && row.value) setKybdataToken(row.value);
       if (row.key === "clubkonnect_api_key"  && row.value) setClubkonnectApiKey(row.value);
       if (row.key === "clubkonnect_user_id"  && row.value) setClubkonnectUserId(row.value);

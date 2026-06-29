@@ -15,7 +15,7 @@ import {
 import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
 import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
-import { setBigisubToken, isBigisubConfigured } from "../lib/providers/bigisub";
+import { setBigisubToken, setBigisubBaseUrl, getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
 import {
   setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
@@ -442,6 +442,7 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   const netMap   = getAllNetworkMappings();
   const examMap  = getAllExamMappings();
   obj.activeProvider          = getActiveProviderName();
+  obj.bigisub_base_url        = getBigisubBaseUrl();
   obj.kyb_configured          = String(statuses.kyb);
   obj.bigisub_configured      = String(statuses.bigisub);
   obj.clubkonnect_configured  = String(statuses.clubkonnect);
@@ -458,6 +459,7 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
     if (key === "kybdata_api_token"    && value) setKybdataToken(value);
     if (key === "bigisub_api_token"    && value) setBigisubToken(value);
+    if (key === "bigisub_base_url"              ) setBigisubBaseUrl(value);
     if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
     if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
     if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);

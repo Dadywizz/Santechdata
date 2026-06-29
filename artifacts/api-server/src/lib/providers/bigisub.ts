@@ -9,12 +9,19 @@
  * or falls back to the BIGISUB_API_TOKEN environment variable.
  */
 
-const BASE = "https://bigisub.ng/wp-json/api/v2";
-
+let _base = process.env.BIGISUB_BASE_URL ?? "https://bigisub.ng/wp-json/api/v2";
 let _token = process.env.BIGISUB_API_TOKEN ?? "";
 
 export function setBigisubToken(token: string): void {
   if (token) _token = token;
+}
+
+export function setBigisubBaseUrl(url: string): void {
+  if (url) _base = url.replace(/\/$/, "");
+}
+
+export function getBigisubBaseUrl(): string {
+  return _base;
 }
 
 export function isBigisubConfigured(): boolean {
@@ -24,11 +31,17 @@ export function isBigisubConfigured(): boolean {
 function headers() {
   return {
     "Content-Type": "application/json",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
     "Authorization": `Bearer ${_token}`,
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+    "Referer": "https://bigisub.ng/",
+    "Origin": "https://bigisub.ng",
   };
 }
 
-async function bigisubFetch(url: string, opts: RequestInit = {}) {
+async function bigisubFetch(path: string, opts: RequestInit = {}) {
+  const url = path.startsWith("http") ? path : `${_base}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25_000);
   try {
@@ -39,7 +52,12 @@ async function bigisubFetch(url: string, opts: RequestInit = {}) {
     });
     const text = await res.text();
     try { return JSON.parse(text); }
-    catch { throw new Error(`BigISub non-JSON response: ${text.slice(0, 300)}`); }
+    catch {
+      if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+        throw new Error(`BigISub API returned an HTML page — the base URL may be incorrect, or the server is blocked by Cloudflare. Check Admin → Settings → BigISub Base URL. Current URL: ${url}`);
+      }
+      throw new Error(`BigISub non-JSON response: ${text.slice(0, 200)}`);
+    }
   } catch (err: any) {
     if (err.name === "AbortError") throw new Error("BigISub request timed out. Please try again.");
     throw err;
@@ -51,14 +69,14 @@ async function bigisubFetch(url: string, opts: RequestInit = {}) {
 // ─── Account ─────────────────────────────────────────────────────────────────
 
 export async function bigisubGetBalance(): Promise<{ balance?: number; message?: string }> {
-  const res = await bigisubFetch(`${BASE}/balance`);
+  const res = await bigisubFetch("/balance");
   return { balance: res?.data?.balance ?? res?.balance, message: res?.message };
 }
 
 // ─── Data Plans ───────────────────────────────────────────────────────────────
 
 export async function bigisubGetDataVariations(network: string): Promise<Array<{ id: string; name: string; price: number; validity?: string }>> {
-  const res = await bigisubFetch(`${BASE}/variations/data?service_id=${encodeURIComponent(network.toLowerCase())}`);
+  const res = await bigisubFetch(`/variations/data?service_id=${encodeURIComponent(network.toLowerCase())}`);
   return Array.isArray(res) ? res : (res?.data ?? res?.variations ?? []);
 }
 
@@ -69,7 +87,7 @@ export async function bigisubVerifyMeter(opts: {
   disco: string;
   meter_type: string;
 }): Promise<{ customer_name?: string; address?: string; message?: string; status?: string }> {
-  const res = await bigisubFetch(`${BASE}/verify-customer`, {
+  const res = await bigisubFetch("/verify-customer", {
     method: "POST",
     body: JSON.stringify({
       service_id: opts.disco.toLowerCase(),
@@ -89,7 +107,7 @@ export async function bigisubVerifySmartcard(opts: {
   smart_card_number: string;
   cable_name: string;
 }): Promise<{ customer_name?: string; current_plan?: string; message?: string; status?: string }> {
-  const res = await bigisubFetch(`${BASE}/verify-customer`, {
+  const res = await bigisubFetch("/verify-customer", {
     method: "POST",
     body: JSON.stringify({
       service_id: opts.cable_name.toLowerCase(),
