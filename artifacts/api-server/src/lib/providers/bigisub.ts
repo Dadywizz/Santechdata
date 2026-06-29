@@ -9,7 +9,7 @@
  * or falls back to the BIGISUB_API_TOKEN environment variable.
  */
 
-let _base = process.env.BIGISUB_BASE_URL ?? "https://bigisub.ng/wp-json/api/v2";
+let _base = process.env.BIGISUB_BASE_URL ?? "https://bigisub.ng/api/v1";
 let _token = process.env.BIGISUB_API_TOKEN ?? "";
 
 export function setBigisubToken(token: string): void {

@@ -56,7 +56,7 @@ const PROVIDERS: ProviderDef[] = [
     id: "bigisub", label: "BigISub", desc: "bigisub.ng",
     fields: [
       { credKey: "bigisub_api_token", label: "API Token", hint: "Paste your BigISub API token" },
-      { credKey: "bigisub_base_url",  label: "API Base URL", hint: "e.g. https://bigisub.ng/wp-json/api/v2" },
+      { credKey: "bigisub_base_url",  label: "API Base URL", hint: "e.g. https://bigisub.ng/api/v1" },
     ],
   },
   {
@@ -228,6 +228,14 @@ export default function AdminSettings() {
   const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
   const [verified, setVerified] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
 
+  // Per-network / per-exam routing
+  const [netProviders, setNetProviders] = useState<Record<string, string>>({
+    MTN: "kyb", AIRTEL: "kyb", GLO: "kyb", "9MOBILE": "kyb",
+  });
+  const [examProviders, setExamProviders] = useState<Record<string, string>>({
+    WAEC: "kyb", NECO: "kyb", JAMB: "kyb", NABTEB: "kyb",
+  });
+
   const reload = async () => {
     const s = await fetchSettings();
     if (s.supportEmail)         setSupportEmail(s.supportEmail);
@@ -252,6 +260,18 @@ export default function AdminSettings() {
 
     setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
     setVerified({ kyb: s.kyb_verified === "true", bigisub: s.bigisub_verified === "true" });
+    setNetProviders({
+      MTN:     s.net_provider_MTN     ?? "kyb",
+      AIRTEL:  s.net_provider_AIRTEL  ?? "kyb",
+      GLO:     s.net_provider_GLO     ?? "kyb",
+      "9MOBILE": s["net_provider_9MOBILE"] ?? "kyb",
+    });
+    setExamProviders({
+      WAEC:   s.exam_provider_WAEC   ?? "kyb",
+      NECO:   s.exam_provider_NECO   ?? "kyb",
+      JAMB:   s.exam_provider_JAMB   ?? "kyb",
+      NABTEB: s.exam_provider_NABTEB ?? "kyb",
+    });
     setLoading(false);
   };
 
@@ -283,6 +303,8 @@ export default function AdminSettings() {
         referralBonus, minFunding, resellerCommissionRate,
         resellerPromoActive: String(resellerPromoActive),
         resellerPromoEndDate, resellerPromoTitle, resellerPromoText,
+        ...Object.fromEntries(Object.entries(netProviders).map(([k, v]) => [`net_provider_${k}`, v])),
+        ...Object.fromEntries(Object.entries(examProviders).map(([k, v]) => [`exam_provider_${k}`, v])),
       });
       toast({ title: "Settings saved!" });
     } catch {
@@ -336,6 +358,59 @@ export default function AdminSettings() {
             {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
             {syncing ? "Syncing..." : "Sync KYB Plans"}
           </Button>
+        </SectionCard>
+
+        {/* Provider Routing */}
+        <SectionCard icon={ArrowRightLeft} title="Provider Routing">
+          <p className="text-xs text-slate-500 -mt-1">
+            Choose which provider handles each network and exam type. Click <strong>Save Changes</strong> to apply.
+          </p>
+
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Mobile Networks</p>
+            <div className="space-y-2">
+              {(["MTN", "AIRTEL", "GLO", "9MOBILE"] as const).map((net) => (
+                <div key={net} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-sm font-bold text-slate-700">{net}</span>
+                  <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+                    {(["kyb", "bigisub"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNetProviders((prev) => ({ ...prev, [net]: p }))}
+                        className={`px-3 py-1.5 transition-colors ${netProviders[net] === p ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        {p === "kyb" ? "KYB Data" : "BigISub"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Exam Pins</p>
+            <div className="space-y-2">
+              {(["WAEC", "NECO", "JAMB", "NABTEB"] as const).map((exam) => (
+                <div key={exam} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-sm font-bold text-slate-700">{exam}</span>
+                  <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+                    {(["kyb", "bigisub"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setExamProviders((prev) => ({ ...prev, [exam]: p }))}
+                        className={`px-3 py-1.5 transition-colors ${examProviders[exam] === p ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        {p === "kyb" ? "KYB Data" : "BigISub"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </SectionCard>
 
         {/* Exam Types */}
