@@ -159,6 +159,113 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Own VTU Website ── */}
+      <section className="py-16 px-4 bg-gray-50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <span className="inline-block bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide mb-3">
+              Business Opportunity
+            </span>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+              Want Your Own VTU Website?
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              We build you a fully working VTU platform just like SanTech Data — with your own brand,
+              your own domain, and powered by our API. You focus on selling, we handle the technology.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            {[
+              { icon: "🌐", title: "Your Own Domain", desc: "Get your site on your domain or a free subdomain like yourbrand.santechdata.com.ng" },
+              { icon: "🎨", title: "Custom Branding", desc: "Your logo, your name, your colours — fully branded to your business" },
+              { icon: "⚡", title: "Powered by Our API", desc: "Every transaction runs through SanTech Data's infrastructure. Instant, reliable delivery" },
+              { icon: "📊", title: "Full Admin Panel", desc: "Manage your users, set your own prices, track transactions and profits" },
+              { icon: "💰", title: "Keep Your Profit", desc: "Set your own prices. Sell data, airtime, electricity, cable and exam tokens" },
+              { icon: "🚀", title: "Ready in Days", desc: "We build and deploy your site within days of payment — no technical skills needed" },
+            ].map((f) => (
+              <div key={f.title} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+                <div className="text-2xl mb-2">{f.icon}</div>
+                <h3 className="font-bold text-gray-800 mb-1">{f.title}</h3>
+                <p className="text-gray-500 text-sm">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-8 text-white text-center">
+            <p className="text-orange-100 text-sm uppercase tracking-wide font-semibold mb-1">One-time setup fee</p>
+            <p className="text-4xl font-extrabold mb-2">₦200,000</p>
+            <p className="text-orange-100 mb-6">Full VTU website · Custom branding · Subdomain included · Lifetime API access</p>
+            <a
+              href="https://wa.me/2349026329296?text=Hello%2C%20I%20am%20interested%20in%20getting%20my%20own%20VTU%20website%20for%20%E2%82%A6200%2C000.%20Please%20tell%20me%20more."
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button size="lg" className="bg-white text-orange-600 hover:bg-orange-50 font-bold px-8">
+                💬 Contact Us on WhatsApp
+              </Button>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Developer API ── */}
+      <section className="py-16 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-10 items-center">
+            <div className="flex-1">
+              <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide mb-3">
+                Developer API
+              </span>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">
+                Already Have a Platform? Connect Our API
+              </h2>
+              <p className="text-gray-500 mb-6">
+                If you're a developer or already have your own app, integrate directly with SanTech Data's API.
+                Buy data, airtime, electricity and more programmatically — with instant delivery and
+                competitive wholesale rates.
+              </p>
+              <ul className="space-y-3 mb-6">
+                {[
+                  "Simple REST API with API key authentication",
+                  "Data, Airtime, Electricity, Cable & Exam endpoints",
+                  "Wallet-based billing — fund once, buy anytime",
+                  "Real-time transaction status and webhooks",
+                  "Dedicated support for API clients",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-gray-600 text-sm">
+                    <span className="text-blue-600 font-bold mt-0.5">✓</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="https://wa.me/2349026329296?text=Hello%2C%20I%20am%20interested%20in%20the%20SanTech%20Data%20API%20for%20developers.%20Please%20send%20me%20more%20information."
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6">
+                  Request API Access
+                </Button>
+              </a>
+            </div>
+            <div className="flex-1 bg-gray-900 rounded-2xl p-6 font-mono text-sm text-green-400 shadow-xl w-full">
+              <div className="text-gray-500 mb-3 text-xs">// Buy 1GB MTN data via API</div>
+              <div><span className="text-blue-400">POST</span> <span className="text-white">/api/v1/data/purchase</span></div>
+              <div className="mt-2 text-gray-300">{"{"}</div>
+              <div className="pl-4 text-yellow-300">"network": <span className="text-green-400">"MTN"</span>,</div>
+              <div className="pl-4 text-yellow-300">"plan_id": <span className="text-green-400">"1gb-smart"</span>,</div>
+              <div className="pl-4 text-yellow-300">"phone": <span className="text-green-400">"080XXXXXXXX"</span></div>
+              <div className="text-gray-300">{"}"}</div>
+              <div className="mt-3 text-gray-500">// Response</div>
+              <div className="text-gray-300">{"{"}</div>
+              <div className="pl-4 text-yellow-300">"status": <span className="text-green-400">"success"</span>,</div>
+              <div className="pl-4 text-yellow-300">"message": <span className="text-green-400">"1GB delivered"</span>,</div>
+              <div className="pl-4 text-yellow-300">"reference": <span className="text-green-400">"DATA-17827..."</span></div>
+              <div className="text-gray-300">{"}"}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Contact ── */}
       <section className="py-12 px-4 bg-gray-50">
         <div className="max-w-3xl mx-auto text-center">
