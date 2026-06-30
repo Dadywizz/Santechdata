@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import NotFound from "@/pages/not-found";
+import Landing from "@/pages/landing";
 
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -57,10 +58,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/verify-email" component={VerifyEmail} />
 
-      <Route path="/" component={() => {
-        window.location.replace("/dashboard");
-        return null;
-      }} />
+      <Route path="/" component={Landing} />
 
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/buy-data" component={BuyData} />
