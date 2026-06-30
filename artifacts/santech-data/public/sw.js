@@ -1,4 +1,4 @@
-const CACHE = "santech-v1";
+const CACHE = "santech-v4";
 const OFFLINE = ["/", "/manifest.json"];
 
 self.addEventListener("install", (e) => {

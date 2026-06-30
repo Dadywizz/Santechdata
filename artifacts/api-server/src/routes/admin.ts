@@ -11,6 +11,7 @@ import {
   ticketsTable,
   settingsTable,
   examTypesTable,
+  apiKeysTable,
 } from "@workspace/db";
 import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
 import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
@@ -703,6 +704,72 @@ router.post("/admin/debug-monnify", authenticate, requireAdmin, async (_req, res
   } catch (err: any) {
     res.json({ configured: true, baseUrl, authSuccess: false, error: err?.message });
   }
+});
+
+// ── API KEYS ──────────────────────────────────────────────────────────────────
+
+router.get("/admin/api-keys", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const keys = await db
+    .select({
+      id: apiKeysTable.id,
+      userId: apiKeysTable.userId,
+      name: apiKeysTable.name,
+      key: apiKeysTable.key,
+      isActive: apiKeysTable.isActive,
+      totalRequests: apiKeysTable.totalRequests,
+      lastUsedAt: apiKeysTable.lastUsedAt,
+      createdAt: apiKeysTable.createdAt,
+      userFullName: usersTable.fullName,
+      userEmail: usersTable.email,
+    })
+    .from(apiKeysTable)
+    .leftJoin(usersTable, eq(apiKeysTable.userId, usersTable.id))
+    .orderBy(desc(apiKeysTable.createdAt));
+
+  res.json(keys.map(k => ({
+    id: k.id, userId: k.userId, name: k.name, key: k.key,
+    isActive: k.isActive, totalRequests: k.totalRequests,
+    lastUsedAt: k.lastUsedAt, createdAt: k.createdAt,
+    user: { fullName: k.userFullName, email: k.userEmail },
+  })));
+});
+
+router.post("/admin/api-keys", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const { userId, name } = req.body as { userId?: string; name?: string };
+  if (!userId || !name) { res.status(400).json({ error: "userId and name are required" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const rawKey = `sk_live_${crypto.randomUUID().replace(/-/g, "")}`;
+  const [created] = await db.insert(apiKeysTable).values({ userId, name, key: rawKey }).returning();
+  res.status(201).json({
+    id: created.id, userId: created.userId, name: created.name, key: created.key,
+    isActive: created.isActive, totalRequests: created.totalRequests,
+    lastUsedAt: created.lastUsedAt, createdAt: created.createdAt,
+    user: { fullName: user.fullName, email: user.email },
+  });
+});
+
+router.patch("/admin/api-keys/:id", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const { id } = req.params;
+  const { isActive } = req.body as { isActive?: boolean };
+  if (typeof isActive !== "boolean") { res.status(400).json({ error: "isActive (boolean) is required" }); return; }
+  const [updated] = await db.update(apiKeysTable).set({ isActive }).where(eq(apiKeysTable.id, id)).returning();
+  if (!updated) { res.status(404).json({ error: "API key not found" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId)).limit(1);
+  res.json({
+    id: updated.id, userId: updated.userId, name: updated.name, key: updated.key,
+    isActive: updated.isActive, totalRequests: updated.totalRequests,
+    lastUsedAt: updated.lastUsedAt, createdAt: updated.createdAt,
+    user: user ? { fullName: user.fullName, email: user.email } : null,
+  });
+});
+
+router.delete("/admin/api-keys/:id", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const id = (_req as any).params.id as string;
+  const [deleted] = await db.delete(apiKeysTable).where(eq(apiKeysTable.id, id)).returning();
+  if (!deleted) { res.status(404).json({ error: "API key not found" }); return; }
+  res.json({ message: "API key deleted" });
 });
 
 export default router;

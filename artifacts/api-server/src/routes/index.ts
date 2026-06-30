@@ -10,6 +10,7 @@ import supportRouter from "./support";
 import adminRouter from "./admin";
 import airtimeToCashRouter from "./airtime-to-cash";
 import resellerRouter from "./reseller";
+import apiV1Router from "./api-v1";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(supportRouter);
 router.use(adminRouter);
 router.use(airtimeToCashRouter);
 router.use(resellerRouter);
+router.use(apiV1Router);
 
 export default router;

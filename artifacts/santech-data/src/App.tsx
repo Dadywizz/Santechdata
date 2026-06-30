@@ -35,6 +35,7 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
 import AdminResellers from "@/pages/admin/resellers";
+import AdminApiKeys from "@/pages/admin/api-keys";
 import BecomeReseller from "@/pages/become-reseller";
 import BuyAirtime from "@/pages/buy-airtime";
 import PrivacyPolicy from "@/pages/privacy-policy";
@@ -87,6 +88,7 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettings} />
       <Route path="/admin/failed-payments" component={AdminFailedPayments} />
       <Route path="/admin/resellers" component={AdminResellers} />
+      <Route path="/admin/api-keys" component={AdminApiKeys} />
 
       <Route component={NotFound} />
     </Switch>

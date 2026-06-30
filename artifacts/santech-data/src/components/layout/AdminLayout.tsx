@@ -3,13 +3,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
 import {
   LayoutDashboard, Users, History, Wifi, MessageSquare, PieChart,
-  Bell, Settings, LogOut, AlertTriangle, ChevronRight, Crown,
+  Bell, Settings, LogOut, AlertTriangle, ChevronRight, Crown, KeyRound,
 } from "lucide-react";
 
 const ADMIN_NAV = [
   { href: "/admin",               label: "Overview",        icon: LayoutDashboard },
   { href: "/admin/users",         label: "Users",           icon: Users           },
   { href: "/admin/resellers",     label: "Resellers",       icon: Crown           },
+  { href: "/admin/api-keys",      label: "API Keys",        icon: KeyRound        },
   { href: "/admin/transactions",  label: "Transactions",    icon: History         },
   { href: "/admin/failed-payments", label: "Failed Payments", icon: AlertTriangle },
   { href: "/admin/data-plans",    label: "Data Plans",      icon: Wifi            },
