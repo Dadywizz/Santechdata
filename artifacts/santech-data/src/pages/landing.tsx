@@ -2,20 +2,21 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 
-const isPWA =
-  window.matchMedia("(display-mode: standalone)").matches ||
-  (window.navigator as any).standalone === true;
-
 export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (isPWA) {
+    const isPWA =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+    const hasToken = !!sessionStorage.getItem("santech_token");
+
+    if (hasToken) {
       navigate("/dashboard");
+    } else if (isPWA) {
+      navigate("/login");
     }
   }, [navigate]);
-
-  if (isPWA) return null;
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -81,12 +82,12 @@ export default function Landing() {
           <p className="text-center text-gray-500 mb-10">All your utility top-ups, handled fast and cheap</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { icon: "📶", title: "Data Bundles", desc: "MTN, Airtel, GLO & 9Mobile. Daily, weekly & monthly plans from ₦100", color: "blue" },
-              { icon: "📞", title: "Airtime", desc: "Instant airtime top-up for all Nigerian networks at the best rates", color: "green" },
-              { icon: "⚡", title: "Electricity", desc: "Buy prepaid tokens for EKEDC, IKEDC, AEDC and all DISCOs instantly", color: "yellow" },
-              { icon: "📺", title: "Cable TV", desc: "DStv, GOtv and StarTimes subscriptions renewed in seconds", color: "purple" },
-              { icon: "📝", title: "Exam Tokens", desc: "WAEC, NECO, JAMB and NABTEB result checker PINs at cheap rates", color: "orange" },
-              { icon: "💰", title: "Reseller Plan", desc: "Become a reseller for just ₦500 and earn more on every purchase", color: "red" },
+              { icon: "📶", title: "Data Bundles", desc: "MTN, Airtel, GLO & 9Mobile. Daily, weekly & monthly plans from ₦100" },
+              { icon: "📞", title: "Airtime", desc: "Instant airtime top-up for all Nigerian networks at the best rates" },
+              { icon: "⚡", title: "Electricity", desc: "Buy prepaid tokens for EKEDC, IKEDC, AEDC and all DISCOs instantly" },
+              { icon: "📺", title: "Cable TV", desc: "DStv, GOtv and StarTimes subscriptions renewed in seconds" },
+              { icon: "📝", title: "Exam Tokens", desc: "WAEC, NECO, JAMB and NABTEB result checker PINs at cheap rates" },
+              { icon: "💰", title: "Reseller Plan", desc: "Become a reseller for just ₦500 and earn more on every purchase" },
             ].map((s) => (
               <div key={s.title} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="text-3xl mb-3">{s.icon}</div>
@@ -147,7 +148,7 @@ export default function Landing() {
         <div className="max-w-3xl mx-auto bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-3">Become a Reseller</h2>
           <p className="text-blue-100 mb-6 max-w-xl mx-auto">
-            Pay just ₦500 once and unlock wholesale prices on all data and services. 
+            Pay just ₦500 once and unlock wholesale prices on all data and services.
             Sell to your customers and earn profit on every transaction.
           </p>
           <a href="/register">
@@ -162,7 +163,7 @@ export default function Landing() {
       <section className="py-12 px-4 bg-gray-50">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-xl font-bold text-gray-800 mb-2">Need Help?</h2>
-          <p className="text-gray-500 mb-6">Our support team is always ready to assist you</p>
+          <p className="text-gray-500 mb-6">Reach us on WhatsApp or email — we respond fast</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
               href="https://wa.me/2349026329296"
@@ -173,9 +174,9 @@ export default function Landing() {
                 💬 WhatsApp: 09026329296
               </Button>
             </a>
-            <a href="/support">
-              <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 w-full sm:w-auto">
-                Open Support Ticket
+            <a href="mailto:santechdata@gmail.com">
+              <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 gap-2 w-full sm:w-auto">
+                ✉️ santechdata@gmail.com
               </Button>
             </a>
           </div>
@@ -191,11 +192,21 @@ export default function Landing() {
             </div>
             <span className="text-white font-semibold">SanTech Data</span>
           </div>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-6 text-sm">
             <a href="/login" className="hover:text-white transition-colors">Sign In</a>
             <a href="/register" className="hover:text-white transition-colors">Register</a>
             <a href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="/support" className="hover:text-white transition-colors">Support</a>
+            <a
+              href="https://wa.me/2349026329296"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors"
+            >
+              WhatsApp
+            </a>
+            <a href="mailto:santechdata@gmail.com" className="hover:text-white transition-colors">
+              Email Us
+            </a>
           </div>
           <p className="text-xs">© {new Date().getFullYear()} SanTech Data. All rights reserved.</p>
         </div>
