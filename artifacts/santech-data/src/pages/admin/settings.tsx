@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Settings, Mail, CreditCard, Megaphone, Save, Loader2,
   ArrowRightLeft, BookOpen, RefreshCw, Bug, CheckCircle,
-  AlertCircle, Link, Eye, EyeOff, Crown,
+  AlertCircle, Link, Eye, EyeOff, Crown, Lock,
 } from "lucide-react";
 
 const API = "/api/admin/settings";
@@ -220,6 +220,11 @@ export default function AdminSettings() {
   const [resellerCommissionRate, setResellerCommissionRate] = useState("3");
   const [resellerPromoActive, setResellerPromoActive] = useState(false);
   const [resellerPromoEndDate, setResellerPromoEndDate] = useState("");
+
+  const [pwdCurrent, setPwdCurrent] = useState("");
+  const [pwdNew, setPwdNew] = useState("");
+  const [pwdConfirm, setPwdConfirm] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
   const [resellerPromoTitle, setResellerPromoTitle] = useState("Become a Reseller — Limited Offer!");
   const [resellerPromoText, setResellerPromoText] = useState("Activate your reseller account for just ₦500 and earn commission on every referral purchase. Offer ends soon!");
 
@@ -285,6 +290,34 @@ export default function AdminSettings() {
       return r as { ok: boolean; message: string; balance?: number };
     } catch {
       return { ok: false, message: "Failed to link — please try again" };
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!pwdCurrent || !pwdNew || !pwdConfirm) {
+      toast({ title: "All password fields are required", variant: "destructive" }); return;
+    }
+    if (pwdNew.length < 8) {
+      toast({ title: "New password must be at least 8 characters", variant: "destructive" }); return;
+    }
+    if (pwdNew !== pwdConfirm) {
+      toast({ title: "New passwords do not match", variant: "destructive" }); return;
+    }
+    setPwdSaving(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+        body: JSON.stringify({ currentPassword: pwdCurrent, newPassword: pwdNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      toast({ title: "Password changed successfully" });
+      setPwdCurrent(""); setPwdNew(""); setPwdConfirm("");
+    } catch (e: any) {
+      toast({ title: "Failed to change password", description: e.message, variant: "destructive" });
+    } finally {
+      setPwdSaving(false);
     }
   };
 
@@ -577,6 +610,43 @@ export default function AdminSettings() {
               <Input value={value} onChange={(e) => set(e.target.value)} placeholder={placeholder} className="h-10" />
             </div>
           ))}
+        </SectionCard>
+
+        {/* Change Password */}
+        <SectionCard icon={Lock} title="Change Admin Password">
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Current Password</Label>
+            <Input
+              type="password"
+              value={pwdCurrent}
+              onChange={(e) => setPwdCurrent(e.target.value)}
+              placeholder="Enter your current password"
+              className="h-10"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">New Password</Label>
+            <Input
+              type="password"
+              value={pwdNew}
+              onChange={(e) => setPwdNew(e.target.value)}
+              placeholder="Minimum 8 characters"
+              className="h-10"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Confirm New Password</Label>
+            <Input
+              type="password"
+              value={pwdConfirm}
+              onChange={(e) => setPwdConfirm(e.target.value)}
+              placeholder="Repeat your new password"
+              className="h-10"
+            />
+          </div>
+          <Button onClick={handleChangePassword} disabled={pwdSaving} className="w-full">
+            {pwdSaving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Changing...</> : <><Lock className="h-4 w-4 mr-2" />Change Password</>}
+          </Button>
         </SectionCard>
 
         {/* Wallet */}
