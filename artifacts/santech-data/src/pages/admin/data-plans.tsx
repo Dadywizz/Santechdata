@@ -31,7 +31,7 @@ function PlanForm({ plan, onClose }: { plan?: any; onClose: () => void }) {
     size: plan?.size || "",
     validity: plan?.validity || "30 Days",
     price: plan?.price?.toString() || "",
-    resellerPrice: plan?.resellerPrice != null ? plan.resellerPrice.toString() : (plan?.price?.toString() || ""),
+    resellerPrice: plan?.resellerPrice != null ? plan.resellerPrice.toString() : "",
     costPrice: plan?.costPrice?.toString() || "",
     providerCode: plan?.providerCode || "",
   });

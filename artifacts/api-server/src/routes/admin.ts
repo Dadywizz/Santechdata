@@ -299,6 +299,11 @@ router.patch("/admin/data-plans/:id", authenticate, requireAdmin, async (req: Au
   if (parsed.data.costPrice != null) updates.costPrice = parsed.data.costPrice.toString();
   if (parsed.data.isActive != null) updates.isActive = parsed.data.isActive;
   if ((parsed.data as any).providerCode != null) updates.providerCode = (parsed.data as any).providerCode;
+  if ("resellerPrice" in parsed.data) {
+    updates.resellerPrice = (parsed.data as any).resellerPrice != null
+      ? (parsed.data as any).resellerPrice.toString()
+      : null;
+  }
 
   const [plan] = await db.update(dataPlansTable).set(updates).where(eq(dataPlansTable.id, raw)).returning();
   if (!plan) {
