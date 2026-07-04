@@ -36,7 +36,7 @@ async function fetchUsers() {
   const res = await fetch("/api/admin/users?limit=200", { headers: { Authorization: `Bearer ${tok()}` } });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.users ?? [];
+  return data.data ?? data.users ?? [];
 }
 
 async function createKey(userId: string, name: string): Promise<ApiKey | null> {

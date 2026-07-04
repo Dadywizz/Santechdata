@@ -228,6 +228,12 @@ export default function AdminSettings() {
   const [resellerPromoTitle, setResellerPromoTitle] = useState("Become a Reseller — Limited Offer!");
   const [resellerPromoText, setResellerPromoText] = useState("Activate your reseller account for just ₦500 and earn commission on every referral purchase. Offer ends soon!");
 
+  // Custom provider
+  const [customProviderName, setCustomProviderName] = useState("");
+  const [customProviderUrl, setCustomProviderUrl] = useState("");
+  const [customProviderToken, setCustomProviderToken] = useState("");
+  const [customProviderSaving, setCustomProviderSaving] = useState(false);
+
   // Provider state
   const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
   const [verified, setVerified] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
@@ -262,6 +268,10 @@ export default function AdminSettings() {
     if (s.resellerPromoTitle)         setResellerPromoTitle(s.resellerPromoTitle);
     if (s.resellerPromoText)          setResellerPromoText(s.resellerPromoText);
 
+    if (s.custom_provider_name) setCustomProviderName(s.custom_provider_name);
+    if (s.custom_provider_url)  setCustomProviderUrl(s.custom_provider_url);
+    if (s.custom_provider_token) setCustomProviderToken(s.custom_provider_token);
+
     setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
     setVerified({ kyb: s.kyb_verified === "true", bigisub: s.bigisub_verified === "true" });
     setNetProviders({
@@ -290,6 +300,25 @@ export default function AdminSettings() {
       return r as { ok: boolean; message: string; balance?: number };
     } catch {
       return { ok: false, message: "Failed to link — please try again" };
+    }
+  };
+
+  const handleSaveCustomProvider = async () => {
+    if (!customProviderName.trim() && !customProviderUrl.trim() && !customProviderToken.trim()) {
+      toast({ title: "Nothing to save", description: "Fill in at least one field.", variant: "destructive" }); return;
+    }
+    setCustomProviderSaving(true);
+    try {
+      await patchSettings({
+        custom_provider_name: customProviderName,
+        custom_provider_url: customProviderUrl,
+        custom_provider_token: customProviderToken,
+      });
+      toast({ title: "Custom provider saved!" });
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setCustomProviderSaving(false);
     }
   };
 
@@ -335,6 +364,8 @@ export default function AdminSettings() {
         referralBonus, minFunding, resellerCommissionRate,
         resellerPromoActive: String(resellerPromoActive),
         resellerPromoEndDate, resellerPromoTitle, resellerPromoText,
+        custom_provider_name: customProviderName,
+        custom_provider_url: customProviderUrl,
         ...Object.fromEntries(Object.entries(netProviders).map(([k, v]) => [`net_provider_${k}`, v])),
         ...Object.fromEntries(Object.entries(examProviders).map(([k, v]) => [`exam_provider_${k}`, v])),
       });
@@ -390,6 +421,55 @@ export default function AdminSettings() {
             {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
             {syncing ? "Syncing..." : "Sync KYB Plans"}
           </Button>
+        </SectionCard>
+
+        {/* Custom / Free Provider */}
+        <SectionCard icon={Link} title="Custom / Free Provider">
+          <p className="text-xs text-slate-500 -mt-1">
+            Got a new API? Enter its name and base URL here to save it for future integration.
+          </p>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Provider Name</Label>
+            <Input
+              value={customProviderName}
+              onChange={(e) => setCustomProviderName(e.target.value)}
+              placeholder="e.g. FreeMobileAPI, NigeriaVTU, MyDataPro"
+              className="h-10"
+            />
+            <p className="text-xs text-slate-400 mt-1">Give it any name you like — this is just for your reference.</p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Base URL</Label>
+            <Input
+              value={customProviderUrl}
+              onChange={(e) => setCustomProviderUrl(e.target.value)}
+              placeholder="https://api.example.com/v1"
+              className="h-10"
+            />
+            <p className="text-xs text-slate-400 mt-1">The root endpoint of the provider's API.</p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">API Token / Key</Label>
+            <Input
+              type="password"
+              value={customProviderToken}
+              onChange={(e) => setCustomProviderToken(e.target.value)}
+              placeholder="Paste your API token or key"
+              className="h-10"
+            />
+            <p className="text-xs text-slate-400 mt-1">Stored securely. Share the API docs with us to complete the integration.</p>
+          </div>
+          <Button onClick={handleSaveCustomProvider} disabled={customProviderSaving} className="w-full">
+            {customProviderSaving
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
+              : <><Save className="h-4 w-4 mr-2" />Save Custom Provider</>}
+          </Button>
+          {customProviderName && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-700">
+              <CheckCircle size={13} className="shrink-0" />
+              <span><strong>{customProviderName}</strong> is saved{customProviderUrl ? ` — ${customProviderUrl}` : ""}.</span>
+            </div>
+          )}
         </SectionCard>
 
         {/* Provider Routing */}
