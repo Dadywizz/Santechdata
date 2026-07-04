@@ -1574,6 +1574,8 @@ components:
           type: ["string", "null"]
         price:
           type: ["number", "null"]
+        resellerPrice:
+          type: ["number", "null"]
         costPrice:
           type: ["number", "null"]
         providerCode:

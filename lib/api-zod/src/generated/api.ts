@@ -920,6 +920,7 @@ export const AdminUpdateDataPlanParams = zod.object({
 export const AdminUpdateDataPlanBody = zod.object({
   "name": zod.string().nullish(),
   "price": zod.number().nullish(),
+  "resellerPrice": zod.number().nullish(),
   "costPrice": zod.number().nullish(),
   "providerCode": zod.string().nullish(),
   "isActive": zod.boolean().nullish()

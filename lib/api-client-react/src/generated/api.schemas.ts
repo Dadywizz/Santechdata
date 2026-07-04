@@ -218,6 +218,8 @@ export interface DataPlanUpdate {
   /** @nullable */
   price?: number | null;
   /** @nullable */
+  resellerPrice?: number | null;
+  /** @nullable */
   costPrice?: number | null;
   /** @nullable */
   providerCode?: string | null;
