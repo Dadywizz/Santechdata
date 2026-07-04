@@ -294,6 +294,11 @@ export default function AdminDataPlans() {
                   <div className="text-right">
                     <p className="font-bold text-primary">₦{plan.price?.toLocaleString()}</p>
                     <p className="text-xs text-muted-foreground">Cost: ₦{plan.costPrice?.toLocaleString()}</p>
+                    {plan.resellerPrice != null ? (
+                      <p className="text-xs font-medium text-purple-600">Reseller: ₦{plan.resellerPrice?.toLocaleString()}</p>
+                    ) : (
+                      <p className="text-xs text-slate-300">Reseller: —</p>
+                    )}
                   </div>
                   <Switch
                     checked={plan.isActive}
