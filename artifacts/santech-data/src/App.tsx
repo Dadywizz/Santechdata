@@ -36,6 +36,7 @@ import AdminSettings from "@/pages/admin/settings";
 import AdminFailedPayments from "@/pages/admin/failed-payments";
 import AdminResellers from "@/pages/admin/resellers";
 import AdminApiKeys from "@/pages/admin/api-keys";
+import ApiKeys from "@/pages/api-keys";
 import BecomeReseller from "@/pages/become-reseller";
 import BuyAirtime from "@/pages/buy-airtime";
 import PrivacyPolicy from "@/pages/privacy-policy";
@@ -76,6 +77,7 @@ function Router() {
       <Route path="/payment/callback" component={PaymentCallback} />
       <Route path="/airtime-to-cash" component={AirtimeToCash} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/api-keys" component={ApiKeys} />
       <Route path="/become-reseller" component={BecomeReseller} />
 
       <Route path="/admin" component={AdminDashboard} />

@@ -22,7 +22,7 @@ import {
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
   setExamProvider, getAllExamMappings, EXAM_TYPES,
 } from "../lib/providers/activeProvider";
-import { eq, sql, desc, inArray, not } from "drizzle-orm";
+import { eq, sql, desc, inArray, not, and } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
   AdminGetUsersQueryParams,
@@ -706,7 +706,54 @@ router.post("/admin/debug-monnify", authenticate, requireAdmin, async (_req, res
   }
 });
 
-// ── API KEYS ──────────────────────────────────────────────────────────────────
+// ── USER API KEYS (customer self-service) ────────────────────────────────────
+
+router.get("/user/api-keys", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const userId = req.user!.id;
+  const keys = await db
+    .select({
+      id: apiKeysTable.id,
+      name: apiKeysTable.name,
+      key: apiKeysTable.key,
+      isActive: apiKeysTable.isActive,
+      totalRequests: apiKeysTable.totalRequests,
+      lastUsedAt: apiKeysTable.lastUsedAt,
+      createdAt: apiKeysTable.createdAt,
+    })
+    .from(apiKeysTable)
+    .where(eq(apiKeysTable.userId, userId))
+    .orderBy(desc(apiKeysTable.createdAt));
+  res.json(keys);
+});
+
+router.post("/user/api-keys", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const userId = req.user!.id;
+  const { name } = req.body as { name?: string };
+  if (!name?.trim()) { res.status(400).json({ error: "Key name is required" }); return; }
+
+  const existing = await db.select({ id: apiKeysTable.id }).from(apiKeysTable).where(eq(apiKeysTable.userId, userId));
+  if (existing.length >= 3) { res.status(400).json({ error: "Maximum 3 API keys allowed per account" }); return; }
+
+  const rawKey = `sk_live_${crypto.randomUUID().replace(/-/g, "")}`;
+  const [created] = await db.insert(apiKeysTable).values({ userId, name: name.trim(), key: rawKey }).returning();
+  res.status(201).json({
+    id: created.id, name: created.name, key: created.key,
+    isActive: created.isActive, totalRequests: created.totalRequests,
+    lastUsedAt: created.lastUsedAt, createdAt: created.createdAt,
+  });
+});
+
+router.delete("/user/api-keys/:id", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  const userId = req.user!.id;
+  const { id } = req.params;
+  const [deleted] = await db.delete(apiKeysTable)
+    .where(and(eq(apiKeysTable.id, id), eq(apiKeysTable.userId, userId)))
+    .returning();
+  if (!deleted) { res.status(404).json({ error: "API key not found" }); return; }
+  res.json({ message: "API key deleted" });
+});
+
+// ── API KEYS (admin) ──────────────────────────────────────────────────────────
 
 router.get("/admin/api-keys", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const keys = await db

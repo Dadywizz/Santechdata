@@ -5,12 +5,8 @@ export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    const isPWA =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
     const hasToken = !!sessionStorage.getItem("santech_token");
     if (hasToken) navigate("/dashboard");
-    else if (isPWA) navigate("/login");
   }, [navigate]);
 
   return (
@@ -98,30 +94,20 @@ export default function Landing() {
 
             {/* App badges */}
             <div className="flex flex-wrap gap-3">
-              <a
-                href="https://wa.me/2349026329296?text=Hello%2C%20I%20want%20to%20download%20the%20SanTech%20Data%20app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[#34a853] text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-green-700 transition-colors"
-              >
+              <span className="flex items-center gap-2 bg-[#34a853]/80 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-default select-none opacity-75">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18.5v-13A1.5 1.5 0 0 1 4.914 4.1l10 6.5a1.5 1.5 0 0 1 0 2.8l-10 6.5A1.5 1.5 0 0 1 3 18.5z"/></svg>
                 <span>
-                  <span className="block text-[10px] font-normal opacity-80">GET IT ON</span>
+                  <span className="block text-[10px] font-normal opacity-80">COMING SOON ON</span>
                   Google Play
                 </span>
-              </a>
-              <a
-                href="https://wa.me/2349026329296?text=Hello%2C%20I%20want%20to%20download%20the%20SanTech%20Data%20iOS%20app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-[#0f172a] border border-gray-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-800 transition-colors"
-              >
+              </span>
+              <span className="flex items-center gap-2 bg-[#0f172a] border border-gray-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-default select-none opacity-75">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
                 <span>
-                  <span className="block text-[10px] font-normal opacity-80">DOWNLOAD ON THE</span>
+                  <span className="block text-[10px] font-normal opacity-80">COMING SOON ON</span>
                   App Store
                 </span>
-              </a>
+              </span>
             </div>
           </div>
 
@@ -230,7 +216,7 @@ export default function Landing() {
             {[
               { title: "Customer", price: "Free", desc: "Create an account and start buying instantly. Fund your wallet and top up any network.", cta: "Get Started", href: "/register", highlight: false },
               { title: "Reseller", price: "₦500", desc: "One-time fee. Get wholesale prices on all plans, earn commission from referrals every month.", cta: "Become Reseller", href: "/register", highlight: true },
-              { title: "Own VTU Site", price: "₦200,000", desc: "We build you a fully branded VTU website powered by our API. Your domain, your business.", cta: "Contact Us", href: "https://wa.me/2349026329296?text=I+want+my+own+VTU+website", highlight: false },
+              { title: "Own VTU Site", price: "₦200,000", desc: "We build you a fully branded VTU website powered by our API. Your domain, your business.", cta: "Contact Us", href: "https://wa.me/2348063136201?text=I+want+my+own+VTU+website", highlight: false },
             ].map((p) => (
               <div key={p.title} className={`rounded-2xl p-6 text-left ${p.highlight ? "bg-[#0f172a] text-white shadow-xl scale-105" : "bg-white border border-gray-100 text-[#0f172a]"}`}>
                 <p className={`text-sm font-semibold uppercase tracking-wide mb-2 ${p.highlight ? "text-blue-400" : "text-orange-500"}`}>{p.title}</p>
@@ -328,7 +314,7 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <a href="https://wa.me/2349026329296?text=I+am+interested+in+the+SanTech+Data+API" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#0f172a] text-white font-bold px-6 py-3 rounded-xl hover:bg-gray-800 transition-colors">
+              <a href="https://wa.me/2348063136201?text=I+am+interested+in+the+SanTech+Data+API" target="_blank" rel="noopener noreferrer" className="inline-block bg-[#0f172a] text-white font-bold px-6 py-3 rounded-xl hover:bg-gray-800 transition-colors">
                 Request API Access
               </a>
             </div>
@@ -367,7 +353,7 @@ export default function Landing() {
             <p className="text-white text-4xl font-extrabold mb-2">₦200,000</p>
             <p className="text-orange-100 mb-6">Full VTU site · Custom branding · Subdomain · Lifetime API access</p>
             <a
-              href="https://wa.me/2349026329296?text=Hello%2C+I+want+my+own+VTU+website+for+%E2%82%A6200%2C000"
+              href="https://wa.me/2348063136201?text=Hello%2C+I+want+my+own+VTU+website+for+%E2%82%A6200%2C000"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block bg-white text-orange-600 font-bold px-8 py-3 rounded-xl hover:bg-orange-50 transition-colors"
@@ -384,9 +370,13 @@ export default function Landing() {
           <h2 className="text-xl font-bold text-[#0f172a] mb-2">Need Help or Have a Question?</h2>
           <p className="text-gray-400 mb-6">Reach us on WhatsApp or email — we respond fast</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="https://wa.me/2349026329296" target="_blank" rel="noopener noreferrer"
+            <a href="tel:09026329296"
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors">
+              📞 Call: 09026329296
+            </a>
+            <a href="https://wa.me/2348063136201" target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-3 rounded-xl transition-colors">
-              💬 WhatsApp: 09026329296
+              💬 WhatsApp: 08063136201
             </a>
             <a href="mailto:santechdata@gmail.com"
               className="flex items-center justify-center gap-2 border-2 border-[#0f172a] text-[#0f172a] hover:bg-[#0f172a] hover:text-white font-semibold px-5 py-3 rounded-xl transition-colors">
@@ -407,7 +397,7 @@ export default function Landing() {
             <a href="/login" className="hover:text-white transition-colors">Sign In</a>
             <a href="/register" className="hover:text-white transition-colors">Register</a>
             <a href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="https://wa.me/2349026329296" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">WhatsApp</a>
+            <a href="https://wa.me/2348063136201" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">WhatsApp</a>
             <a href="mailto:santechdata@gmail.com" className="hover:text-white transition-colors">Email</a>
           </div>
           <p className="text-xs">© {new Date().getFullYear()} SanTech Data</p>
