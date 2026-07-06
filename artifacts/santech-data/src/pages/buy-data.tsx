@@ -10,6 +10,7 @@ import { useGetDataPlans, getGetDataPlansQueryKey, usePurchaseData, DataPlanNetw
 import { Check, Wifi, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const NETWORKS = [
   { id: DataPlanNetwork.MTN, name: "MTN", color: "bg-[#FFCB00] text-black", border: "border-[#FFCB00]" },
@@ -20,6 +21,13 @@ const NETWORKS = [
 
 export default function BuyData() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isReseller = (user as any)?.role === "reseller";
+  const planPrice = (plan: DataPlan) =>
+    isReseller && (plan as any).resellerPrice != null
+      ? (plan as any).resellerPrice as number
+      : plan.price;
+
   const [network, setNetwork] = useState<DataPlanNetwork | null>(null);
   const [phone, setPhone] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
@@ -169,7 +177,12 @@ export default function BuyData() {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-bold text-lg">{plan.size}</span>
-                    <span className="font-bold text-primary">₦{plan.price.toLocaleString()}</span>
+                    <div className="text-right">
+                      <span className="font-bold text-primary">₦{planPrice(plan).toLocaleString()}</span>
+                      {isReseller && (plan as any).resellerPrice != null && (
+                        <p className="text-[10px] text-purple-500 font-semibold leading-none mt-0.5">Reseller</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between items-center text-sm text-muted-foreground">
                     <span>{plan.validity}</span>
@@ -224,7 +237,7 @@ export default function BuyData() {
               >
                 {purchaseMutation.isPending
                   ? "Processing..."
-                  : `Pay ₦${selectedPlan.price.toLocaleString()}`}
+                  : `Pay ₦${planPrice(selectedPlan).toLocaleString()}`}
               </Button>
             </div>
           </div>
