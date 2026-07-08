@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Link } from "wouter";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 import {
   LayoutDashboard, Wifi, Zap, Tv, BookOpen, CreditCard, History,
   Users, Bell, MessageSquare, User, LogOut, Phone, ChevronRight, Crown, KeyRound,
@@ -206,6 +207,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <main className={`flex-1 md:ml-64 min-w-0 ${announcement ? "pt-24 md:pt-10" : "pt-14 md:pt-0"} pb-20 md:pb-0`}>
         <div className="p-4 md:p-8">
+          <InstallAppBanner />
           {children}
         </div>
       </main>

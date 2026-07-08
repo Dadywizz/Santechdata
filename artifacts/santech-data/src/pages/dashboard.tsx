@@ -1,6 +1,5 @@
 import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { WalletCard } from "@/components/WalletCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -123,9 +122,6 @@ export default function Dashboard() {
         <h1 className="text-xl font-black text-slate-900">{greeting}, {firstName} 👋</h1>
         <p className="text-sm text-slate-500 mt-0.5">What would you like to do today?</p>
       </div>
-
-      {/* Install App banner — only shown in browser, not in installed app */}
-      <InstallAppBanner />
 
       {/* Reseller promo banner — admin-controlled, non-resellers only */}
       {isCustomer && promo?.active && (

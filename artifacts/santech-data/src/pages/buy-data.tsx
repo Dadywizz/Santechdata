@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { PurchasingOverlay } from "@/components/ui/purchasing-overlay";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,8 +79,6 @@ export default function BuyData() {
   return (
     <AppLayout>
       <PageHeader title="Buy Data" description="Instant data top-up for all networks" />
-
-      <InstallAppBanner />
 
       <div className="grid gap-6 md:grid-cols-3 pb-28">
         {/* Left column — network + phone */}

@@ -1,27 +1,29 @@
 import { useEffect, useState } from "react";
-import { Download, Share, X } from "lucide-react";
+import { Download, Share, X, Smartphone } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const DISMISS_KEY = "santech_install_banner_dismissed_at";
+const DISMISS_KEY = "santech_install_dismissed_at";
 const DISMISS_DAYS = 7;
 
 function isDismissed() {
-  const raw = localStorage.getItem(DISMISS_KEY);
-  if (!raw) return false;
-  const dismissedAt = Number(raw);
-  if (Number.isNaN(dismissedAt)) return false;
-  return Date.now() - dismissedAt < DISMISS_DAYS * 24 * 60 * 60 * 1000;
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    return Date.now() - Number(raw) < DISMISS_DAYS * 86400000;
+  } catch {
+    return false;
+  }
 }
 
 function isStandalone() {
+  if (typeof window === "undefined") return true;
   return (
-    typeof window !== "undefined" &&
-    (window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true)
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true
   );
 }
 
@@ -31,86 +33,87 @@ function isIos() {
 
 export function InstallAppBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIosHelp, setShowIosHelp] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [ios, setIos] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (isStandalone() || isDismissed()) return;
-
-    const iosDevice = isIos();
-    setIos(iosDevice);
-
-    if (iosDevice) {
-      setVisible(true);
+    if (isStandalone() || isDismissed()) {
+      setDismissed(true);
       return;
     }
-
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setVisible(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (!visible) return null;
+  if (dismissed || isStandalone()) return null;
+
+  const ios = isIos();
 
   const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    setVisible(false);
-    setShowIosHelp(false);
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* empty */ }
+    setDismissed(true);
+    setShowHelp(false);
   };
 
   const handleInstall = async () => {
-    if (ios) {
-      setShowIosHelp(true);
-      return;
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") { setDismissed(true); return; }
+      setDeferredPrompt(null);
     }
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setVisible(false);
-    }
-    setDeferredPrompt(null);
+    setShowHelp(true);
   };
+
+  const helpText = ios
+    ? 'Tap the Share button in Safari, then choose "Add to Home Screen" to install.'
+    : 'Tap the browser menu (⋮) then "Add to Home Screen" or "Install App" to install.';
 
   return (
     <div className="mb-5">
-      <div className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-4 py-3 transition-colors">
+      <div className="flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl px-4 py-3 shadow-md shadow-blue-500/20">
         <button
           type="button"
           onClick={handleInstall}
           className="flex items-center gap-3 flex-1 min-w-0 text-left"
         >
-          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-            <Download size={18} />
+          <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+            {ios ? <Share size={18} /> : <Download size={18} />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-slate-400 leading-none">INSTALL</p>
-            <p className="text-base font-bold leading-tight">SanTech Data App</p>
+            <p className="text-[10px] text-blue-200 leading-none font-medium uppercase tracking-wide">
+              {deferredPrompt ? "Install Now" : "Get the App"}
+            </p>
+            <p className="text-sm font-bold leading-tight">
+              {deferredPrompt
+                ? "Add SanTech Data to your home screen"
+                : ios
+                ? "Add to Home Screen — it's free"
+                : "Install SanTech Data on your phone"}
+            </p>
           </div>
-          <span className="text-xs text-slate-400 shrink-0">Add to Home Screen →</span>
+          <div className="shrink-0 bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg">
+            Install
+          </div>
         </button>
         <button
           type="button"
           onClick={dismiss}
           aria-label="Dismiss"
-          className="p-1 text-slate-400 hover:text-white shrink-0"
+          className="p-1 text-blue-200 hover:text-white shrink-0"
         >
-          <X size={16} />
+          <X size={15} />
         </button>
       </div>
 
-      {showIosHelp && (
-        <div className="mt-2 flex items-start gap-2 bg-slate-100 text-slate-700 rounded-2xl px-4 py-3 text-sm">
-          <Share size={16} className="mt-0.5 shrink-0 text-slate-500" />
-          <p>
-            Tap the <strong>Share</strong> button in Safari, then choose{" "}
-            <strong>&ldquo;Add to Home Screen&rdquo;</strong> to install the app.
-          </p>
+      {showHelp && (
+        <div className="mt-2 flex items-start gap-2.5 bg-blue-50 border border-blue-100 text-blue-800 rounded-2xl px-4 py-3 text-sm">
+          <Smartphone size={16} className="mt-0.5 shrink-0 text-blue-500" />
+          <p>{helpText}</p>
         </div>
       )}
     </div>
