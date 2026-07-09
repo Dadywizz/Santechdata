@@ -9,6 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
 function LandingInstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [installed, setInstalled] = useState(false);
 
   const standalone =
     typeof window !== "undefined" &&
@@ -16,7 +17,7 @@ function LandingInstallButton() {
       (window.navigator as any).standalone === true);
 
   useEffect(() => {
-    if (standalone) return;
+    if (standalone) { setInstalled(true); return; }
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -25,7 +26,7 @@ function LandingInstallButton() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, [standalone]);
 
-  if (standalone) return null;
+  if (installed) return null;
 
   const ios =
     typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -33,32 +34,37 @@ function LandingInstallButton() {
   const handleClick = async () => {
     if (deferredPrompt) {
       await deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") { setInstalled(true); return; }
       setDeferredPrompt(null);
-      return;
     }
     setShowHelp(true);
   };
 
   return (
-    <div>
+    <div className="w-full">
       <button
         type="button"
         onClick={handleClick}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+        className="relative w-full flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-base px-6 py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/40 overflow-hidden group"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>
-          <span className="block text-[10px] font-normal opacity-80">FREE INSTALL</span>
-          Install App
+        <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {ios
+            ? <><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></>
+            : <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>
+          }
+        </svg>
+        <span className="flex flex-col items-start leading-tight">
+          <span className="text-[10px] font-normal text-blue-200 uppercase tracking-widest">Free — No sign-up needed</span>
+          <span>{deferredPrompt ? "Install SanTech Data Now" : ios ? "Add to Home Screen" : "Install App on Your Phone"}</span>
         </span>
       </button>
       {showHelp && (
-        <p className="mt-2 text-xs text-gray-500">
-          {ios
-            ? 'In Safari, tap Share → "Add to Home Screen"'
-            : 'Tap the browser menu (⋮) → "Add to Home Screen"'}
-        </p>
+        <div className="mt-3 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+          <p>{ios ? 'Tap the Share button at the bottom of Safari, then "Add to Home Screen".' : 'Tap the menu (⋮) in Chrome, then tap "Add to Home Screen" or "Install App".'}</p>
+        </div>
       )}
     </div>
   );
