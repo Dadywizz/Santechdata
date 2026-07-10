@@ -6,3 +6,4 @@
 - [EasyAccess API](easyaccess-api.md) — API reference; only Abuja electricity company code (5) is empirically confirmed, all other disco codes are unverified guesses — see caveat before trusting any
 - [Provider routing keys](provider-code-vs-discoid.md) — providerCode (string) vs numeric discoid are different identifier shapes; don't mix them across providers
 - [Multi-instance settings staleness](multi-instance-settings-staleness.md) — autoscale instances keep stale in-memory provider config after Admin Settings save; use TTL read-through refresh, not setInterval
+- [EasyAccess egress-IP blocking](easyaccess-egress-ip-blocking.md) — prod-only EasyAccess verify failures traced to rotating autoscale egress IP being flagged; republish rotates IP, no static-IP feature exists
