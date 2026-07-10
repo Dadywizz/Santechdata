@@ -1063,6 +1063,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/TransactionList"
 
+  /admin/transactions/{id}/resolve:
+    post:
+      operationId: adminResolveTransaction
+      tags: [admin]
+      summary: >-
+        Manually resolve an ambiguous service-purchase transaction (a provider
+        request that timed out client-side, or a historical failed purchase
+        later confirmed via the provider's own portal). If outcome=success,
+        marks the transaction delivered, attaches the token/reference, and
+        debits the wallet for the amount if it hasn't already been charged
+        (i.e. was refunded or never charged). If outcome=failed, confirms the
+        refund and closes it out. Only applies to pending or failed
+        transactions of type data/airtime/electricity/cable/exam.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminResolveTransactionInput"
+      responses:
+        "200":
+          description: Transaction resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
   /admin/data-plans:
     get:
       operationId: adminGetDataPlans
@@ -1564,6 +1599,23 @@ components:
           type: number
         note:
           type: string
+
+    AdminResolveTransactionInput:
+      type: object
+      required: [outcome, note]
+      properties:
+        outcome:
+          type: string
+          enum: [success, failed]
+        token:
+          type: string
+          description: >-
+            The real token/reference issued by the provider, if outcome is
+            success and the service returns one (electricity/exam). Optional
+            for services that don't expose a customer-facing token.
+        note:
+          type: string
+          description: What the admin observed on the provider's portal, for the audit trail.
 
     # ─── DATA SCHEMAS ─────────────────────────────────────────────────────────
     DataPlan:

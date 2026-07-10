@@ -8,6 +8,8 @@
  * or falls back to the BIGISUB_API_TOKEN environment variable.
  */
 
+import { ProviderTimeoutError } from "./errors.js";
+
 let _base = process.env.BIGISUB_BASE_URL ?? "https://api.bigisub.ng/api/v2";
 let _token = process.env.BIGISUB_API_TOKEN ?? "";
 
@@ -58,7 +60,7 @@ async function bigisubFetch(path: string, opts: RequestInit = {}) {
       throw new Error(`BigISub non-JSON response: ${text.slice(0, 200)}`);
     }
   } catch (err: any) {
-    if (err.name === "AbortError") throw new Error("BigISub request timed out. Please try again.");
+    if (err.name === "AbortError") throw new ProviderTimeoutError("BigISub request timed out. Please try again.");
     throw err;
   } finally {
     clearTimeout(timeout);

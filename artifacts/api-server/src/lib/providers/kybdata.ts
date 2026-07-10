@@ -8,6 +8,8 @@
  * Base URL: https://api.kybdatassub.com.ng
  */
 
+import { ProviderTimeoutError } from "./errors.js";
+
 const BASE = "https://api.kybdatassub.com.ng";
 
 let _token = process.env.KYBDATA_API_TOKEN ?? "";
@@ -40,7 +42,7 @@ async function kybFetch(url: string, opts: RequestInit = {}) {
     try { return JSON.parse(text); }
     catch { throw new Error(`KYB Data non-JSON response: ${text.slice(0, 300)}`); }
   } catch (err: any) {
-    if (err.name === "AbortError") throw new Error("KYB Data request timed out. Please try again.");
+    if (err.name === "AbortError") throw new ProviderTimeoutError("KYB Data request timed out. Please try again.");
     throw err;
   } finally {
     clearTimeout(timeout);

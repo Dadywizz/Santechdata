@@ -10,6 +10,8 @@ export * from './adminFundInput';
 export * from './adminGetTicketsParams';
 export * from './adminGetTransactionsParams';
 export * from './adminGetUsersParams';
+export * from './adminResolveTransactionInput';
+export * from './adminResolveTransactionInputOutcome';
 export * from './adminStats';
 export * from './airtimePurchaseInput';
 export * from './airtimePurchaseInputNetwork';

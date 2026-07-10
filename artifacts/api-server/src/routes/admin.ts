@@ -33,9 +33,16 @@ import {
   AdminUpdateDataPlanBody,
   AdminUpdateExamTypeBody,
   BroadcastNotificationBody,
+  AdminResolveTransactionBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+// Thrown inside the resolve-transaction db.transaction() to bail out with a
+// specific HTTP status; caught once outside the transaction below.
+class ResolveError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 
 function userToJson(u: typeof usersTable.$inferSelect) {
   return {
@@ -245,6 +252,83 @@ router.get("/admin/transactions", authenticate, requireAdmin, async (req: AuthRe
   });
 
   res.json({ data, total, page, limit });
+});
+
+// POST /admin/transactions/:id/resolve — manually resolve an ambiguous
+// service-purchase transaction: either a "pending" purchase whose provider
+// call timed out client-side (wallet is still debited, outcome unknown), or
+// a historical "failed" purchase (already auto-refunded) that the admin has
+// since confirmed actually succeeded via the provider's own portal.
+router.post("/admin/transactions/:id/resolve", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const parsed = AdminResolveTransactionBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { outcome, token, note } = parsed.data;
+  const RESOLVABLE_TYPES = new Set(["data", "airtime", "electricity", "cable", "exam"]);
+
+  try {
+    const resolvedTx = await db.transaction(async (dtx) => {
+      const [current] = await dtx.select().from(transactionsTable).where(eq(transactionsTable.id, id)).for("update");
+      if (!current) throw new ResolveError(404, "Transaction not found");
+      if (!RESOLVABLE_TYPES.has(current.type)) {
+        throw new ResolveError(400, "Only service-purchase transactions (data, airtime, electricity, cable, exam) can be resolved this way");
+      }
+      const meta = (current.metadata as Record<string, any>) ?? {};
+      if (meta.resolution) {
+        throw new ResolveError(409, `Transaction was already resolved as "${meta.resolution.outcome}" on ${meta.resolution.resolvedAt}`);
+      }
+      if (current.status === "success") {
+        throw new ResolveError(409, "Transaction is already marked successful");
+      }
+
+      const amount = parseFloat(current.amount);
+
+      if (current.status === "pending") {
+        // Wallet is still debited — this was a provider-call timeout, not a
+        // definitive failure, so no refund has happened yet.
+        if (outcome === "failed") {
+          await dtx.update(walletsTable).set({ balance: sql`balance + ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, current.userId));
+        }
+        // outcome === "success": wallet already correctly charged, nothing to move.
+      } else {
+        // current.status === "failed": auto-refunded at the time of failure
+        // (pre-fix behavior), so the customer already has their money back.
+        if (outcome === "success") {
+          const [wallet] = await dtx.select().from(walletsTable).where(eq(walletsTable.userId, current.userId));
+          const balance = wallet ? parseFloat(wallet.balance) : 0;
+          if (balance < amount) {
+            throw new ResolveError(400, `Cannot re-debit ₦${amount.toLocaleString()} for this confirmed purchase — wallet balance is only ₦${balance.toLocaleString()}. Fund the wallet first, then resolve again.`);
+          }
+          await dtx.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, current.userId));
+        }
+        // outcome === "failed": already refunded and already marked failed — this just records confirmation.
+      }
+
+      const resolution = { resolvedBy: req.userId, resolvedAt: new Date().toISOString(), outcome, note };
+      const newMetadata = { ...meta, resolution, ...(token ? { token } : {}) };
+      const [updated] = await dtx.update(transactionsTable)
+        .set({ status: outcome === "success" ? "success" : "failed", metadata: newMetadata })
+        .where(eq(transactionsTable.id, id))
+        .returning();
+      return updated;
+    });
+
+    await db.insert(notificationsTable).values({
+      userId: resolvedTx.userId,
+      title: outcome === "success" ? "Purchase Confirmed" : "Purchase Failed — Refunded",
+      message: outcome === "success"
+        ? `Good news — your ₦${parseFloat(resolvedTx.amount).toLocaleString()} ${resolvedTx.type} purchase went through.${token ? ` Reference: ${token}` : ""}`
+        : `Your ₦${parseFloat(resolvedTx.amount).toLocaleString()} ${resolvedTx.type} purchase could not be confirmed with the provider and has been refunded to your wallet.`,
+      type: resolvedTx.type as any,
+    });
+
+    req.log.info({ adminId: req.userId, transactionId: id, outcome }, "Admin resolved ambiguous transaction");
+    res.json({ message: `Transaction resolved as ${outcome}` });
+  } catch (err: any) {
+    if (err instanceof ResolveError) { res.status(err.status).json({ error: err.message }); return; }
+    req.log.error({ err, transactionId: id }, "Failed to resolve transaction");
+    res.status(500).json({ error: "Failed to resolve transaction" });
+  }
 });
 
 // GET /admin/failed-payments — failed or pending wallet_fund transactions with user info

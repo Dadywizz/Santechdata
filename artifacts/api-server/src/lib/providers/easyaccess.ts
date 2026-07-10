@@ -12,6 +12,8 @@
  * Airtime is NOT supported — there is no EasyAccess airtime endpoint.
  */
 
+import { ProviderTimeoutError } from "./errors.js";
+
 const BASE = "https://easyaccess.com.ng/api/live/v1";
 
 let _token = process.env.EASYACCESS_API_TOKEN ?? "";
@@ -46,7 +48,7 @@ async function easyaccessFetch(path: string, opts: RequestInit = {}) {
     try { return JSON.parse(text); }
     catch { throw new Error(`EasyAccess non-JSON response: ${text.slice(0, 300)}`); }
   } catch (err: any) {
-    if (err.name === "AbortError") throw new Error("EasyAccess request timed out. Please try again.");
+    if (err.name === "AbortError") throw new ProviderTimeoutError("EasyAccess request timed out. Please try again.");
     throw err;
   } finally {
     clearTimeout(timeout);

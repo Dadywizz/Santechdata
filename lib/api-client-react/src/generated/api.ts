@@ -24,6 +24,7 @@ import type {
   AdminGetTicketsParams,
   AdminGetTransactionsParams,
   AdminGetUsersParams,
+  AdminResolveTransactionInput,
   AdminStats,
   AirtimePurchaseInput,
   AirtimeToCashItem,
@@ -3683,6 +3684,78 @@ export function useAdminGetTransactions<TData = Awaited<ReturnType<typeof adminG
 
 
 
+
+export const getAdminResolveTransactionUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/transactions/${id}/resolve`
+}
+
+/**
+ * @summary Manually resolve an ambiguous service-purchase transaction (a provider request that timed out client-side, or a historical failed purchase later confirmed via the provider's own portal). If outcome=success, marks the transaction delivered, attaches the token/reference, and debits the wallet for the amount if it hasn't already been charged (i.e. was refunded or never charged). If outcome=failed, confirms the refund and closes it out. Only applies to pending or failed transactions of type data/airtime/electricity/cable/exam.
+ */
+export const adminResolveTransaction = async (id: string,
+    adminResolveTransactionInput: AdminResolveTransactionInput, options?: RequestInit): Promise<MessageResponse> => {
+
+  return customFetch<MessageResponse>(getAdminResolveTransactionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      adminResolveTransactionInput,)
+  }
+);}
+
+
+
+
+export const getAdminResolveTransactionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminResolveTransaction>>, TError,{id: string;data: BodyType<AdminResolveTransactionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminResolveTransaction>>, TError,{id: string;data: BodyType<AdminResolveTransactionInput>}, TContext> => {
+
+const mutationKey = ['adminResolveTransaction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminResolveTransaction>>, {id: string;data: BodyType<AdminResolveTransactionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminResolveTransaction(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminResolveTransactionMutationResult = NonNullable<Awaited<ReturnType<typeof adminResolveTransaction>>>
+    export type AdminResolveTransactionMutationBody = BodyType<AdminResolveTransactionInput>
+    export type AdminResolveTransactionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manually resolve an ambiguous service-purchase transaction (a provider request that timed out client-side, or a historical failed purchase later confirmed via the provider's own portal). If outcome=success, marks the transaction delivered, attaches the token/reference, and debits the wallet for the amount if it hasn't already been charged (i.e. was refunded or never charged). If outcome=failed, confirms the refund and closes it out. Only applies to pending or failed transactions of type data/airtime/electricity/cable/exam.
+ */
+export const useAdminResolveTransaction = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminResolveTransaction>>, TError,{id: string;data: BodyType<AdminResolveTransactionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminResolveTransaction>>,
+        TError,
+        {id: string;data: BodyType<AdminResolveTransactionInput>},
+        TContext
+      > => {
+      return useMutation(getAdminResolveTransactionMutationOptions(options));
+    }
 
 export const getAdminGetDataPlansUrl = () => {
 

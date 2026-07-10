@@ -880,6 +880,24 @@ export const AdminGetTransactionsResponse = zod.object({
 
 
 /**
+ * @summary Manually resolve an ambiguous service-purchase transaction (a provider request that timed out client-side, or a historical failed purchase later confirmed via the provider's own portal). If outcome=success, marks the transaction delivered, attaches the token/reference, and debits the wallet for the amount if it hasn't already been charged (i.e. was refunded or never charged). If outcome=failed, confirms the refund and closes it out. Only applies to pending or failed transactions of type data/airtime/electricity/cable/exam.
+ */
+export const AdminResolveTransactionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminResolveTransactionBody = zod.object({
+  "outcome": zod.enum(['success', 'failed']),
+  "token": zod.string().optional().describe('The real token\/reference issued by the provider, if outcome is success and the service returns one (electricity\/exam). Optional for services that don\'t expose a customer-facing token.'),
+  "note": zod.string().describe('What the admin observed on the provider\'s portal, for the audit trail.')
+})
+
+export const AdminResolveTransactionResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
  * @summary List all data plans for pricing management
  */
 export const AdminGetDataPlansResponseItem = zod.object({

@@ -30,6 +30,17 @@ export default function BuyAirtime() {
   const mutation = usePurchaseAirtime({
     mutation: {
       onSuccess: (tx: any) => {
+        if (tx.status === "pending") {
+          toast({
+            title: "Purchase Processing",
+            description: tx.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet.",
+            duration: 8000,
+          });
+          setPhone("");
+          setAmount(null);
+          setCustomAmount("");
+          return;
+        }
         setReceipt({
           reference: tx.reference,
           description: tx.description,

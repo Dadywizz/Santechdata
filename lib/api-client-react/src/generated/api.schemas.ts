@@ -175,6 +175,22 @@ export interface AdminFundInput {
   note: string;
 }
 
+export type AdminResolveTransactionInputOutcome = typeof AdminResolveTransactionInputOutcome[keyof typeof AdminResolveTransactionInputOutcome];
+
+
+export const AdminResolveTransactionInputOutcome = {
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+export interface AdminResolveTransactionInput {
+  outcome: AdminResolveTransactionInputOutcome;
+  /** The real token/reference issued by the provider, if outcome is success and the service returns one (electricity/exam). Optional for services that don't expose a customer-facing token. */
+  token?: string;
+  /** What the admin observed on the provider's portal, for the audit trail. */
+  note: string;
+}
+
 export type DataPlanNetwork = typeof DataPlanNetwork[keyof typeof DataPlanNetwork];
 
 

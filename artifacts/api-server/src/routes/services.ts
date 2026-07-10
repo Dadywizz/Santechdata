@@ -29,6 +29,34 @@ import {
   activeVerifySmartcard,
   activePurchaseExam,
 } from "../lib/providers/activeProvider";
+import { ProviderTimeoutError } from "../lib/providers/errors";
+
+type PurchaseType = "data" | "airtime" | "electricity" | "cable" | "exam";
+
+// ── PENDING-REVIEW HELPER ───────────────────────────────────────────────────
+// Used when a provider call times out client-side (AbortController fired)
+// rather than returning a definitive failure. In that case we do NOT know
+// whether the provider actually completed the purchase — refunding
+// immediately can cause a double loss if it did. Instead we leave the wallet
+// debited, record the transaction as "pending", and flag it for an admin to
+// manually verify against the provider's own portal and resolve via
+// POST /admin/transactions/:id/resolve.
+async function recordPendingPurchase(opts: {
+  userId: string; type: PurchaseType; amount: number; reference: string;
+  description: string; metadata: Record<string, any>;
+}) {
+  const [tx] = await db.insert(transactionsTable).values({
+    userId: opts.userId, type: opts.type as any, status: "pending", amount: opts.amount.toString(),
+    description: opts.description, reference: opts.reference,
+    metadata: { ...opts.metadata, awaitingReview: true },
+  }).returning();
+  await db.insert(notificationsTable).values({
+    userId: opts.userId, title: "Purchase Processing",
+    message: `Your ₦${opts.amount} ${opts.type} purchase is taking longer than usual to confirm. We're checking with the provider and will notify you shortly — please don't retry yet.`,
+    type: opts.type as any,
+  });
+  return tx;
+}
 
 const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "ikeja-electric":        "28",
@@ -149,6 +177,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
   let providerError = "";
   let rawResponse: any = null;
+  let isTimeout = false;
 
   try {
     const r = await activePurchaseData({ plan: plan.providerCode, mobile_number: phone, network: plan.network });
@@ -167,6 +196,17 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
   } catch (err: any) {
     req.log?.error({ err }, "Data purchase error");
     providerError = err?.message ?? "";
+    isTimeout = err instanceof ProviderTimeoutError;
+  }
+
+  if (!delivered && isTimeout) {
+    const tx = await recordPendingPurchase({
+      userId: req.userId!, type: "data", amount: price, reference,
+      description: `${plan.network} ${plan.name} data for ${phone} — awaiting confirmation`,
+      metadata: { network: plan.network, size: plan.size, validity: plan.validity, phone, providerError },
+    });
+    res.status(202).json({ id: tx.id, status: "pending", message: "Your data purchase is being confirmed. We'll notify you shortly — please don't retry yet." });
+    return;
   }
 
   if (!delivered) {
@@ -217,6 +257,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   let delivered = false;
   let providerError = "";
   let rawResponse: any = null;
+  let isTimeout = false;
 
   try {
     const r = await activePurchaseAirtime({ network, amount, mobile_number: phone });
@@ -235,6 +276,17 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
   } catch (err: any) {
     req.log?.error({ err }, "Airtime purchase error");
     providerError = err?.message ?? "";
+    isTimeout = err instanceof ProviderTimeoutError;
+  }
+
+  if (!delivered && isTimeout) {
+    const tx = await recordPendingPurchase({
+      userId: req.userId!, type: "airtime", amount, reference,
+      description: `${network} ₦${amount} airtime for ${phone} — awaiting confirmation`,
+      metadata: { network, phone, amount, providerError },
+    });
+    res.status(202).json({ id: tx.id, status: "pending", message: "Your airtime purchase is being confirmed. We'll notify you shortly — please don't retry yet." });
+    return;
   }
 
   if (!delivered) {
@@ -329,6 +381,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   let delivered = false;
   let providerError = "";
   let rawResponse: any = null;
+  let isTimeout = false;
 
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
@@ -349,6 +402,17 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   } catch (err: any) {
     req.log?.error({ err }, "Electricity purchase error");
     providerError = err?.message ?? "";
+    isTimeout = err instanceof ProviderTimeoutError;
+  }
+
+  if (!delivered && isTimeout) {
+    const tx = await recordPendingPurchase({
+      userId: req.userId!, type: "electricity", amount, reference,
+      description: `Electricity for meter ${meterNumber} — awaiting confirmation`,
+      metadata: { meterNumber, providerCode, meterType, phone, providerError },
+    });
+    res.status(202).json({ id: tx.id, status: "pending", message: "Your electricity purchase is being confirmed. We'll notify you shortly — please don't retry yet." });
+    return;
   }
 
   if (!delivered) {
@@ -458,6 +522,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   let delivered = false;
   let providerError = "";
   let rawResponse: any = null;
+  let isTimeout = false;
 
   try {
     const r = await activePurchaseCable({ plan_id: plan.kybPlanId, smart_card_number: smartcardNumber });
@@ -476,6 +541,17 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
   } catch (err: any) {
     req.log?.error({ err }, "Cable subscribe error");
     providerError = err?.message ?? "";
+    isTimeout = err instanceof ProviderTimeoutError;
+  }
+
+  if (!delivered && isTimeout) {
+    const tx = await recordPendingPurchase({
+      userId: req.userId!, type: "cable", amount: plan.price, reference,
+      description: `${plan.name} for ${smartcardNumber} — awaiting confirmation`,
+      metadata: { provider, planName: plan.name, smartcardNumber, providerError },
+    });
+    res.status(202).json({ id: tx.id, status: "pending", message: "Your cable subscription is being confirmed. We'll notify you shortly — please don't retry yet." });
+    return;
   }
 
   if (!delivered) {
@@ -541,6 +617,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   let delivered = false;
   let providerError = "";
   let rawResponse: any = null;
+  let isTimeout = false;
 
   try {
     const r = await activePurchaseExam({ examid: kybExamId, quantity, examCode: examType.code });
@@ -561,6 +638,17 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   } catch (err: any) {
     req.log?.error({ err }, "Exam purchase error");
     providerError = err?.message ?? "";
+    isTimeout = err instanceof ProviderTimeoutError;
+  }
+
+  if (!delivered && isTimeout) {
+    const tx = await recordPendingPurchase({
+      userId: req.userId!, type: "exam", amount: totalCost, reference,
+      description: `${quantity}x ${examType.name} token(s) — awaiting confirmation`,
+      metadata: { examType: examType.code, quantity, phone, providerError },
+    });
+    res.status(202).json({ id: tx.id, status: "pending", message: "Your exam token purchase is being confirmed. We'll notify you shortly — please don't retry yet." });
+    return;
   }
 
   if (!delivered) {
