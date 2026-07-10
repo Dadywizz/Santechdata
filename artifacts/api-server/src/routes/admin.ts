@@ -741,6 +741,17 @@ router.post("/admin/debug-monnify", authenticate, requireAdmin, async (_req, res
   }
 });
 
+// TEMPORARY diagnostic route — remove after EasyAccess egress-IP investigation is resolved.
+router.get("/admin/debug-egress-ip", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const r = await fetch("https://api.ipify.org?format=json");
+    const body = await r.json();
+    res.json({ egressIp: (body as any).ip });
+  } catch (err: any) {
+    res.json({ error: err?.message });
+  }
+});
+
 // ── USER API KEYS (customer self-service) ────────────────────────────────────
 
 router.get("/user/api-keys", authenticate, async (req: AuthRequest, res): Promise<void> => {
