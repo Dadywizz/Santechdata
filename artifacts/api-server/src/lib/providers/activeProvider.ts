@@ -27,8 +27,17 @@ import {
 } from "./bigisub";
 import {
   isEasyaccessConfigured, easyaccessVerifyMeter, easyaccessPurchaseElectricity, easyaccessGetBalance,
-  easyaccessPurchaseData, easyaccessPurchaseExam, isEasyaccessExamSupported,
+  easyaccessPurchaseData, easyaccessPurchaseExam, isEasyaccessExamSupported, EASYACCESS_ELEC_COMPANY_ID,
 } from "./easyaccess";
+
+// Only discos with a company code confirmed against the live EasyAccess API
+// (see the comment above EASYACCESS_ELEC_COMPANY_ID) should be routed to
+// EasyAccess. Anything else falls back to KYB Data so an unverified/guessed
+// code can't silently misroute a customer's verification or purchase to the
+// wrong utility company.
+function isEasyaccessDiscoConfirmed(providerCode?: string): boolean {
+  return !!providerCode && providerCode.toLowerCase() in EASYACCESS_ELEC_COMPANY_ID;
+}
 
 export type ProviderName = "kyb" | "bigisub" | "clubkonnect" | "gsubz" | "easyaccess";
 export type NetworkName  = "MTN" | "AIRTEL" | "GLO" | "9MOBILE";
@@ -245,7 +254,10 @@ export async function activePurchaseElectricity(opts: { discoid: number | string
   const p = getElectricityProviderName();
   if (p === "kyb")         return kybdataPurchaseElectricity(opts);
   if (p === "bigisub")     return bigisubPurchaseElectricity({ ...opts, discoid: opts.providerCode ?? opts.discoid });
-  if (p === "easyaccess")  return easyaccessPurchaseElectricity({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", MeterType: opts.MeterType, amount: opts.amount });
+  if (p === "easyaccess") {
+    if (!isEasyaccessDiscoConfirmed(opts.providerCode)) return kybdataPurchaseElectricity(opts);
+    return easyaccessPurchaseElectricity({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", MeterType: opts.MeterType, amount: opts.amount });
+  }
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseElectricity(opts);
     if (p === "gsubz")       return await gsubzPurchaseElectricity(opts);
@@ -273,7 +285,10 @@ export async function activeVerifyMeter(opts: { meter_number: string; discoid: n
   const p = getElectricityProviderName();
   if (p === "kyb")         return kybdataVerifyMeter(opts);
   if (p === "bigisub")     return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: opts.providerCode ?? String(opts.discoid), meter_type: opts.meter_type });
-  if (p === "easyaccess")  return easyaccessVerifyMeter({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", meter_type: opts.meter_type });
+  if (p === "easyaccess") {
+    if (!isEasyaccessDiscoConfirmed(opts.providerCode)) return kybdataVerifyMeter(opts);
+    return easyaccessVerifyMeter({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", meter_type: opts.meter_type });
+  }
   try {
     if (p === "clubkonnect") return await clubkonnectVerifyMeter(opts);
     if (p === "gsubz")       return await gsubzVerifyMeter(opts);

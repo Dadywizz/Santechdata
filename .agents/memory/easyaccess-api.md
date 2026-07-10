@@ -34,8 +34,9 @@ Airtime has no EasyAccess endpoint.
 - 1 = MTN, 2 = GLO, 3 = AIRTEL, 4 = 9MOBILE
 
 ### Electricity company codes (for `/pay-electricity` and `/verify-electricity`)
-- 1=Ikeja, 2=Eko, 3=Abuja, 4=Kaduna, 5=Port Harcourt, 6=Ibadan, 7=Enugu, 8=Jos, 9=Benin, 10=Kano, 11=Yola, 12=Aba
-- Companies 13-20 exist but are "currently unavailable"
+**Only `abuja-electric` = 5 is confirmed** (2026-07-10, via a real customer meter verified live against the API). Every other code below is UNCONFIRMED GUESSWORK — the "documentation" it was sourced from (a screenshot) turned out to be a 404/dead page, not real EasyAccess docs. Do not trust or re-enable them without empirically verifying each one the same way (real meter number for that disco, live verify-electricity call, confirm customer name matches). `activeProvider.ts` only routes a disco to EasyAccess if it's present in `EASYACCESS_ELEC_COMPANY_ID` (currently just Abuja); everything else automatically falls back to KYB Data so a wrong guess can't misroute a customer's verification/purchase to an unrelated utility company.
+- Unconfirmed guesses (do not trust): 1=Ikeja, 2=Eko, 3=Abuja(wrong, actually 5), 4=Kaduna, 6=Ibadan, 7=Enugu, 8=Jos, 9=Benin, 10=Kano, 11=Yola, 12=Aba
+- Companies 13-20 allegedly "currently unavailable" per the same untrustworthy source
 
 ### Meter type codes
 - 1 = prepaid, 2 = postpaid

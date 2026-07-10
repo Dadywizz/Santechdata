@@ -67,14 +67,26 @@ export async function easyaccessGetPlans(productType: string): Promise<any> {
 
 // ─── Electricity company codes ────────────────────────────────────────────────
 // Keyed by our canonical providerCode (see ELECTRICITY_PROVIDERS in services.ts)
+//
+// IMPORTANT: the full 1-12 mapping that used to live here (Ikeja=1, Eko=2,
+// Abuja=3, Kaduna=4, Port Harcourt=5, Ibadan=6, Enugu=7, Jos=8, Benin=9,
+// Kano=10, Yola=11, Aba=12) was never actually sourced from real EasyAccess
+// documentation — the screenshot it was based on was a dead/404 page. It was
+// effectively a guess based on a "common" disco numbering convention.
+//
+// On 2026-07-10 a production report (customer "ALH LAWAL ISA WASE", meter
+// 0137211132303, confirmed by the merchant to be an Abuja Electric customer)
+// proved the guess wrong: verify-electricity only succeeded, with the correct
+// customer name, for company=5 — not company=3 as previously assumed. So
+// company 5 is empirically confirmed to be Abuja Electric, not Port Harcourt.
+//
+// Only Abuja is confirmed below. All other discos are commented out until
+// each is confirmed the same way (a real meter number for that disco,
+// verified against EasyAccess directly) — see activeProvider.ts, which falls
+// back to KYB Data for any disco not listed here so unverified codes can't
+// silently misroute a customer's verification/purchase to the wrong utility.
 export const EASYACCESS_ELEC_COMPANY_ID: Record<string, number> = {
-  "ikeja-electric":        1,
-  "abuja-electric":        3,
-  "kaduna-electric":       4,
-  "portharcourt-electric": 5,
-  "ibadan-electric":       6,
-  "jos-electric":          8,
-  "kano-electric":         10,
+  "abuja-electric": 5, // confirmed 2026-07-10 via live meter verification
 };
 
 function meterTypeCode(meterType: string): number {
