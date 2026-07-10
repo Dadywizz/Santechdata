@@ -13,7 +13,7 @@ import {
   examTypesTable,
   apiKeysTable,
 } from "@workspace/db";
-import { kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
+import { kybdataGetDataPlans, kybdataGetElectricityDiscos, isKybdataConfigured } from "../lib/providers/kybdata";
 import { isGsubzConfigured } from "../lib/providers/gsubz";
 import { getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
 import { isEasyaccessConfigured, easyaccessGetPlans } from "../lib/providers/easyaccess";
@@ -640,6 +640,24 @@ router.get("/admin/easyaccess-plans", authenticate, requireAdmin, async (req: Au
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     req.log?.error({ err }, "EasyAccess get-plans error");
+    res.status(502).json({ error: msg });
+  }
+});
+
+// GET /admin/kyb-electricity-discos — read-only lookup of KYB Data's raw disco
+// catalog, used to confirm the correct discoid before switching electricity
+// routing to KYB Data (KYB_ELEC_DISCO_ID in services.ts uses guessed IDs).
+router.get("/admin/kyb-electricity-discos", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  if (!isKybdataConfigured()) {
+    res.status(503).json({ error: "KYB Data token not configured. Set it in Admin → Settings." });
+    return;
+  }
+  try {
+    const raw = await kybdataGetElectricityDiscos();
+    res.json(raw);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    req.log?.error({ err }, "KYB Data get-electricity-discos error");
     res.status(502).json({ error: msg });
   }
 });
