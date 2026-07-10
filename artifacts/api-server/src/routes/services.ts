@@ -269,15 +269,15 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
 
 // ── ELECTRICITY ───────────────────────────────────────────────────────────────
 const ELECTRICITY_PROVIDERS = [
-  { id: "ikeja-electric",        name: "Ikeja Electric (IKEDC)"        },
-  { id: "abuja-electric",        name: "Abuja Electric (AEDC)"         },
-  { id: "kaduna-electric",       name: "Kaduna Electric (KAEDCO)"      },
-  { id: "portharcourt-electric", name: "Port Harcourt Electric (PHED)" },
-  { id: "ibadan-electric",       name: "Ibadan Electric (IBEDC)"       },
-  { id: "jos-electric",          name: "Jos Electric (JED)"            },
-  { id: "kano-electric",         name: "Kano Electric (KEDCO)"         },
-  { id: "enugu-electric",        name: "Enugu Electric (EEDC)"         },
-  { id: "benin-electric",        name: "Benin Electric (BEDC)"         },
+  { id: "ikeja-electric",        code: "ikeja-electric",        name: "Ikeja Electric (IKEDC)"        },
+  { id: "abuja-electric",        code: "abuja-electric",        name: "Abuja Electric (AEDC)"         },
+  { id: "kaduna-electric",       code: "kaduna-electric",       name: "Kaduna Electric (KAEDCO)"      },
+  { id: "portharcourt-electric", code: "portharcourt-electric", name: "Port Harcourt Electric (PHED)" },
+  { id: "ibadan-electric",       code: "ibadan-electric",       name: "Ibadan Electric (IBEDC)"       },
+  { id: "jos-electric",          code: "jos-electric",          name: "Jos Electric (JED)"            },
+  { id: "kano-electric",         code: "kano-electric",         name: "Kano Electric (KEDCO)"         },
+  { id: "enugu-electric",        code: "enugu-electric",        name: "Enugu Electric (EEDC)"         },
+  { id: "benin-electric",        code: "benin-electric",        name: "Benin Electric (BEDC)"         },
 ];
 
 router.get("/electricity/providers", authenticate, async (_req, res): Promise<void> => {
