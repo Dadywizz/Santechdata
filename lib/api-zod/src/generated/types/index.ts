@@ -44,6 +44,7 @@ export * from './examTransaction';
 export * from './examTransactionPinsItem';
 export * from './examType';
 export * from './examTypeCode';
+export * from './examTypeUpdate';
 export * from './forgotPasswordInput';
 export * from './fundingInput';
 export * from './fundingInputGateway';

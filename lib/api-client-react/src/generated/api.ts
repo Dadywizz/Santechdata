@@ -47,6 +47,7 @@ import type {
   ExamPurchaseInput,
   ExamTransaction,
   ExamType,
+  ExamTypeUpdate,
   ForgotPasswordInput,
   FundingInput,
   GetCablePlansParams,
@@ -3971,6 +3972,78 @@ export const useAdminDeleteDataPlan = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAdminDeleteDataPlanMutationOptions(options));
+    }
+
+export const getAdminUpdateExamTypeUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/exams/${id}`
+}
+
+/**
+ * @summary Update exam type pricing
+ */
+export const adminUpdateExamType = async (id: string,
+    examTypeUpdate: ExamTypeUpdate, options?: RequestInit): Promise<ExamType> => {
+
+  return customFetch<ExamType>(getAdminUpdateExamTypeUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      examTypeUpdate,)
+  }
+);}
+
+
+
+
+export const getAdminUpdateExamTypeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateExamType>>, TError,{id: string;data: BodyType<ExamTypeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminUpdateExamType>>, TError,{id: string;data: BodyType<ExamTypeUpdate>}, TContext> => {
+
+const mutationKey = ['adminUpdateExamType'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminUpdateExamType>>, {id: string;data: BodyType<ExamTypeUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  adminUpdateExamType(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminUpdateExamTypeMutationResult = NonNullable<Awaited<ReturnType<typeof adminUpdateExamType>>>
+    export type AdminUpdateExamTypeMutationBody = BodyType<ExamTypeUpdate>
+    export type AdminUpdateExamTypeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update exam type pricing
+ */
+export const useAdminUpdateExamType = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminUpdateExamType>>, TError,{id: string;data: BodyType<ExamTypeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminUpdateExamType>>,
+        TError,
+        {id: string;data: BodyType<ExamTypeUpdate>},
+        TContext
+      > => {
+      return useMutation(getAdminUpdateExamTypeMutationOptions(options));
     }
 
 export const getAdminGetTicketsUrl = (params?: AdminGetTicketsParams,) => {

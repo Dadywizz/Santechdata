@@ -523,12 +523,11 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
   if (!examType) { res.status(404).json({ error: "Exam type not found" }); return; }
   if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
-  // KYB Data numeric IDs for exam types
+  // KYB Data numeric IDs for exam types (only used if the exam is routed to
+  // KYB Data; BigISub/EasyAccess/Clubkonnect route by examCode instead, see
+  // activePurchaseExam in lib/providers/activeProvider.ts).
   const KYB_EXAM_IDS: Record<string, number> = { NECO: 19, WAEC: 34 };
-  const kybExamId = KYB_EXAM_IDS[examType.code.toUpperCase()];
-  if (!kybExamId) {
-    res.status(503).json({ error: `${examType.code} tokens are not currently available. Please contact support on 09026329296.` }); return;
-  }
+  const kybExamId = KYB_EXAM_IDS[examType.code.toUpperCase()] ?? 0;
 
   const totalCost = parseFloat(examType.price) * quantity;
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));

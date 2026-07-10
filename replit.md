@@ -63,6 +63,13 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - **KYB Data** — token loaded from `kybdata_api_token` DB setting (set via Admin → Settings) or `KYBDATA_API_TOKEN` env var. Admin can update via the Settings page without restarting the server.
 - **EasyAccess** — token loaded from `easyaccess_api_token` DB setting (set via Admin → Settings) or `EASYACCESS_API_TOKEN` env var. Electricity-only; toggle which provider handles electricity via Admin → Settings → Provider Routing → Electricity (`elec_provider` setting). Dev and production have separate databases, so this setting must be applied separately in each environment's Admin → Settings after deploying.
 
+## Exam Pricing
+
+- Exam types (WAEC, NECO, JAMB, NABTEB) each have `price` + `costPrice` in `exam_types`, editable by admin at `/admin/exams`.
+- `POST /admin/seed-exam-types` upserts all 4 exam codes with default pricing on first insert; re-running it only refreshes `name`/`description`, never overwrites admin-set `price`/`costPrice`.
+- `PATCH /admin/exams/:id` updates name/price/costPrice/description for a single exam type (admin-only).
+- Public `/exam/types` GET intentionally omits `costPrice` to avoid exposing margin to customers.
+
 ## Reseller Programme
 
 - Customers pay ₦500 one-time to become resellers (deducted from wallet)

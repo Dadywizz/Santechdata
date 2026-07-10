@@ -405,6 +405,7 @@ export const GetExamTypesResponseItem = zod.object({
   "name": zod.string(),
   "code": zod.enum(['WAEC', 'NECO', 'JAMB', 'NABTEB']),
   "price": zod.number(),
+  "costPrice": zod.number().nullish(),
   "description": zod.string().nullish()
 })
 export const GetExamTypesResponse = zod.array(GetExamTypesResponseItem)
@@ -949,6 +950,30 @@ export const AdminDeleteDataPlanParams = zod.object({
 
 export const AdminDeleteDataPlanResponse = zod.object({
   "message": zod.string()
+})
+
+
+/**
+ * @summary Update exam type pricing
+ */
+export const AdminUpdateExamTypeParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdminUpdateExamTypeBody = zod.object({
+  "name": zod.string().nullish(),
+  "price": zod.number().nullish(),
+  "costPrice": zod.number().nullish(),
+  "description": zod.string().nullish()
+})
+
+export const AdminUpdateExamTypeResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "code": zod.enum(['WAEC', 'NECO', 'JAMB', 'NABTEB']),
+  "price": zod.number(),
+  "costPrice": zod.number().nullish(),
+  "description": zod.string().nullish()
 })
 
 

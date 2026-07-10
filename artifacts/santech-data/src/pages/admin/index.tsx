@@ -3,7 +3,7 @@ import { useGetAdminStats, getGetAdminStatsQueryKey } from "@workspace/api-clien
 import {
   Users, TrendingUp, CreditCard, MessageSquare, Activity, Wallet,
   ShieldX, ShieldCheck, ArrowUpRight, AlertTriangle,
-  History, Wifi, Bell, Settings,
+  History, Wifi, Bell, Settings, GraduationCap,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -203,6 +203,7 @@ export default function AdminDashboard() {
           <QuickLink href="/admin/users"           label="Manage Users"       icon={Users}          color="bg-blue-100 text-blue-600"     />
           <QuickLink href="/admin/transactions"    label="View Transactions"  icon={History}        color="bg-purple-100 text-purple-600"  />
           <QuickLink href="/admin/data-plans"      label="Set Data Plans"     icon={Wifi}           color="bg-teal-100 text-teal-600"     />
+          <QuickLink href="/admin/exams"           label="Set Exam Pricing"   icon={GraduationCap}  color="bg-indigo-100 text-indigo-600" />
           <QuickLink href="/admin/tickets"         label="Support Tickets"    icon={MessageSquare}  color="bg-red-100 text-red-600"       />
           <QuickLink href="/admin/notifications"   label="Send Notification"  icon={Bell}           color="bg-amber-100 text-amber-600"   />
           <QuickLink href="/admin/settings"        label="App Settings"       icon={Settings}       color="bg-slate-100 text-slate-600"   />

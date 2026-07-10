@@ -1145,6 +1145,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /admin/exams/{id}:
+    patch:
+      operationId: adminUpdateExamType
+      tags: [admin]
+      summary: Update exam type pricing
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamTypeUpdate"
+      responses:
+        "200":
+          description: Exam type updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamType"
+
   /admin/tickets:
     get:
       operationId: adminGetTickets
@@ -1750,6 +1777,20 @@ components:
           enum: [WAEC, NECO, JAMB, NABTEB]
         price:
           type: number
+        costPrice:
+          type: ["number", "null"]
+        description:
+          type: ["string", "null"]
+
+    ExamTypeUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        price:
+          type: ["number", "null"]
+        costPrice:
+          type: ["number", "null"]
         description:
           type: ["string", "null"]
 

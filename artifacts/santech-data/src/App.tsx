@@ -29,6 +29,7 @@ import AdminDashboard from "@/pages/admin/index";
 import AdminUsers from "@/pages/admin/users";
 import AdminTransactions from "@/pages/admin/transactions";
 import AdminDataPlans from "@/pages/admin/data-plans";
+import AdminExams from "@/pages/admin/exams";
 import AdminTickets from "@/pages/admin/tickets";
 import AdminAnalytics from "@/pages/admin/analytics";
 import AdminNotifications from "@/pages/admin/notifications";
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/transactions" component={AdminTransactions} />
       <Route path="/admin/data-plans" component={AdminDataPlans} />
+      <Route path="/admin/exams" component={AdminExams} />
       <Route path="/admin/tickets" component={AdminTickets} />
       <Route path="/admin/analytics" component={AdminAnalytics} />
       <Route path="/admin/notifications" component={AdminNotifications} />

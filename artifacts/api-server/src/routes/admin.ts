@@ -31,6 +31,7 @@ import {
   AdminGetTransactionsQueryParams,
   AdminCreateDataPlanBody,
   AdminUpdateDataPlanBody,
+  AdminUpdateExamTypeBody,
   BroadcastNotificationBody,
 } from "@workspace/api-zod";
 
@@ -50,6 +51,14 @@ function txToJson(tx: typeof transactionsTable.$inferSelect) {
     id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount),
     description: tx.description, reference: tx.reference, metadata: tx.metadata,
     userId: tx.userId, createdAt: tx.createdAt,
+  };
+}
+
+function examTypeToJson(e: typeof examTypesTable.$inferSelect) {
+  return {
+    id: e.id, name: e.name, code: e.code, price: parseFloat(e.price),
+    costPrice: e.costPrice != null ? parseFloat(e.costPrice) : null,
+    description: e.description,
   };
 }
 
@@ -706,11 +715,15 @@ router.post("/admin/clear-data-plans", authenticate, requireAdmin, async (_req, 
   res.json({ message: "All data plans cleared. You can now add plans for your new provider." });
 });
 
-// POST /admin/seed-exam-types — upsert NECO + WAEC (KYB Data supported types)
+// POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB with default pricing.
+// Existing rows keep their code but get their name/description refreshed; price/costPrice
+// are only set on first insert so admin edits made via /admin/exams are never overwritten.
 router.post("/admin/seed-exam-types", authenticate, requireAdmin, async (_req, res): Promise<void> => {
   const TYPES = [
     { name: "NECO (National Examinations Council)", code: "NECO" as const, price: "2099", costPrice: "1950", description: "NECO result checker PIN" },
     { name: "WAEC (West African Examinations Council)", code: "WAEC" as const, price: "3700", costPrice: "3500", description: "WAEC result checker PIN" },
+    { name: "JAMB (Joint Admissions and Matriculation Board)", code: "JAMB" as const, price: "1000", costPrice: "850", description: "JAMB result checker PIN" },
+    { name: "NABTEB (National Business and Technical Examinations Board)", code: "NABTEB" as const, price: "1000", costPrice: "850", description: "NABTEB result checker PIN" },
   ];
 
   let upserted = 0;
@@ -718,11 +731,39 @@ router.post("/admin/seed-exam-types", authenticate, requireAdmin, async (_req, r
     await db.insert(examTypesTable).values(t)
       .onConflictDoUpdate({
         target: examTypesTable.code,
-        set: { name: t.name, price: t.price, costPrice: t.costPrice, description: t.description },
+        set: { name: t.name, description: t.description },
       });
     upserted++;
   }
-  res.json({ upserted, message: `${upserted} exam type(s) synced (NECO + WAEC).` });
+  res.json({ upserted, message: `${upserted} exam type(s) synced (WAEC, NECO, JAMB, NABTEB).` });
+});
+
+// PATCH /admin/exams/:id — update exam type pricing
+router.patch("/admin/exams/:id", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const parsed = AdminUpdateExamTypeBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (parsed.data.name != null) updates.name = parsed.data.name;
+  if (parsed.data.price != null) updates.price = parsed.data.price.toString();
+  if (parsed.data.costPrice != null) updates.costPrice = parsed.data.costPrice.toString();
+  if ("description" in parsed.data) updates.description = parsed.data.description ?? null;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+
+  const [examType] = await db.update(examTypesTable).set(updates).where(eq(examTypesTable.id, raw)).returning();
+  if (!examType) {
+    res.status(404).json({ error: "Exam type not found" });
+    return;
+  }
+  res.json(examTypeToJson(examType));
 });
 
 // POST /admin/debug-monnify — test Monnify auth (without creating any account)

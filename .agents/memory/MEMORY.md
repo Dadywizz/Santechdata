@@ -7,3 +7,4 @@
 - [Provider routing keys](provider-code-vs-discoid.md) — providerCode (string) vs numeric discoid are different identifier shapes; don't mix them across providers
 - [Multi-instance settings staleness](multi-instance-settings-staleness.md) — autoscale instances keep stale in-memory provider config after Admin Settings save; use TTL read-through refresh, not setInterval
 - [EasyAccess egress-IP blocking](easyaccess-egress-ip-blocking.md) — prod-only EasyAccess verify failures traced to rotating autoscale egress IP being flagged; republish rotates IP, no static-IP feature exists
+- [Exam provider routing](exam-provider-routing.md) — a route's own hardcoded exam-ID allowlist can silently block a code (e.g. JAMB/NABTEB) even though the provider layer fully supports it

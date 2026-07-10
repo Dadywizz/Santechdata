@@ -5,13 +5,12 @@
  * SanTech Data VTU Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { ExamTypeCode } from './examTypeCode';
 
-export interface ExamType {
-  id: string;
-  name: string;
-  code: ExamTypeCode;
-  price: number;
+export interface ExamTypeUpdate {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  price?: number | null;
   /** @nullable */
   costPrice?: number | null;
   /** @nullable */

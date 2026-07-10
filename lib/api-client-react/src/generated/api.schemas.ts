@@ -376,6 +376,19 @@ export interface ExamType {
   code: ExamTypeCode;
   price: number;
   /** @nullable */
+  costPrice?: number | null;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface ExamTypeUpdate {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  costPrice?: number | null;
+  /** @nullable */
   description?: string | null;
 }
 
