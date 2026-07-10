@@ -715,6 +715,12 @@ router.post("/admin/clear-data-plans", authenticate, requireAdmin, async (_req, 
   res.json({ message: "All data plans cleared. You can now add plans for your new provider." });
 });
 
+// GET /admin/exams — list all exam types with cost price + sell price for pricing management
+router.get("/admin/exams", authenticate, requireAdmin, async (_req, res): Promise<void> => {
+  const types = await db.select().from(examTypesTable);
+  res.json(types.map(examTypeToJson));
+});
+
 // POST /admin/seed-exam-types — upsert WAEC, NECO, JAMB, NABTEB with default pricing.
 // Existing rows keep their code but get their name/description refreshed; price/costPrice
 // are only set on first insert so admin edits made via /admin/exams are never overwritten.

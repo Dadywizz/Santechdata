@@ -3974,6 +3974,83 @@ export const useAdminDeleteDataPlan = <TError = ErrorType<unknown>,
       return useMutation(getAdminDeleteDataPlanMutationOptions(options));
     }
 
+export const getAdminGetExamTypesUrl = () => {
+
+
+
+
+  return `/api/admin/exams`
+}
+
+/**
+ * @summary List all exam types for pricing management
+ */
+export const adminGetExamTypes = async ( options?: RequestInit): Promise<ExamType[]> => {
+
+  return customFetch<ExamType[]>(getAdminGetExamTypesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAdminGetExamTypesQueryKey = () => {
+    return [
+    `/api/admin/exams`
+    ] as const;
+    }
+
+
+export const getAdminGetExamTypesQueryOptions = <TData = Awaited<ReturnType<typeof adminGetExamTypes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetExamTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminGetExamTypesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetExamTypes>>> = ({ signal }) => adminGetExamTypes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminGetExamTypes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AdminGetExamTypesQueryResult = NonNullable<Awaited<ReturnType<typeof adminGetExamTypes>>>
+export type AdminGetExamTypesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all exam types for pricing management
+ */
+
+export function useAdminGetExamTypes<TData = Awaited<ReturnType<typeof adminGetExamTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminGetExamTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAdminGetExamTypesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getAdminUpdateExamTypeUrl = (id: string,) => {
 
 

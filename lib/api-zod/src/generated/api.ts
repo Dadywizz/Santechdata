@@ -954,6 +954,20 @@ export const AdminDeleteDataPlanResponse = zod.object({
 
 
 /**
+ * @summary List all exam types for pricing management
+ */
+export const AdminGetExamTypesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "code": zod.enum(['WAEC', 'NECO', 'JAMB', 'NABTEB']),
+  "price": zod.number(),
+  "costPrice": zod.number().nullish(),
+  "description": zod.string().nullish()
+})
+export const AdminGetExamTypesResponse = zod.array(AdminGetExamTypesResponseItem)
+
+
+/**
  * @summary Update exam type pricing
  */
 export const AdminUpdateExamTypeParams = zod.object({

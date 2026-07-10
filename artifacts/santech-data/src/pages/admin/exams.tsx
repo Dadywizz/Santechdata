@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useGetExamTypes, getGetExamTypesQueryKey, useAdminUpdateExamType } from "@workspace/api-client-react";
+import { useAdminGetExamTypes, getAdminGetExamTypesQueryKey, useAdminUpdateExamType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { GraduationCap, Pencil, RefreshCw } from "lucide-react";
@@ -33,7 +33,7 @@ function ExamForm({ examType, onClose }: { examType: any; onClose: () => void })
     mutation: {
       onSuccess: () => {
         toast({ title: "Exam pricing updated" });
-        queryClient.invalidateQueries({ queryKey: getGetExamTypesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getAdminGetExamTypesQueryKey() });
         onClose();
       },
       onError: (e: any) => toast({ title: "Failed", description: e.data?.error, variant: "destructive" }),
@@ -86,7 +86,7 @@ export default function AdminExams() {
   const [editExam, setEditExam] = useState<any>(null);
   const [syncing, setSyncing] = useState(false);
 
-  const { data = [], isLoading } = useGetExamTypes({ query: { queryKey: getGetExamTypesQueryKey() } });
+  const { data = [], isLoading } = useAdminGetExamTypes({ query: { queryKey: getAdminGetExamTypesQueryKey() } });
 
   const handleSync = async () => {
     setSyncing(true);
@@ -101,7 +101,7 @@ export default function AdminExams() {
         toast({ title: "Sync failed", description: data.error ?? "Unknown error", variant: "destructive" });
       } else {
         toast({ title: "Exam types synced", description: data.message });
-        queryClient.invalidateQueries({ queryKey: getGetExamTypesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getAdminGetExamTypesQueryKey() });
       }
     } catch {
       toast({ title: "Sync failed", description: "Network error. Please try again.", variant: "destructive" });
