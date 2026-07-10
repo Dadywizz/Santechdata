@@ -101,7 +101,11 @@ export async function easyaccessVerifyMeter(opts: {
       company,
       metertype: meterTypeCode(opts.meter_type),
       meterno: opts.meter_number,
-      amount: 1000,
+      // Some discos (e.g. Kaduna, Ibadan, Jos) reject verify calls below their
+      // minimum vend amount (observed: N2000). This is just a probe amount for
+      // verification, not an actual charge, so use a value safely above any
+      // known disco minimum to avoid false "invalid meter" failures.
+      amount: 3000,
     }),
   });
   const ok = isSuccess(res);
