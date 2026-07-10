@@ -376,7 +376,7 @@ export default function AdminSettings() {
         ...Object.fromEntries(Object.entries(examProviders).map(([k, v]) => [`exam_provider_${k}`, v])),
         elec_provider: electricityProvider,
       });
-      toast({ title: "Settings saved!" });
+      toast({ title: "Settings saved!", description: "May take up to 15 seconds to apply on all servers." });
     } catch {
       toast({ title: "Failed to save", variant: "destructive" });
     } finally {

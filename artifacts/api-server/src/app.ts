@@ -3,6 +3,7 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { ensureFreshSettings } from "./lib/settingsCache";
 
 declare global {
   namespace Express {
@@ -41,6 +42,10 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/api", async (_req, _res, next) => {
+  await ensureFreshSettings();
+  next();
+});
 app.use("/api", router);
 
 export default app;

@@ -13,18 +13,18 @@ import {
   examTypesTable,
   apiKeysTable,
 } from "@workspace/db";
-import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
-import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
-import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
-import { setBigisubToken, setBigisubBaseUrl, getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
-import { setEasyaccessToken, isEasyaccessConfigured, easyaccessGetPlans } from "../lib/providers/easyaccess";
+import { kybdataGetDataPlans, isKybdataConfigured } from "../lib/providers/kybdata";
+import { isGsubzConfigured } from "../lib/providers/gsubz";
+import { getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
+import { isEasyaccessConfigured, easyaccessGetPlans } from "../lib/providers/easyaccess";
 import {
-  setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
-  setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
-  setExamProvider, getAllExamMappings, EXAM_TYPES,
-  setElectricityProvider, getElectricityProviderName,
+  getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
+  getAllNetworkMappings, testProviderConnection, NETWORKS,
+  getAllExamMappings, EXAM_TYPES,
+  getElectricityProviderName,
 } from "../lib/providers/activeProvider";
 import { eq, sql, desc, inArray, not, and } from "drizzle-orm";
+import { refreshSettings } from "../lib/settingsCache";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
 import {
   AdminGetUsersQueryParams,
@@ -472,19 +472,11 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
   const entries = Object.entries(req.body as Record<string, string>);
   for (const [key, value] of entries) {
     await db.insert(settingsTable).values({ key, value }).onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-    if (key === "kybdata_api_token"    && value) setKybdataToken(value);
-    if (key === "bigisub_api_token"    && value) setBigisubToken(value);
-    if (key === "bigisub_base_url"     && value) setBigisubBaseUrl(value);
-    if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
-    if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
-    if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);
-    if (key === "easyaccess_api_token" && value) setEasyaccessToken(value);
-    if (key === "activeProvider"       && value) setActiveProvider(value);
-    if (key === "elec_provider")                 setElectricityProvider(value);
-    if (key.startsWith("net_provider_"))        setNetworkProvider(key.replace("net_provider_", ""), value);
-    if (key.startsWith("exam_provider_"))       setExamProvider(key.replace("exam_provider_", ""), value);
   }
-  res.json({ updated: entries.length });
+  // Hot-reload this instance immediately; other autoscale instances will
+  // pick up the change within their own settings-cache TTL (see settingsCache.ts).
+  await refreshSettings();
+  res.json({ updated: entries.length, propagationSeconds: 15 });
 });
 
 // POST /admin/link-provider — save credential + test connection
@@ -738,17 +730,6 @@ router.post("/admin/debug-monnify", authenticate, requireAdmin, async (_req, res
     });
   } catch (err: any) {
     res.json({ configured: true, baseUrl, authSuccess: false, error: err?.message });
-  }
-});
-
-// TEMPORARY diagnostic route — remove after EasyAccess egress-IP investigation is resolved.
-router.get("/admin/debug-egress-ip", authenticate, requireAdmin, async (_req, res): Promise<void> => {
-  try {
-    const r = await fetch("https://api.ipify.org?format=json");
-    const body = await r.json();
-    res.json({ egressIp: (body as any).ip });
-  } catch (err: any) {
-    res.json({ error: err?.message });
   }
 });
 

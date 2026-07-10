@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
+import { refreshSettings } from "../lib/settingsCache";
 import {
   GetDataPlansQueryParams,
   PurchaseDataBody,
@@ -285,6 +286,9 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   const parsed = VerifyMeterBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { meterNumber, providerCode, meterType } = parsed.data;
+  // Force a fresh read of routing settings — this path has previously misrouted
+  // on stale per-instance state, so don't rely on the TTL window here.
+  await refreshSettings();
   if (!isElectricityProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
@@ -309,6 +313,9 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const { meterNumber, providerCode, meterType, amount, phone } = parsed.data;
 
   if (amount < 500) { res.status(400).json({ error: "Minimum electricity purchase is ₦500" }); return; }
+  // Force a fresh read of routing settings — this path has previously misrouted
+  // on stale per-instance state, so don't rely on the TTL window here.
+  await refreshSettings();
   if (!isElectricityProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));

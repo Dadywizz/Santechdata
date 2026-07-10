@@ -1,0 +1,10 @@
+---
+name: Multi-instance settings staleness on autoscale
+description: Provider/routing config loaded once at process boot goes stale on other autoscale instances after an Admin Settings save; symptom is intermittent/inconsistent provider behavior in production that never reproduces in dev.
+---
+
+Provider credentials and routing choices (e.g. which VTU/electricity provider is active) were historically loaded from the DB `settings` table once at server boot into module-level in-memory variables, and only "hot-reloaded" on the single instance that happened to handle an Admin → Settings PATCH request.
+
+**Why this matters:** Replit autoscale can run multiple concurrent instances of the same server process. An admin saving a setting only updates the DB plus whichever instance served that request — every other already-running instance keeps its stale in-memory value indefinitely (no restart, no TTL). Symptom pattern: the DB clearly shows the correct/intended setting, direct calls to the intended downstream provider succeed reliably, yet some fraction of real customer requests behave as if a *different* provider or stale config is active. This is very hard to catch in dev (single instance) and looks like a flaky/external-provider bug until you compare a failing request's actual raw provider response shape against the DB setting.
+
+**How to apply:** Any in-memory config/credentials cache that can be changed at runtime via an admin action needs either (a) a short TTL read-through refresh from the DB triggered on the request path (not a `setInterval`, since autoscale suspends CPU between requests and timers won't fire reliably), or (b) to be re-read from the DB on every use. A ~15s TTL read-through cache (single-flight, swallow DB errors and keep last-good state) applied via request middleware is a reasonable default for low-QPS apps. For a specific hot path that has already caused a customer-facing incident, additionally force an unconditional refresh at the top of that handler rather than relying on the TTL window.
