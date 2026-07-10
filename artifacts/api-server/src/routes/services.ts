@@ -284,14 +284,21 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   const parsed = VerifyMeterBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { meterNumber, providerCode, meterType } = parsed.data;
+  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
   try {
-    if (isActiveProviderConfigured()) {
-      const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-      const r = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
-      res.json({ meterNumber, name: r.customer_name || "Customer", address: r.address || "" }); return;
+    const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
+    const r: any = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
+    const customerName = r?.data?.customer_name || r?.customer_name;
+    if (!customerName) {
+      const providerMsg = r?.message || r?.data?.message || "Could not verify this meter number. Please check it and try again.";
+      res.status(422).json({ error: providerMsg });
+      return;
     }
-  } catch (err) { req.log?.error({ err }, "Meter verify error"); }
-  res.json({ meterNumber, name: "Customer", address: "" });
+    res.json({ meterNumber, name: customerName, address: r?.data?.address || r?.address || "" });
+  } catch (err: any) {
+    req.log?.error({ err }, "Meter verify error");
+    res.status(422).json({ error: err?.message || "Could not verify this meter number. Please check it and try again." });
+  }
 });
 
 router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res): Promise<void> => {
@@ -407,13 +414,20 @@ router.post("/cable/verify-smartcard", authenticate, async (req: AuthRequest, re
   const parsed = VerifySmartcardBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { smartcardNumber, provider } = parsed.data as { smartcardNumber: string; provider?: string };
+  if (!isActiveProviderConfigured() || !provider) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
   try {
-    if (isActiveProviderConfigured() && provider) {
-      const r = await activeVerifySmartcard({ smart_card_number: smartcardNumber, cable_name: provider });
-      res.json({ smartcardNumber, name: r.customer_name || "Customer", currentPlan: r.current_plan || "", dueDate: "" }); return;
+    const r: any = await activeVerifySmartcard({ smart_card_number: smartcardNumber, cable_name: provider });
+    const customerName = r?.data?.customer_name || r?.customer_name;
+    if (!customerName) {
+      const providerMsg = r?.message || r?.data?.message || "Could not verify this smartcard number. Please check it and try again.";
+      res.status(422).json({ error: providerMsg });
+      return;
     }
-  } catch (err) { req.log?.error({ err }, "Smartcard verify error"); }
-  res.json({ smartcardNumber, name: "Customer", currentPlan: "", dueDate: "" });
+    res.json({ smartcardNumber, name: customerName, currentPlan: r?.data?.current_plan || r?.current_plan || "", dueDate: "" });
+  } catch (err: any) {
+    req.log?.error({ err }, "Smartcard verify error");
+    res.status(422).json({ error: err?.message || "Could not verify this smartcard number. Please check it and try again." });
+  }
 });
 
 router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Promise<void> => {
