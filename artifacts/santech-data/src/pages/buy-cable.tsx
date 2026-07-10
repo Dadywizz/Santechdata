@@ -40,10 +40,10 @@ export default function BuyCable() {
   const subscribeMutation = useSubscribeCable({
     mutation: {
       onSuccess: (tx: any) => {
-        if (tx.status === "pending") {
+        if (!tx || tx.status !== "success") {
           toast({
-            title: "Subscription Processing",
-            description: tx.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet.",
+            title: tx?.status === "pending" ? "Subscription Processing" : "Subscription Submitted",
+            description: tx?.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet — check your Transactions page for the result.",
             duration: 8000,
           });
           setSmartcardNumber(""); setPlanId(""); setVerified(null);

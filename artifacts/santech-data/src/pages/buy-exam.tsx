@@ -28,23 +28,23 @@ export default function BuyExam() {
   const mutation = usePurchaseExamToken({
     mutation: {
       onSuccess: (tx: any) => {
-        if (tx.status === "pending") {
+        if (!tx || tx.status !== "success") {
           toast({
-            title: "Purchase Processing",
-            description: tx.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet.",
+            title: tx?.status === "pending" ? "Purchase Processing" : "Purchase Submitted",
+            description: tx?.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet — check your Transactions page for the result.",
             duration: 8000,
           });
           setSelectedExam(""); setQuantity(1);
           return;
         }
         setReceipt({
-          reference: tx.reference,
-          description: tx.description,
+          reference: tx.id,
+          description: `${tx.examType} exam token${(tx.pins?.length ?? 0) > 1 ? "s" : ""}`,
           amount: tx.amount,
-          examType: (tx.metadata as any)?.examType,
-          quantity: (tx.metadata as any)?.quantity,
-          phone: (tx.metadata as any)?.phone,
-          tokens: (tx.metadata as any)?.tokens,
+          examType: tx.examType,
+          quantity,
+          phone,
+          tokens: tx.pins,
           createdAt: tx.createdAt,
           type: "exam",
         });

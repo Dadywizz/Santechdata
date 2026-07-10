@@ -40,23 +40,22 @@ export default function BuyElectricity() {
   const purchaseMutation = usePurchaseElectricity({
     mutation: {
       onSuccess: (tx: any) => {
-        if (tx.status === "pending") {
+        if (!tx || tx.status !== "success") {
           toast({
-            title: "Purchase Processing",
-            description: tx.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet.",
+            title: tx?.status === "pending" ? "Purchase Processing" : "Purchase Submitted",
+            description: tx?.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet — check your Transactions page for the result.",
             duration: 8000,
           });
           setMeterNumber(""); setAmount(null); setCustomAmount(""); setVerified(null); setPhone("");
           return;
         }
         setReceipt({
-          reference: tx.reference,
-          description: tx.description,
+          reference: tx.id,
+          description: `Electricity token for meter ${tx.meterNumber}`,
           amount: tx.amount,
-          provider: (tx.metadata as any)?.provider,
-          meterNumber: (tx.metadata as any)?.meterNumber,
-          phone: (tx.metadata as any)?.phone,
-          token: (tx.metadata as any)?.token,
+          meterNumber: tx.meterNumber,
+          phone,
+          token: tx.token,
           createdAt: tx.createdAt,
           type: "electricity",
         });

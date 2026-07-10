@@ -41,10 +41,10 @@ export default function BuyData() {
   const purchaseMutation = usePurchaseData({
     mutation: {
       onSuccess: (tx: any) => {
-        if (tx.status === "pending") {
+        if (!tx || tx.status !== "success") {
           toast({
-            title: "Purchase Processing",
-            description: tx.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet.",
+            title: tx?.status === "pending" ? "Purchase Processing" : "Purchase Submitted",
+            description: tx?.message || "We're confirming this with the provider and will notify you shortly. Please don't retry yet — check your Transactions page for the result.",
             duration: 8000,
           });
           setPhone("");
