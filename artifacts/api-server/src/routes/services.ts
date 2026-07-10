@@ -334,7 +334,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
     const r = await activePurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount, providerCode });
     rawResponse = r;
-    req.log?.info({ r }, "KYB Data electricity response");
+    req.log?.info({ r, providerCode }, "Electricity provider response");
     const success = (r as any).success === true;
     const st = String((r as any).status ?? "").toLowerCase();
     const msg = String(r.message ?? "").toLowerCase();
