@@ -25,8 +25,11 @@ import {
   bigisubPurchaseElectricity, bigisubPurchaseCable, bigisubPurchaseExam,
   bigisubVerifyMeter, bigisubVerifySmartcard, bigisubGetBalance,
 } from "./bigisub";
+import {
+  isEasyaccessConfigured, easyaccessVerifyMeter, easyaccessPurchaseElectricity, easyaccessGetBalance,
+} from "./easyaccess";
 
-export type ProviderName = "kyb" | "bigisub" | "clubkonnect" | "gsubz";
+export type ProviderName = "kyb" | "bigisub" | "clubkonnect" | "gsubz" | "easyaccess";
 export type NetworkName  = "MTN" | "AIRTEL" | "GLO" | "9MOBILE";
 export type ExamName     = "WAEC" | "NECO" | "JAMB" | "NABTEB";
 
@@ -37,6 +40,7 @@ export const PROVIDER_INFO: Record<ProviderName, {
   bigisub:      { label: "BigISub",     description: "bigisub.ng",            credentialKey: "bigisub_api_token",   credentialLabel: "API Token" },
   clubkonnect:  { label: "Clubkonnect", description: "clubkonnect.com",       credentialKey: "clubkonnect_api_key", credentialLabel: "API Key"   },
   gsubz:        { label: "Gsubz",       description: "gsubz.com",             credentialKey: "gsubz_api_key",       credentialLabel: "API Key"   },
+  easyaccess:   { label: "EasyAccess",  description: "easyaccess.com.ng",     credentialKey: "easyaccess_api_token", credentialLabel: "API Token" },
 };
 
 export const NETWORKS: NetworkName[] = ["MTN", "AIRTEL", "GLO", "9MOBILE"];
@@ -49,6 +53,8 @@ let _default: ProviderName = "kyb";
 const _networkProviders: Partial<Record<NetworkName, ProviderName>> = {};
 // Per-exam overrides
 const _examProviders: Partial<Record<ExamName, ProviderName>> = {};
+// Electricity service override (single toggle — not per-disco)
+let _electricityProvider: ProviderName | null = null;
 
 export function setDefaultProvider(name: string): void {
   if (name in PROVIDER_INFO) _default = name as ProviderName;
@@ -66,12 +72,20 @@ export function setExamProvider(exam: string, provider: string): void {
   else if (EXAM_TYPES.includes(ex) && provider === "")       delete _examProviders[ex];
 }
 
+export function setElectricityProvider(provider: string): void {
+  if (provider in PROVIDER_INFO) _electricityProvider = provider as ProviderName;
+  else if (provider === "") _electricityProvider = null;
+}
+
 export function getDefaultProviderName(): ProviderName { return _default; }
 export function getNetworkProviderName(network: string): ProviderName {
   return _networkProviders[network.toUpperCase() as NetworkName] ?? _default;
 }
 export function getExamProviderName(exam: string): ProviderName {
   return _examProviders[exam.toUpperCase() as ExamName] ?? _default;
+}
+export function getElectricityProviderName(): ProviderName {
+  return _electricityProvider ?? _default;
 }
 
 export function getAllNetworkMappings(): Record<NetworkName, ProviderName> {
@@ -90,11 +104,13 @@ export function setActiveProvider(name: string): void { setDefaultProvider(name)
 export function getActiveProviderName(): ProviderName { return _default; }
 
 export function isActiveProviderConfigured(): boolean { return isProviderConfigured(_default); }
+export function isElectricityProviderConfigured(): boolean { return isProviderConfigured(getElectricityProviderName()); }
 export function isProviderConfigured(name: ProviderName): boolean {
   if (name === "kyb")         return isKybdataConfigured();
   if (name === "bigisub")     return isBigisubConfigured();
   if (name === "clubkonnect") return isClubkonnectConfigured();
   if (name === "gsubz")       return isGsubzConfigured();
+  if (name === "easyaccess")  return isEasyaccessConfigured();
   return false;
 }
 
@@ -104,6 +120,7 @@ export function getAllProviderStatuses(): Record<ProviderName, boolean> {
     bigisub:     isBigisubConfigured(),
     clubkonnect: isClubkonnectConfigured(),
     gsubz:       isGsubzConfigured(),
+    easyaccess:  isEasyaccessConfigured(),
   };
 }
 
@@ -135,6 +152,12 @@ export async function testProviderConnection(name: ProviderName): Promise<{ ok: 
       return { ok, message: ok ? "Connected successfully" : (r.message ?? "Could not verify — check your API key and account verification"), balance: r.balance };
     }
     if (name === "gsubz" && isGsubzConfigured()) return { ok: true, message: "Credentials saved. Full integration pending." };
+    if (name === "easyaccess") {
+      if (!isEasyaccessConfigured()) return { ok: false, message: "API token not set" };
+      const r = await easyaccessGetBalance();
+      const ok = r.balance !== undefined;
+      return { ok, message: ok ? "Connected successfully" : (r.message ?? "Connection failed"), balance: r.balance };
+    }
     return { ok: false, message: "No credentials saved" };
   } catch (err: any) {
     return { ok: false, message: err?.message ?? "Connection test failed" };
@@ -205,12 +228,14 @@ export async function activePurchaseExam(opts: { examid: number | string; quanti
   return kybdataPurchaseExam(opts);
 }
 
-export async function activePurchaseElectricity(opts: { discoid: number | string; MeterType: string; meter_number: string; amount: number }) {
-  if (_default === "kyb")     return kybdataPurchaseElectricity(opts);
-  if (_default === "bigisub") return bigisubPurchaseElectricity(opts);
+export async function activePurchaseElectricity(opts: { discoid: number | string; MeterType: string; meter_number: string; amount: number; providerCode?: string }) {
+  const p = getElectricityProviderName();
+  if (p === "kyb")         return kybdataPurchaseElectricity(opts);
+  if (p === "bigisub")     return bigisubPurchaseElectricity({ ...opts, discoid: opts.providerCode ?? opts.discoid });
+  if (p === "easyaccess")  return easyaccessPurchaseElectricity({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", MeterType: opts.MeterType, amount: opts.amount });
   try {
-    if (_default === "clubkonnect") return await clubkonnectPurchaseElectricity(opts);
-    if (_default === "gsubz")       return await gsubzPurchaseElectricity(opts);
+    if (p === "clubkonnect") return await clubkonnectPurchaseElectricity(opts);
+    if (p === "gsubz")       return await gsubzPurchaseElectricity(opts);
   } catch {
     if (isKybdataConfigured()) return kybdataPurchaseElectricity(opts);
     return bigisubPurchaseElectricity(opts);
@@ -231,12 +256,14 @@ export async function activePurchaseCable(opts: { plan_id: number | string; smar
   return kybdataPurchaseCable(opts);
 }
 
-export async function activeVerifyMeter(opts: { meter_number: string; discoid: number | string; meter_type: string }) {
-  if (_default === "kyb")     return kybdataVerifyMeter(opts);
-  if (_default === "bigisub") return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: String(opts.discoid), meter_type: opts.meter_type });
+export async function activeVerifyMeter(opts: { meter_number: string; discoid: number | string; meter_type: string; providerCode?: string }) {
+  const p = getElectricityProviderName();
+  if (p === "kyb")         return kybdataVerifyMeter(opts);
+  if (p === "bigisub")     return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: opts.providerCode ?? String(opts.discoid), meter_type: opts.meter_type });
+  if (p === "easyaccess")  return easyaccessVerifyMeter({ meter_number: opts.meter_number, providerCode: opts.providerCode ?? "", meter_type: opts.meter_type });
   try {
-    if (_default === "clubkonnect") return await clubkonnectVerifyMeter(opts);
-    if (_default === "gsubz")       return await gsubzVerifyMeter(opts);
+    if (p === "clubkonnect") return await clubkonnectVerifyMeter(opts);
+    if (p === "gsubz")       return await gsubzVerifyMeter(opts);
   } catch {
     if (isKybdataConfigured()) return kybdataVerifyMeter(opts);
     return bigisubVerifyMeter({ meter_number: opts.meter_number, disco: String(opts.discoid), meter_type: opts.meter_type });

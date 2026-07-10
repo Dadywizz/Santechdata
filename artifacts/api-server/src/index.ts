@@ -7,7 +7,8 @@ import { setKybdataToken } from "./lib/providers/kybdata";
 import { setClubkonnectApiKey, setClubkonnectUserId } from "./lib/providers/clubkonnect";
 import { setGsubzApiKey } from "./lib/providers/gsubz";
 import { setBigisubToken, setBigisubBaseUrl } from "./lib/providers/bigisub";
-import { setActiveProvider, setNetworkProvider, setExamProvider } from "./lib/providers/activeProvider";
+import { setEasyaccessToken } from "./lib/providers/easyaccess";
+import { setActiveProvider, setNetworkProvider, setExamProvider, setElectricityProvider } from "./lib/providers/activeProvider";
 
 const rawPort = process.env["PORT"];
 
@@ -39,7 +40,9 @@ app.listen(port, async (err) => {
       if (row.key === "clubkonnect_api_key"  && row.value) setClubkonnectApiKey(row.value);
       if (row.key === "clubkonnect_user_id"  && row.value) setClubkonnectUserId(row.value);
       if (row.key === "gsubz_api_key"        && row.value) setGsubzApiKey(row.value);
+      if (row.key === "easyaccess_api_token" && row.value) setEasyaccessToken(row.value);
       if (row.key === "activeProvider"       && row.value) setActiveProvider(row.value);
+      if (row.key === "elec_provider"        && row.value) setElectricityProvider(row.value);
       if (row.key.startsWith("net_provider_"))  setNetworkProvider(row.key.replace("net_provider_", ""), row.value);
       if (row.key.startsWith("exam_provider_")) setExamProvider(row.key.replace("exam_provider_", ""), row.value);
     }

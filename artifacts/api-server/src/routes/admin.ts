@@ -17,10 +17,12 @@ import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../li
 import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
 import { setBigisubToken, setBigisubBaseUrl, getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
+import { setEasyaccessToken, isEasyaccessConfigured } from "../lib/providers/easyaccess";
 import {
   setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
   setExamProvider, getAllExamMappings, EXAM_TYPES,
+  setElectricityProvider, getElectricityProviderName,
 } from "../lib/providers/activeProvider";
 import { eq, sql, desc, inArray, not, and } from "drizzle-orm";
 import { authenticate, requireAdmin, type AuthRequest } from "../middlewares/auth";
@@ -457,6 +459,9 @@ router.get("/admin/settings", authenticate, requireAdmin, async (_req, res): Pro
   obj.bigisub_verified = statuses.bigisub ? (obj["bigisub_verified"] ?? "false") : "false";
   obj.clubkonnect_configured  = String(statuses.clubkonnect);
   obj.gsubz_configured        = String(statuses.gsubz);
+  obj.easyaccess_configured   = String(statuses.easyaccess);
+  obj.easyaccess_verified     = statuses.easyaccess ? (obj["easyaccess_verified"] ?? "false") : "false";
+  obj.elec_provider           = getElectricityProviderName();
   for (const net  of NETWORKS)    obj[`net_provider_${net}`]  = netMap[net];
   for (const exam of EXAM_TYPES)  obj[`exam_provider_${exam}`] = examMap[exam];
   res.json(obj);
@@ -473,7 +478,9 @@ router.patch("/admin/settings", authenticate, requireAdmin, async (req: AuthRequ
     if (key === "clubkonnect_api_key"  && value) setClubkonnectApiKey(value);
     if (key === "clubkonnect_user_id"  && value) setClubkonnectUserId(value);
     if (key === "gsubz_api_key"        && value) setGsubzApiKey(value);
+    if (key === "easyaccess_api_token" && value) setEasyaccessToken(value);
     if (key === "activeProvider"       && value) setActiveProvider(value);
+    if (key === "elec_provider")                 setElectricityProvider(value);
     if (key.startsWith("net_provider_"))        setNetworkProvider(key.replace("net_provider_", ""), value);
     if (key.startsWith("exam_provider_"))       setExamProvider(key.replace("exam_provider_", ""), value);
   }

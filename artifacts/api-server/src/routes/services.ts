@@ -19,6 +19,7 @@ import {
 } from "@workspace/api-zod";
 import {
   isActiveProviderConfigured,
+  isElectricityProviderConfigured,
   activePurchaseData,
   activePurchaseAirtime,
   activeVerifyMeter,
@@ -284,10 +285,10 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
   const parsed = VerifyMeterBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { meterNumber, providerCode, meterType } = parsed.data;
-  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isElectricityProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-    const r: any = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid" });
+    const r: any = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid", providerCode });
     const customerName = r?.data?.customer_name || r?.customer_name;
     if (!customerName) {
       const providerMsg = r?.message || r?.data?.message || "Could not verify this meter number. Please check it and try again.";
@@ -307,7 +308,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const { meterNumber, providerCode, meterType, amount, phone } = parsed.data;
 
   if (amount < 500) { res.status(400).json({ error: "Minimum electricity purchase is ₦500" }); return; }
-  if (!isActiveProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
+  if (!isElectricityProviderConfigured()) { res.status(503).json({ error: "Service temporarily unavailable. Please try again later." }); return; }
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
@@ -323,7 +324,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
 
   try {
     const discoId = KYB_ELEC_DISCO_ID[providerCode.toLowerCase()] ?? "1";
-    const r = await activePurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount });
+    const r = await activePurchaseElectricity({ discoid: discoId, MeterType: meterType ?? "prepaid", meter_number: meterNumber, amount, providerCode });
     rawResponse = r;
     req.log?.info({ r }, "KYB Data electricity response");
     const success = (r as any).success === true;

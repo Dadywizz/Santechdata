@@ -42,7 +42,7 @@ async function adminPost(path: string, body?: unknown): Promise<any> {
   return res.json();
 }
 
-type ProviderName = "kyb" | "bigisub";
+type ProviderName = "kyb" | "bigisub" | "easyaccess";
 
 type ProviderDef = {
   id: ProviderName;
@@ -61,6 +61,10 @@ const PROVIDERS: ProviderDef[] = [
   {
     id: "kyb", label: "KYB Data", desc: "kybdatassub.com.ng",
     fields: [{ credKey: "kybdata_api_token", label: "API Token", hint: "Paste your KYB Data API token" }],
+  },
+  {
+    id: "easyaccess", label: "EasyAccess", desc: "easyaccess.com.ng",
+    fields: [{ credKey: "easyaccess_api_token", label: "API Token", hint: "Paste your EasyAccess API token" }],
   },
 ];
 
@@ -235,8 +239,8 @@ export default function AdminSettings() {
   const [customProviderSaving, setCustomProviderSaving] = useState(false);
 
   // Provider state
-  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
-  const [verified, setVerified] = useState<Record<string, boolean>>({ kyb: false, bigisub: false });
+  const [configured, setConfigured] = useState<Record<string, boolean>>({ kyb: false, bigisub: false, easyaccess: false });
+  const [verified, setVerified] = useState<Record<string, boolean>>({ kyb: false, bigisub: false, easyaccess: false });
 
   // Per-network / per-exam routing
   const [netProviders, setNetProviders] = useState<Record<string, string>>({
@@ -245,6 +249,7 @@ export default function AdminSettings() {
   const [examProviders, setExamProviders] = useState<Record<string, string>>({
     WAEC: "kyb", NECO: "kyb", JAMB: "kyb", NABTEB: "kyb",
   });
+  const [electricityProvider, setElectricityProvider] = useState<string>("kyb");
 
   const reload = async () => {
     const s = await fetchSettings();
@@ -272,8 +277,8 @@ export default function AdminSettings() {
     if (s.custom_provider_url)  setCustomProviderUrl(s.custom_provider_url);
     if (s.custom_provider_token) setCustomProviderToken(s.custom_provider_token);
 
-    setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true" });
-    setVerified({ kyb: s.kyb_verified === "true", bigisub: s.bigisub_verified === "true" });
+    setConfigured({ kyb: s.kyb_configured === "true", bigisub: s.bigisub_configured === "true", easyaccess: s.easyaccess_configured === "true" });
+    setVerified({ kyb: s.kyb_verified === "true", bigisub: s.bigisub_verified === "true", easyaccess: s.easyaccess_verified === "true" });
     setNetProviders({
       MTN:     s.net_provider_MTN     ?? "kyb",
       AIRTEL:  s.net_provider_AIRTEL  ?? "kyb",
@@ -286,6 +291,7 @@ export default function AdminSettings() {
       JAMB:   s.exam_provider_JAMB   ?? "kyb",
       NABTEB: s.exam_provider_NABTEB ?? "kyb",
     });
+    setElectricityProvider(s.elec_provider ?? "kyb");
     setLoading(false);
   };
 
@@ -368,6 +374,7 @@ export default function AdminSettings() {
         custom_provider_url: customProviderUrl,
         ...Object.fromEntries(Object.entries(netProviders).map(([k, v]) => [`net_provider_${k}`, v])),
         ...Object.fromEntries(Object.entries(examProviders).map(([k, v]) => [`exam_provider_${k}`, v])),
+        elec_provider: electricityProvider,
       });
       toast({ title: "Settings saved!" });
     } catch {
@@ -521,6 +528,25 @@ export default function AdminSettings() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Electricity</p>
+            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <span className="text-sm font-bold text-slate-700">All Discos</span>
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
+                {(["kyb", "bigisub", "easyaccess"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setElectricityProvider(p)}
+                    className={`px-3 py-1.5 transition-colors ${electricityProvider === p ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                  >
+                    {p === "kyb" ? "KYB Data" : p === "bigisub" ? "BigISub" : "EasyAccess"}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </SectionCard>

@@ -30,7 +30,7 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - `lib/api-client-react/` — generated React Query hooks
 - `lib/db/` — Drizzle schema (`users`, `wallets`, `transactions`, `data_plans`, `exam_types`, `notifications`, `referrals`, `tickets`, `ticket_messages`)
 - `artifacts/api-server/src/routes/` — all API route handlers
-- `artifacts/api-server/src/lib/providers/` — integration stubs for VTpass, Clubkonnect, and payment gateways
+- `artifacts/api-server/src/lib/providers/` — provider integrations: BigISub, KYB Data, EasyAccess (electricity only), and payment gateways
 - `artifacts/santech-data/src/pages/` — all customer and admin pages
 - `artifacts/santech-data/src/components/` — shared UI components
 
@@ -38,7 +38,7 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 
 - Contract-first API: OpenAPI spec → Orval → typed React Query hooks + Zod validators. Never handwrite fetch calls.
 - JWT auth stored as `santech_token` / `santech_user` in localStorage; `setAuthTokenGetter` wired in `main.tsx`.
-- All VTU service calls (airtime, data, electricity, cable, exam) are stubbed to work in dev mode. Swap the stubs in `services.ts` for real VTpass/Clubkonnect calls using the provider layer in `lib/providers/`.
+- VTU service calls (airtime, data, cable, exam) route through BigISub/KYB Data; electricity routes through whichever provider is set in `elec_provider` (KYB, BigISub, or EasyAccess) via the provider layer in `lib/providers/`.
 - Payment gateway initiation returns a `paymentUrl` for redirect; verification is simulated in dev mode. Wire `gateways.ts` for production.
 - Admin seeded on first `db push` (see `lib/db/seed.ts`): `admin@santechdata.ng` / `Admin@123456`.
 
@@ -53,13 +53,15 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - Contact number for support: 09026329296
 - Services: data, airtime, electricity, cable TV (DStv/GOtv/StarTimes), exam tokens (WAEC/NECO/JAMB/NABTEB)
 - Payment gateways: Paystack, Flutterwave, Monnify
-- VTU provider: **BigISub** (bigisub.ng) — primary provider for all services. KYB Data also available.
-- DO NOT use VTpass, EasyAccess, Clubkonnect, or Nellobyte
+- VTU provider: **BigISub** (bigisub.ng) — primary provider for data/airtime/cable/exam. KYB Data also available.
+- **Electricity provider: EasyAccess** (easyaccess.com.ng) — explicitly requested to handle electricity purchases specifically (overrides the general "do not use EasyAccess" guidance below, which still applies to other services).
+- DO NOT use VTpass, Clubkonnect, or Nellobyte. Do not use EasyAccess for anything other than electricity without asking first.
 
 ## Provider Setup
 
 - **BigISub** — token loaded from `bigisub_api_token` DB setting (set via Admin → Settings) or `BIGISUB_API_TOKEN` env var. Shown first in Settings UI.
 - **KYB Data** — token loaded from `kybdata_api_token` DB setting (set via Admin → Settings) or `KYBDATA_API_TOKEN` env var. Admin can update via the Settings page without restarting the server.
+- **EasyAccess** — token loaded from `easyaccess_api_token` DB setting (set via Admin → Settings) or `EASYACCESS_API_TOKEN` env var. Electricity-only; toggle which provider handles electricity via Admin → Settings → Provider Routing → Electricity (`elec_provider` setting). Dev and production have separate databases, so this setting must be applied separately in each environment's Admin → Settings after deploying.
 
 ## Reseller Programme
 
@@ -82,7 +84,10 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
-- Provider integration stubs: `artifacts/api-server/src/lib/providers/`
-  - `vtpass.ts` — VTpass API (data, airtime, electricity, cable, exam)
-  - `clubkonnect.ts` — Clubkonnect API (data, airtime, exam pins)
+- Provider integrations: `artifacts/api-server/src/lib/providers/`
+  - `bigisub.ts` — BigISub API (data, airtime, electricity, cable, exam) — primary provider
+  - `kybdata.ts` — KYB Data API (alternate provider, incl. default electricity)
+  - `easyaccess.ts` — EasyAccess API (electricity only)
+  - `activeProvider.ts` — routes each service call to the currently configured provider, with a dedicated electricity override
   - `gateways.ts` — Paystack, Flutterwave, Monnify payment initiation + verification
+  - `vtpass.ts` / `clubkonnect.ts` — legacy stubs, not in use (see "User preferences")
