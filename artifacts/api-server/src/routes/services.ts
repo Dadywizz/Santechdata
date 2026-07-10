@@ -291,6 +291,7 @@ router.post("/electricity/verify-meter", authenticate, async (req: AuthRequest, 
     const r: any = await activeVerifyMeter({ meter_number: meterNumber, discoid: discoId, meter_type: meterType ?? "prepaid", providerCode });
     const customerName = r?.data?.customer_name || r?.customer_name;
     if (!customerName) {
+      req.log?.warn({ providerCode, meterNumber, rawResponse: r }, "Meter verify: no customer_name in provider response");
       const providerMsg = r?.message || r?.data?.message || "Could not verify this meter number. Please check it and try again.";
       res.status(422).json({ error: providerMsg });
       return;
