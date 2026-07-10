@@ -268,6 +268,26 @@ export async function activePurchaseElectricity(opts: { discoid: number | string
   return kybdataPurchaseElectricity(opts);
 }
 
+// Checks the float/wallet balance of whichever provider would actually
+// handle an electricity purchase for the given disco right now (mirrors the
+// routing in activePurchaseElectricity, including the EasyAccess disco-
+// confirmation fallback to KYB). Used to pre-flight purchases so customers
+// aren't debited for a request the provider can't fund.
+export async function activeGetElectricityBalance(providerCode?: string): Promise<{ provider: ProviderName; balance?: number; message?: string }> {
+  const p = getElectricityProviderName();
+  if (p === "easyaccess" && !isEasyaccessDiscoConfirmed(providerCode)) {
+    const r = await kybdataGetBalance();
+    return { provider: "kyb", ...r };
+  }
+  if (p === "easyaccess") { const r = await easyaccessGetBalance(); return { provider: "easyaccess", ...r }; }
+  if (p === "bigisub")    { const r = await bigisubGetBalance();    return { provider: "bigisub", ...r }; }
+  if (p === "kyb")        { const r = await kybdataGetBalance();    return { provider: "kyb", ...r }; }
+  // clubkonnect/gsubz don't have a reliable balance check wired up here —
+  // skip the pre-flight check for those and let the purchase call itself
+  // surface any provider-side error.
+  return { provider: p };
+}
+
 export async function activePurchaseCable(opts: { plan_id: number | string; smart_card_number: string; cable_name?: string }) {
   if (_default === "kyb")     return kybdataPurchaseCable(opts);
   if (_default === "bigisub") return bigisubPurchaseCable(opts);

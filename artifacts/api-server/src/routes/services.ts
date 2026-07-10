@@ -28,6 +28,7 @@ import {
   activePurchaseCable,
   activeVerifySmartcard,
   activePurchaseExam,
+  activeGetElectricityBalance,
 } from "../lib/providers/activeProvider";
 import { ProviderTimeoutError } from "../lib/providers/errors";
 
@@ -56,6 +57,39 @@ async function recordPendingPurchase(opts: {
     type: opts.type as any,
   });
   return tx;
+}
+
+// ── LOW PROVIDER-BALANCE GUARD ──────────────────────────────────────────────
+// Electricity providers (EasyAccess, KYB, BigISub) hold a prepaid float that
+// funds customer purchases. When that float runs low, the provider rejects
+// the purchase AFTER we'd already debit the customer — forcing an immediate
+// refund and a broken experience (and, if the provider's rejection message
+// is misread, a risk of the purchase actually going through while we still
+// refund). Check the float before touching the customer's wallet so we can
+// fail fast with a clear message instead.
+const LOW_BALANCE_ALERT_COOLDOWN_MS = 15 * 60 * 1000;
+async function alertAdminsOfLowProviderBalance(provider: string, balance: number, attemptedAmount: number): Promise<void> {
+  try {
+    const key = "elec_low_balance_alert_at";
+    const [existing] = await db.select({ value: settingsTable.value }).from(settingsTable).where(eq(settingsTable.key, key));
+    const lastAlert = existing?.value ? new Date(existing.value).getTime() : 0;
+    if (Date.now() - lastAlert < LOW_BALANCE_ALERT_COOLDOWN_MS) return;
+
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    if (admins.length > 0) {
+      await db.insert(notificationsTable).values(
+        admins.map((admin) => ({
+          userId: admin.id, title: "Electricity Provider Balance Low",
+          message: `${provider} balance is only ₦${balance.toLocaleString()} — too low to cover a ₦${attemptedAmount.toLocaleString()} purchase. Electricity purchases are being blocked until you fund the ${provider} account. Go to Admin → Settings to check.`,
+          type: "electricity" as any,
+        }))
+      );
+    }
+    await db.insert(settingsTable).values({ key, value: new Date().toISOString() })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value: new Date().toISOString(), updatedAt: new Date() } });
+  } catch (err) {
+    // Never let alerting failure block/break the purchase-guard response.
+  }
 }
 
 const KYB_ELEC_DISCO_ID: Record<string, string> = {
@@ -373,6 +407,20 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   if (parseFloat(wallet.balance) < amount) {
     res.status(400).json({ error: "Insufficient wallet balance. Please fund your wallet to continue." }); return;
+  }
+
+  try {
+    const providerBalance = await activeGetElectricityBalance(providerCode);
+    if (typeof providerBalance.balance === "number" && providerBalance.balance < amount) {
+      req.log?.warn({ providerBalance, amount }, "Electricity purchase blocked: provider float too low");
+      await alertAdminsOfLowProviderBalance(providerBalance.provider, providerBalance.balance, amount);
+      res.status(503).json({ error: "Electricity purchases are temporarily unavailable. We're on it — please try again shortly." });
+      return;
+    }
+  } catch (err) {
+    // Balance pre-check itself failing shouldn't block a purchase attempt —
+    // fall through and let the actual purchase call surface any real error.
+    req.log?.warn({ err }, "Electricity provider balance pre-check failed; proceeding without it");
   }
 
   await db.update(walletsTable).set({ balance: sql`balance - ${amount}`, updatedAt: new Date() }).where(eq(walletsTable.userId, req.userId!));
