@@ -17,7 +17,7 @@ import { setKybdataToken, kybdataGetDataPlans, isKybdataConfigured } from "../li
 import { setClubkonnectApiKey, setClubkonnectUserId } from "../lib/providers/clubkonnect";
 import { setGsubzApiKey, isGsubzConfigured } from "../lib/providers/gsubz";
 import { setBigisubToken, setBigisubBaseUrl, getBigisubBaseUrl, isBigisubConfigured } from "../lib/providers/bigisub";
-import { setEasyaccessToken, isEasyaccessConfigured } from "../lib/providers/easyaccess";
+import { setEasyaccessToken, isEasyaccessConfigured, easyaccessGetPlans } from "../lib/providers/easyaccess";
 import {
   setActiveProvider, getActiveProviderName, PROVIDER_INFO, getAllProviderStatuses,
   setNetworkProvider, getAllNetworkMappings, testProviderConnection, NETWORKS,
@@ -627,6 +627,29 @@ router.post("/admin/sync-kyb-plans", authenticate, requireAdmin, async (req: Aut
   }
 
   res.json({ added, updated, deactivated, errors });
+});
+
+// GET /admin/easyaccess-plans — read-only lookup of EasyAccess's raw plan catalog,
+// used to help map data_plans.providerCode to EasyAccess plan IDs before switching
+// a network's Data routing to EasyAccess.
+router.get("/admin/easyaccess-plans", authenticate, requireAdmin, async (req: AuthRequest, res): Promise<void> => {
+  if (!isEasyaccessConfigured()) {
+    res.status(503).json({ error: "EasyAccess token not configured. Set it in Admin → Settings." });
+    return;
+  }
+  const productType = String(req.query.product_type ?? "");
+  if (!productType) {
+    res.status(400).json({ error: "product_type query param is required (e.g. mtn_sme, glo_gifting, airtel_gifting, 9mobile_sme, waec, neco, nabteb)" });
+    return;
+  }
+  try {
+    const raw = await easyaccessGetPlans(productType);
+    res.json(raw);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    req.log?.error({ err }, "EasyAccess get-plans error");
+    res.status(502).json({ error: msg });
+  }
 });
 
 // GET /admin/resellers — list all reseller accounts

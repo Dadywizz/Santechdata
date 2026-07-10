@@ -27,6 +27,7 @@ import {
 } from "./bigisub";
 import {
   isEasyaccessConfigured, easyaccessVerifyMeter, easyaccessPurchaseElectricity, easyaccessGetBalance,
+  easyaccessPurchaseData, easyaccessPurchaseExam, isEasyaccessExamSupported,
 } from "./easyaccess";
 
 export type ProviderName = "kyb" | "bigisub" | "clubkonnect" | "gsubz" | "easyaccess";
@@ -185,8 +186,9 @@ async function fallback<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function activePurchaseData(opts: { plan: number | string; mobile_number: string; network?: string }) {
   const p = byNetwork(opts.network ?? "");
-  if (p === "kyb")     return kybdataPurchaseData(opts);
-  if (p === "bigisub") return bigisubPurchaseData(opts);
+  if (p === "kyb")        return kybdataPurchaseData(opts);
+  if (p === "bigisub")    return bigisubPurchaseData(opts);
+  if (p === "easyaccess") return easyaccessPurchaseData(opts);
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseData(opts);
     if (p === "gsubz")       return await gsubzPurchaseData(opts);
@@ -198,10 +200,15 @@ export async function activePurchaseData(opts: { plan: number | string; mobile_n
   return kybdataPurchaseData(opts);
 }
 
+// EasyAccess has no airtime endpoint, so a network routed to "easyaccess" for
+// airtime automatically falls back to the primary provider (KYB/BigISub).
 export async function activePurchaseAirtime(opts: { network: string; amount: number; mobile_number: string }) {
   const p = byNetwork(opts.network);
   if (p === "kyb")     return kybdataPurchaseAirtime(opts);
   if (p === "bigisub") return bigisubPurchaseAirtime(opts);
+  if (p === "easyaccess") {
+    return primaryFallback() === "bigisub" ? bigisubPurchaseAirtime(opts) : kybdataPurchaseAirtime(opts);
+  }
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseAirtime(opts);
     if (p === "gsubz")       return await gsubzPurchaseAirtime(opts);
@@ -213,10 +220,16 @@ export async function activePurchaseAirtime(opts: { network: string; amount: num
   return kybdataPurchaseAirtime(opts);
 }
 
+// EasyAccess only supports WAEC/NECO/NABTEB; a JAMB purchase routed to
+// "easyaccess" automatically falls back to the primary provider.
 export async function activePurchaseExam(opts: { examid: number | string; quantity: number; examCode?: string }) {
   const p = byExam(opts.examCode ?? "");
   if (p === "kyb")     return kybdataPurchaseExam(opts);
   if (p === "bigisub") return bigisubPurchaseExam(opts);
+  if (p === "easyaccess") {
+    if (isEasyaccessExamSupported(opts.examCode ?? "")) return easyaccessPurchaseExam(opts);
+    return primaryFallback() === "bigisub" ? bigisubPurchaseExam(opts) : kybdataPurchaseExam(opts);
+  }
   try {
     if (p === "clubkonnect") return await clubkonnectPurchaseExam({ examCode: opts.examCode ?? "", quantity: opts.quantity });
     if (p === "gsubz")       return await gsubzPurchaseExam(opts);

@@ -10,7 +10,9 @@ Auth: `Authorization: Bearer {token}` + `Cache-Control: no-cache`
 Token stored as DB setting `easyaccess_api_token` (Admin → Settings) or `EASYACCESS_API_TOKEN` env fallback.
 
 ## Current usage in this project
-EasyAccess is wired as the **electricity** provider only (toggle via Admin → Settings → Provider Routing → Electricity, DB setting `elec_provider`). BigISub/KYB Data remain primary for data, airtime, cable, and exam pins — do not assume EasyAccess covers those without re-checking `easyaccess.ts`, since scope has changed over time as providers were swapped in/out.
+EasyAccess is wired as: **electricity** (`elec_provider` setting, live), **exam pins** for WAEC/NECO/NABTEB (per-exam `exam_provider_*` setting — NECO is live; JAMB unsupported, auto-falls back), and is a *selectable option* for **Data** per network (`net_provider_*` setting) but is NOT actually enabled for any network by default — see caveat below. Airtime has no EasyAccess endpoint; if a network's provider resolves to easyaccess, airtime purchases auto-fall back to the primary provider (kyb/bigisub). Scope has changed over time as providers were swapped in/out — always re-check `easyaccess.ts` and `activeProvider.ts` rather than assuming.
+
+**Data plan-code caveat (do not enable EasyAccess for a network's Data routing without doing this first):** `data_plans.providerCode` is a single shared string column holding whichever provider last synced the catalog (currently KYB/BigISub numeric IDs, e.g. MTN 1GB = "859"). EasyAccess uses a completely different ID scheme (fetched via `GET /get-plans`, e.g. MTN 1GB = plan_id "51") with different plan sizes/validities offered, so switching a network's Data provider to EasyAccess without remapping `providerCode` per plan will send invalid plan IDs and fail purchases. EasyAccess's data wholesale pricing also runs well above current KYB cost (e.g. MTN 1GB: KYB cost ~₦228 vs EasyAccess ~₦779), so remapping also has margin implications, not just a technical mapping exercise. A read-only `GET /admin/easyaccess-plans?product_type=X` admin route exists to inspect EasyAccess's live catalog for this comparison.
 
 ## Supported endpoints
 

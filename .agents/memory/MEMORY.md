@@ -3,5 +3,5 @@
 - [Clubkonnect](clubkonnect-dead.md) — all VTU endpoints broken (404/INVALID_CREDENTIALS); do not use
 - [BigISub provider](bigisub-provider.md) — primary VTU provider; token stored in DB as `bigisub_api_token` or BIGISUB_API_TOKEN env; configurable via Admin → Settings
 - [Reseller system](reseller-system.md) — ₦500 one-time upgrade; `reseller` role in users enum; resellerPrice on data_plans; admin can suspend/activate/revoke
-- [EasyAccess API](easyaccess-api.md) — API reference; currently wired as the electricity-only provider, toggled via `elec_provider` setting
+- [EasyAccess API](easyaccess-api.md) — API reference; electricity + WAEC/NECO/NABTEB exam pins live; Data is selectable per network but needs plan-code remap first (see caveat)
 - [Provider routing keys](provider-code-vs-discoid.md) — providerCode (string) vs numeric discoid are different identifier shapes; don't mix them across providers

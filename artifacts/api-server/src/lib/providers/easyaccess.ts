@@ -7,7 +7,9 @@
  * Token is loaded from the `easyaccess_api_token` DB setting (set via Admin → Settings)
  * or falls back to the EASYACCESS_API_TOKEN environment variable.
  *
- * Only electricity is wired through this provider for now (verify + purchase).
+ * Supports: electricity (verify + purchase), data purchase, and exam pins
+ * (WAEC/NECO/NABTEB only — JAMB is not available via EasyAccess).
+ * Airtime is NOT supported — there is no EasyAccess airtime endpoint.
  */
 
 const BASE = "https://easyaccess.com.ng/api/live/v1";
@@ -56,6 +58,11 @@ async function easyaccessFetch(path: string, opts: RequestInit = {}) {
 export async function easyaccessGetBalance(): Promise<{ balance?: number; message?: string }> {
   const res = await easyaccessFetch("/wallet-balance");
   return { balance: res?.balance, message: res?.message };
+}
+
+// product_type: "mtn_sme" | "glo_gifting" | "airtel_gifting" | "9mobile_sme" | "dstv" | "gotv" | "startimes" | "waec" | "neco" | "nabteb"
+export async function easyaccessGetPlans(productType: string): Promise<any> {
+  return easyaccessFetch(`/get-plans?product_type=${encodeURIComponent(productType)}`);
 }
 
 // ─── Electricity company codes ────────────────────────────────────────────────
@@ -129,6 +136,66 @@ export async function easyaccessPurchaseElectricity(opts: {
     status: ok ? "success" : "failed",
     message: res?.message,
     token: res?.data?.token ?? res?.token,
+    transaction_id: res?.data?.reference ?? res?.reference,
+  };
+}
+
+// ─── Data ──────────────────────────────────────────────────────────────────
+// Network codes for /purchase-data (keyed by our canonical network name)
+export const EASYACCESS_NETWORK_ID: Record<string, number> = {
+  MTN: 1, GLO: 2, AIRTEL: 3, "9MOBILE": 4,
+};
+
+export async function easyaccessPurchaseData(opts: {
+  plan: number | string; mobile_number: string; network?: string;
+}): Promise<{ status?: string; message?: string; transaction_id?: string }> {
+  const network = EASYACCESS_NETWORK_ID[(opts.network ?? "").toUpperCase()];
+  if (!network) {
+    return { status: "failed", message: "This network is not supported by EasyAccess." };
+  }
+  const res = await easyaccessFetch("/purchase-data", {
+    method: "POST",
+    body: JSON.stringify({
+      network,
+      dataplan: Number(opts.plan),
+      mobileno: opts.mobile_number,
+    }),
+  });
+  const ok = isSuccess(res);
+  return {
+    status: ok ? "success" : "failed",
+    message: res?.message,
+    transaction_id: res?.data?.reference ?? res?.reference,
+  };
+}
+
+// ─── Exam pins ───────────────────────────────────────────────────────────────
+// EasyAccess only supports these exam boards; JAMB is not available.
+const EASYACCESS_EXAM_BOARDS = new Set(["waec", "neco", "nabteb"]);
+
+export function isEasyaccessExamSupported(examCode: string): boolean {
+  return EASYACCESS_EXAM_BOARDS.has(examCode.toLowerCase());
+}
+
+export async function easyaccessPurchaseExam(opts: {
+  quantity: number; examCode?: string;
+}): Promise<{ status?: string; message?: string; pins?: string[]; transaction_id?: string }> {
+  const board = (opts.examCode ?? "").toLowerCase();
+  if (!EASYACCESS_EXAM_BOARDS.has(board)) {
+    return { status: "failed", message: "This exam type is not supported by EasyAccess." };
+  }
+  const res = await easyaccessFetch("/exam-pins", {
+    method: "POST",
+    body: JSON.stringify({
+      exam_board: board,
+      no_of_pins: opts.quantity,
+    }),
+  });
+  const ok = isSuccess(res);
+  return {
+    status: ok ? "success" : "failed",
+    message: res?.message,
+    pins: res?.data?.pins ?? res?.pins,
     transaction_id: res?.data?.reference ?? res?.reference,
   };
 }

@@ -492,20 +492,23 @@ export default function AdminSettings() {
                 <div key={net} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
                   <span className="text-sm font-bold text-slate-700">{net}</span>
                   <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
-                    {(["kyb", "bigisub"] as const).map((p) => (
+                    {(["kyb", "bigisub", "easyaccess"] as const).map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setNetProviders((prev) => ({ ...prev, [net]: p }))}
                         className={`px-3 py-1.5 transition-colors ${netProviders[net] === p ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
                       >
-                        {p === "kyb" ? "KYB Data" : "BigISub"}
+                        {p === "kyb" ? "KYB Data" : p === "bigisub" ? "BigISub" : "EasyAccess"}
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              EasyAccess doesn't support airtime top-ups — airtime for a network set to EasyAccess automatically uses your backup provider instead. Data still goes through EasyAccess.
+            </p>
           </div>
 
           <div>
@@ -515,20 +518,21 @@ export default function AdminSettings() {
                 <div key={exam} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
                   <span className="text-sm font-bold text-slate-700">{exam}</span>
                   <div className="flex rounded-lg border border-slate-200 overflow-hidden text-[11px] font-semibold">
-                    {(["kyb", "bigisub"] as const).map((p) => (
+                    {(exam === "JAMB" ? (["kyb", "bigisub"] as const) : (["kyb", "bigisub", "easyaccess"] as const)).map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setExamProviders((prev) => ({ ...prev, [exam]: p }))}
                         className={`px-3 py-1.5 transition-colors ${examProviders[exam] === p ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
                       >
-                        {p === "kyb" ? "KYB Data" : "BigISub"}
+                        {p === "kyb" ? "KYB Data" : p === "bigisub" ? "BigISub" : "EasyAccess"}
                       </button>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">EasyAccess doesn't support JAMB pins, so it isn't offered as an option for JAMB.</p>
           </div>
 
           <div>
