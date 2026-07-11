@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useGetTransactions, getGetTransactionsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { History, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, ArrowRightLeft, Search, AlertCircle } from "lucide-react";
+import { History, Wifi, Phone, Zap, Tv, BookOpen, CreditCard, ArrowRightLeft, Search, AlertCircle, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 
 const TYPE_ICONS: Record<string, { icon: any; color: string; bg: string }> = {
   data: { icon: Wifi, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" },
@@ -26,11 +27,66 @@ const STATUS_BADGE: Record<string, string> = {
   failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
+const SERVICE_TYPES = new Set(["data", "airtime", "electricity", "cable", "exam"]);
+
+function buildReceipt(tx: any): ReceiptData | null {
+  if (!SERVICE_TYPES.has(tx.type) || tx.status !== "success") return null;
+  const meta = (tx.metadata ?? {}) as Record<string, any>;
+  const base = {
+    reference: tx.reference,
+    description: tx.description,
+    amount: Number(tx.amount),
+    createdAt: tx.createdAt,
+    type: tx.type as string,
+  };
+  switch (tx.type) {
+    case "electricity":
+      return {
+        ...base,
+        meterNumber: meta.meterNumber,
+        phone: meta.phone,
+        token: meta.token ?? meta.resolution?.token,
+      };
+    case "data":
+      return {
+        ...base,
+        network: meta.network,
+        phone: meta.phone,
+        size: meta.size,
+        validity: meta.validity,
+      };
+    case "airtime":
+      return {
+        ...base,
+        network: meta.network,
+        phone: meta.phone,
+      };
+    case "cable":
+      return {
+        ...base,
+        provider: meta.provider,
+        plan: meta.planName,
+        meterNumber: meta.smartcardNumber,
+      };
+    case "exam":
+      return {
+        ...base,
+        examType: meta.examType,
+        quantity: meta.quantity,
+        phone: meta.phone,
+        tokens: meta.pins,
+      };
+    default:
+      return null;
+  }
+}
+
 export default function Transactions() {
   const [page, setPage] = useState(1);
   const [type, setType] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [, navigate] = useLocation();
 
   const { data, isLoading } = useGetTransactions(
@@ -118,6 +174,7 @@ export default function Transactions() {
                 const Icon = typeInfo.icon;
                 const isCredit = tx.type === "wallet_fund";
                 const isFailedFunding = tx.type === "wallet_fund" && tx.status === "failed";
+                const txReceipt = buildReceipt(tx);
                 return (
                   <div key={tx.id} className="p-4 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center gap-4">
@@ -128,13 +185,22 @@ export default function Transactions() {
                         <p className="font-medium truncate">{tx.description}</p>
                         <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), "MMM d, yyyy h:mm a")} · {tx.reference}</p>
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="flex flex-col items-end gap-1 shrink-0">
                         <p className={`font-semibold ${isCredit ? "text-green-600" : ""}`}>
                           {isCredit ? "+" : "-"}₦{Number(tx.amount).toLocaleString()}
                         </p>
                         <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[tx.status] || STATUS_BADGE.pending}`}>
                           {tx.status}
                         </span>
+                        {txReceipt && (
+                          <button
+                            onClick={() => setReceipt(txReceipt)}
+                            className="flex items-center gap-1 text-[11px] text-primary font-medium hover:underline mt-0.5"
+                          >
+                            <Receipt size={11} />
+                            View Receipt
+                          </button>
+                        )}
                       </div>
                     </div>
                     {isFailedFunding && (
@@ -170,6 +236,8 @@ export default function Transactions() {
           </div>
         </div>
       )}
+
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)} data={receipt} />
     </AppLayout>
   );
 }

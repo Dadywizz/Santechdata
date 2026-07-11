@@ -42,6 +42,11 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
+// Health endpoint registered BEFORE ensureFreshSettings so deployment
+// healthchecks pass immediately during cold start without waiting for DB.
+app.get("/api/healthz", (_req, res) => res.json({ status: "ok" }));
+app.get("/api", (_req, res) => res.json({ status: "ok" }));
+
 app.use("/api", async (_req, _res, next) => {
   await ensureFreshSettings();
   next();
