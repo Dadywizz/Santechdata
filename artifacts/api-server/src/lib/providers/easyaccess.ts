@@ -34,10 +34,10 @@ function headers() {
   };
 }
 
-async function easyaccessFetch(path: string, opts: RequestInit = {}) {
+async function easyaccessFetch(path: string, opts: RequestInit = {}, timeoutMs = 30_000) {
   const url = `${BASE}${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       ...opts,
@@ -148,7 +148,7 @@ export async function easyaccessPurchaseElectricity(opts: {
       meterno: opts.meter_number,
       amount: opts.amount,
     }),
-  });
+  }, 90_000);
   const ok = isSuccess(res);
   return {
     status: ok ? "success" : "failed",
@@ -178,7 +178,7 @@ export async function easyaccessPurchaseData(opts: {
       dataplan: Number(opts.plan),
       mobileno: opts.mobile_number,
     }),
-  });
+  }, 90_000);
   const ok = isSuccess(res);
   return {
     status: ok ? "success" : "failed",
@@ -208,7 +208,7 @@ export async function easyaccessPurchaseExam(opts: {
       exam_board: board,
       no_of_pins: opts.quantity,
     }),
-  });
+  }, 90_000);
   const ok = isSuccess(res);
   return {
     status: ok ? "success" : "failed",

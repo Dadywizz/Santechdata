@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const MESSAGES = [
-  "Connecting to provider...",
-  "Sending your order...",
-  "Waiting for confirmation...",
-  "Almost there...",
+const STAGES: Array<{ after: number; message: string }> = [
+  { after: 0,  message: "Connecting to provider..." },
+  { after: 6,  message: "Sending your order..." },
+  { after: 12, message: "Waiting for confirmation..." },
+  { after: 25, message: "Provider is processing — please hold on..." },
+  { after: 40, message: "Still working on it — almost there..." },
+  { after: 60, message: "This is taking a little longer than usual. Please don't close this page..." },
+  { after: 75, message: "Nearly done — thank you for your patience..." },
 ];
 
 export function PurchasingOverlay({ open }: { open: boolean }) {
@@ -19,7 +22,7 @@ export function PurchasingOverlay({ open }: { open: boolean }) {
 
   if (!open) return null;
 
-  const msgIndex = Math.min(Math.floor(elapsed / 6), MESSAGES.length - 1);
+  const stage = [...STAGES].reverse().find(s => elapsed >= s.after) ?? STAGES[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -27,7 +30,7 @@ export function PurchasingOverlay({ open }: { open: boolean }) {
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <div className="text-center space-y-1">
           <p className="font-semibold text-base">Processing your order</p>
-          <p className="text-sm text-muted-foreground">{MESSAGES[msgIndex]}</p>
+          <p className="text-sm text-muted-foreground">{stage.message}</p>
         </div>
         <div className="text-xs text-muted-foreground tabular-nums">
           {elapsed}s elapsed
