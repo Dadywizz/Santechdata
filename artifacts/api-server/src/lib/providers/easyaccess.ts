@@ -178,7 +178,7 @@ export async function easyaccessPurchaseData(opts: {
       dataplan: Number(opts.plan),
       mobileno: opts.mobile_number,
     }),
-  }, 90_000);
+  }, 30_000);
   const ok = isSuccess(res);
   return {
     status: ok ? "success" : "failed",
@@ -208,7 +208,7 @@ export async function easyaccessPurchaseExam(opts: {
       exam_board: board,
       no_of_pins: opts.quantity,
     }),
-  }, 90_000);
+  }, 30_000);
   const ok = isSuccess(res);
   return {
     status: ok ? "success" : "failed",
