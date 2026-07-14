@@ -270,7 +270,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { title: "Customer", price: "Free", desc: "Create an account and start buying instantly. Fund your wallet and top up any network.", cta: "Get Started", href: "/register", highlight: false },
-              { title: "Reseller", price: "₦500", desc: "One-time fee. Get wholesale prices on all plans, earn commission from referrals every month.", cta: "Become Reseller", href: "/register", highlight: true },
+              { title: "Reseller", price: "₦500", desc: "One-time fee. Get wholesale prices on all plans and earn ₦100 for every friend you refer.", cta: "Become Reseller", href: "/register", highlight: true },
               { title: "Own VTU Site", price: "₦200,000", desc: "We build you a fully branded VTU website powered by our API. Your domain, your business.", cta: "Contact Us", href: "https://wa.me/2348063136201?text=I+want+my+own+VTU+website", highlight: false },
             ].map((p) => (
               <div key={p.title} className={`rounded-2xl p-6 text-left ${p.highlight ? "bg-[#0f172a] text-white shadow-xl scale-105" : "bg-white border border-gray-100 text-[#0f172a]"}`}>
@@ -333,11 +333,11 @@ export default function Landing() {
             </a>
           </div>
           <div className="flex-1 bg-[#1e293b] rounded-2xl p-6 border border-gray-700">
-            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-4">Example Monthly Earning</p>
+            <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-4">Example Earnings</p>
             <div className="space-y-4">
               {[
                 { label: "50 customers × ₦500 data/day", amount: "₦1,500/day profit" },
-                { label: "Commission from 10 referrals", amount: "₦600/month" },
+                { label: "Referral bonus × 10 friends", amount: "₦1,000 bonus" },
                 { label: "Electricity tokens", amount: "₦800/month" },
               ].map((r) => (
                 <div key={r.label} className="flex justify-between items-center border-b border-gray-700 pb-3">

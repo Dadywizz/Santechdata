@@ -16,7 +16,7 @@ router.get("/referrals", authenticate, async (req: AuthRequest, res): Promise<vo
 
   const referred = await db.select().from(usersTable).where(eq(usersTable.referredBy, req.userId!));
 
-  const REFERRAL_BONUS = 200;
+  const REFERRAL_BONUS = 100;
   const totalEarnings = referred.length * REFERRAL_BONUS;
 
   const referrals = referred.map((r) => ({

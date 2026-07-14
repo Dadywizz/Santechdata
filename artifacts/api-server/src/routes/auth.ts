@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import {
   usersTable,
   walletsTable,
+  transactionsTable,
   otpsTable,
   notificationsTable,
   webauthnCredentialsTable,
@@ -112,6 +113,26 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   }).catch(() => {});
 
   req.log.info({ userId: user.id }, "User registered");
+
+  // Credit ₦100 referral bonus to the referrer's wallet
+  if (referredById) {
+    const REFERRAL_BONUS = 100;
+    const [referrerWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, referredById));
+    if (referrerWallet) {
+      await db.update(walletsTable)
+        .set({ balance: sql`${walletsTable.balance} + ${REFERRAL_BONUS}` })
+        .where(eq(walletsTable.id, referrerWallet.id));
+      await db.insert(transactionsTable).values({
+        userId: referredById,
+        type: "wallet_fund",
+        amount: String(REFERRAL_BONUS),
+        status: "success",
+        reference: `REF-${user.id.slice(0, 8).toUpperCase()}`,
+        description: `Referral bonus – ${user.fullName} joined`,
+        metadata: { referralBonus: true, referredUserId: user.id },
+      });
+    }
+  }
 
   const token = signToken(user.id, user.role);
   res.status(201).json({
