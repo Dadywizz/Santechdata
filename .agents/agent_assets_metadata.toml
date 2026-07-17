@@ -71,3 +71,9 @@ id = "a_2YLjLh3eMvPOryTd0WW"
 uri = "file://santech-data-source.zip"
 type = "unspecified"
 title = "SanTech Data – Source Code"
+
+[[outputs]]
+id = "6JYgKZf-0g99DfTf0Rk2V"
+uri = "file://santech-database-backup.zip"
+type = "unspecified"
+title = "SanTech Data – Database Backup (all customers & transactions)"
