@@ -65,3 +65,9 @@ id = "523djd_v_FHuYKJnO_X-M"
 uri = "file://screenshots/real-buydata.jpg"
 type = "image"
 title = "Screenshot 2 — Buy Data"
+
+[[outputs]]
+id = "a_2YLjLh3eMvPOryTd0WW"
+uri = "file://santech-data-source.zip"
+type = "unspecified"
+title = "SanTech Data – Source Code"
