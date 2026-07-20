@@ -109,38 +109,6 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
   res.json({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName });
 });
 
-// POST /wallet/generate-paystack-account — auto-create a Paystack dedicated account
-router.post("/wallet/generate-paystack-account", authenticate, async (req: AuthRequest, res): Promise<void> => {
-  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
-  if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
-
-  if (wallet.paystackAccountNumber) {
-    res.json({ paystackAccountNumber: wallet.paystackAccountNumber, paystackAccountBank: wallet.paystackAccountBank });
-    return;
-  }
-
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
-
-  try {
-    const nameParts = (user.fullName || "").trim().split(/\s+/);
-    const acct = await paystackCreateDedicatedAccount({
-      userId: user.id,
-      email: user.email,
-      firstName: nameParts[0] || user.email,
-      lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
-      phone: user.phone ?? undefined,
-    });
-    await db.update(walletsTable)
-      .set({ paystackAccountNumber: acct.accountNumber, paystackAccountBank: acct.bankName })
-      .where(eq(walletsTable.id, wallet.id));
-    res.json({ paystackAccountNumber: acct.accountNumber, paystackAccountBank: acct.bankName });
-  } catch (err: any) {
-    req.log?.error({ err }, "Paystack DVA generation failed");
-    res.status(503).json({ error: err?.message ?? "Could not generate account. Please try again." });
-  }
-});
-
 // POST /wallet/fund/bank-transfer — generate a one-time Monnify (Sterling Bank) virtual account
 router.post("/wallet/fund/bank-transfer", authenticate, async (req: AuthRequest, res): Promise<void> => {
   const amount = Number(req.body?.amount);

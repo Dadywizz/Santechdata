@@ -27,37 +27,6 @@ function normalizeBankName(name: string | null | undefined): string {
   return name;
 }
 
-function AccountCard({ accountNumber, bankName, label, onCopy, copied }: {
-  accountNumber: string; bankName: string; label: string;
-  onCopy: () => void; copied: boolean;
-}) {
-  return (
-    <div className="rounded-xl border-2 border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20 p-5 space-y-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-          <p className="font-bold text-3xl tracking-widest font-mono">{accountNumber}</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={onCopy} className="shrink-0 gap-1.5">
-          {copied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
-          {copied ? "Copied!" : "Copy"}
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-orange-200 dark:border-orange-700">
-        <div>
-          <p className="text-xs text-muted-foreground">Bank</p>
-          <p className="font-semibold text-sm">{normalizeBankName(bankName)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Account Name</p>
-          <p className="font-semibold text-sm">SanTech Data</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function FundWallet() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("bank");
@@ -78,23 +47,13 @@ export default function FundWallet() {
   const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
 
-  // Paystack VA state
-  const [psGenerating, setPsGenerating] = useState(false);
-  const [psError, setPsError] = useState("");
-  const [psCopied, setPsCopied] = useState(false);
-  const [generatedPsVa, setGeneratedPsVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
-
   const { data: walletData, isLoading: vaLoading } = useGetWallet();
 
   const existingFlwVa = walletData?.virtualAccountNumber
-    ? { accountNumber: walletData.virtualAccountNumber!, bankName: walletData.virtualAccountBank ?? "Flutterwave MFB" }
-    : null;
-  const existingPsVa = (walletData as any)?.paystackAccountNumber
-    ? { accountNumber: (walletData as any).paystackAccountNumber, bankName: (walletData as any).paystackAccountBank ?? "Wema Bank" }
+    ? { accountNumber: walletData.virtualAccountNumber!, bankName: normalizeBankName(walletData.virtualAccountBank) }
     : null;
 
   const flwVa = generatedFlwVa ?? existingFlwVa;
-  const psVa = generatedPsVa ?? existingPsVa;
 
   useEffect(() => {
     fetch("/api/settings/public")
@@ -169,25 +128,6 @@ export default function FundWallet() {
     }
   };
 
-  const handleGeneratePsVA = async () => {
-    setPsGenerating(true);
-    setPsError("");
-    try {
-      const token = sessionStorage.getItem("santech_token");
-      const res = await fetch("/api/wallet/generate-paystack-account", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate account");
-      setGeneratedPsVa({ accountNumber: data.paystackAccountNumber, bankName: normalizeBankName(data.paystackAccountBank) });
-    } catch (err: any) {
-      setPsError(err.message || "Could not generate account. Please try again.");
-    } finally {
-      setPsGenerating(false);
-    }
-  };
-
   const showManualTab = bankSettings?.bankTransferActive && bankSettings.bankAccountNumber;
 
   const TABS: { id: Tab; label: string }[] = [
@@ -216,14 +156,14 @@ export default function FundWallet() {
           ))}
         </div>
 
-        {/* ── BANK TRANSFER — dual virtual accounts ── */}
+        {/* ── BANK TRANSFER — Flutterwave MFB dedicated account ── */}
         {tab === "bank" && (
           <Card>
             <CardContent className="p-6 space-y-6">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
                 <Landmark className="text-orange-500 shrink-0" size={18} />
                 <p className="text-sm text-orange-900 dark:text-orange-100 font-medium">
-                  Your <strong>personal bank accounts</strong> — transfer any amount anytime and your wallet is credited automatically.
+                  Your <strong>personal bank account</strong> — transfer any amount anytime and your wallet is credited automatically.
                 </p>
               </div>
 
@@ -231,124 +171,92 @@ export default function FundWallet() {
                 <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
                   <Loader2 size={18} className="animate-spin" /> Loading account details...
                 </div>
+              ) : flwVa ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl border-2 border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20 p-5 space-y-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Dedicated Account</p>
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                        <p className="font-bold text-3xl tracking-widest font-mono">{flwVa.accountNumber}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { navigator.clipboard.writeText(flwVa.accountNumber).then(() => { setFlwCopied(true); setTimeout(() => setFlwCopied(false), 2500); }); }}
+                        className="shrink-0 gap-1.5"
+                      >
+                        {flwCopied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
+                        {flwCopied ? "Copied!" : "Copy"}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-orange-200 dark:border-orange-700">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Bank</p>
+                        <p className="font-semibold text-sm">{flwVa.bankName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Account Name</p>
+                        <p className="font-semibold text-sm">SanTech Data</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-1.5">
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">How it works</p>
+                    <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-decimal list-inside">
+                      <li>Copy the account number above</li>
+                      <li>Transfer from any bank app, USSD, or internet banking</li>
+                      <li>Your wallet is credited automatically</li>
+                    </ol>
+                  </div>
+                </div>
               ) : (
-                <div className="space-y-6">
-
-                  {/* ── Paystack (Wema Bank) ── */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#0BA4DB]/10 flex items-center justify-center">
-                        <CreditCard size={13} className="text-[#0BA4DB]" />
-                      </div>
-                      <p className="text-sm font-semibold">Paystack — Wema Bank</p>
-                    </div>
-
-                    {psVa ? (
-                      <AccountCard
-                        accountNumber={psVa.accountNumber}
-                        bankName={psVa.bankName}
-                        label="Account 1 · Wema Bank"
-                        onCopy={() => { navigator.clipboard.writeText(psVa.accountNumber).then(() => { setPsCopied(true); setTimeout(() => setPsCopied(false), 2500); }); }}
-                        copied={psCopied}
-                      />
-                    ) : (
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">No Wema Bank account yet. Generate one instantly — no BVN needed.</p>
-                        {psError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{psError}</p>}
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          className="w-full gap-2"
-                          onClick={handleGeneratePsVA}
-                          disabled={psGenerating}
-                        >
-                          {psGenerating
-                            ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
-                            : <><CreditCard size={16} /> Get Wema Bank Account</>}
-                        </Button>
-                      </div>
-                    )}
+                <div className="space-y-4">
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">BVN or NIN required</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires this account to be linked to your identity. Your details go directly to the bank — never stored on our servers.</p>
                   </div>
 
-                  <div className="border-t border-border" />
-
-                  {/* ── Flutterwave MFB ── */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
-                        <Zap size={13} className="text-orange-500" />
-                      </div>
-                      <p className="text-sm font-semibold">Flutterwave MFB</p>
+                  <div>
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => { setIdType("bvn"); setIdNumber(""); setFlwError(""); }}
+                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "bvn" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
+                      >BVN</button>
+                      <button
+                        onClick={() => { setIdType("nin"); setIdNumber(""); setFlwError(""); }}
+                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "nin" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
+                      >NIN</button>
                     </div>
-
-                    {flwVa ? (
-                      <AccountCard
-                        accountNumber={flwVa.accountNumber}
-                        bankName={flwVa.bankName}
-                        label="Account 2 · Flutterwave MFB"
-                        onCopy={() => { navigator.clipboard.writeText(flwVa.accountNumber).then(() => { setFlwCopied(true); setTimeout(() => setFlwCopied(false), 2500); }); }}
-                        copied={flwCopied}
-                      />
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                          <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">BVN or NIN required</p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires this account to be linked to your identity. Your details go directly to the bank — never stored on our servers.</p>
-                        </div>
-
-                        <div>
-                          <div className="flex gap-2 mb-3">
-                            <button
-                              onClick={() => { setIdType("bvn"); setIdNumber(""); setFlwError(""); }}
-                              className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "bvn" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
-                            >BVN</button>
-                            <button
-                              onClick={() => { setIdType("nin"); setIdNumber(""); setFlwError(""); }}
-                              className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "nin" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
-                            >NIN</button>
-                          </div>
-                          <Input
-                            type="tel"
-                            inputMode="numeric"
-                            maxLength={11}
-                            placeholder={`Enter your 11-digit ${idType.toUpperCase()}`}
-                            value={idNumber}
-                            onChange={(e) => { setIdNumber(e.target.value.replace(/\D/g, "")); setFlwError(""); }}
-                            className="h-12 font-mono tracking-widest text-lg"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {idType === "bvn"
-                              ? <>Dial <strong>*565*0#</strong> on any phone to get your BVN.</>
-                              : <>Dial <strong>*346#</strong> on your NIN-registered phone to get your NIN.</>}
-                          </p>
-                        </div>
-
-                        {flwError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{flwError}</p>}
-
-                        <Button
-                          size="lg"
-                          className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
-                          onClick={handleGenerateFlwVA}
-                          disabled={flwGenerating || idNumber.length !== 11}
-                        >
-                          {flwGenerating
-                            ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
-                            : <><Landmark size={16} /> Get Flutterwave MFB Account</>}
-                        </Button>
-                      </div>
-                    )}
+                    <Input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder={`Enter your 11-digit ${idType.toUpperCase()}`}
+                      value={idNumber}
+                      onChange={(e) => { setIdNumber(e.target.value.replace(/\D/g, "")); setFlwError(""); }}
+                      className="h-12 font-mono tracking-widest text-lg"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {idType === "bvn"
+                        ? <>Dial <strong>*565*0#</strong> on any phone to get your BVN.</>
+                        : <>Dial <strong>*346#</strong> on your NIN-registered phone to get your NIN.</>}
+                    </p>
                   </div>
 
-                  {(flwVa || psVa) && (
-                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-1.5">
-                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">How it works</p>
-                      <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-decimal list-inside">
-                        <li>Copy any account number above</li>
-                        <li>Transfer from any bank app, USSD, or internet banking</li>
-                        <li>Your wallet is credited automatically — no need to do anything else</li>
-                      </ol>
-                    </div>
-                  )}
+                  {flwError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{flwError}</p>}
+
+                  <Button
+                    size="lg"
+                    className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+                    onClick={handleGenerateFlwVA}
+                    disabled={flwGenerating || idNumber.length !== 11}
+                  >
+                    {flwGenerating
+                      ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
+                      : <><Landmark size={16} /> Get My Bank Account</>}
+                  </Button>
                 </div>
               )}
             </CardContent>
