@@ -27,7 +27,7 @@ import {
   ChangePasswordBody,
   UpdateProfileBody,
 } from "@workspace/api-zod";
-import { monnifyCreateReservedAccount } from "../lib/providers/gateways";
+import { paystackCreateDedicatedAccount } from "../lib/providers/gateways";
 import { sendOtpEmail } from "../lib/email";
 
 const router: IRouter = Router();
@@ -98,19 +98,23 @@ router.post("/auth/register", async (req, res): Promise<void> => {
 
   const [newWallet] = await db.insert(walletsTable).values({ userId: user.id }).returning();
 
-  // Fire-and-forget: create Monnify dedicated virtual account for instant bank funding
-  monnifyCreateReservedAccount({
-    accountReference: user.id,
-    accountName: user.fullName,
-    customerEmail: user.email,
-    customerName: user.fullName,
-  }).then(async (acct) => {
-    if (acct && newWallet) {
-      await db.update(walletsTable)
-        .set({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName })
-        .where(eq(walletsTable.id, newWallet.id));
-    }
-  }).catch(() => {});
+  // Fire-and-forget: auto-create a Paystack dedicated account for the new user
+  if (process.env.PAYSTACK_SECRET_KEY) {
+    const nameParts = (user.fullName || "").trim().split(/\s+/);
+    paystackCreateDedicatedAccount({
+      userId: user.id,
+      email: user.email,
+      firstName: nameParts[0] || user.email,
+      lastName: nameParts.slice(1).join(" ") || nameParts[0] || "",
+      phone: user.phone ?? undefined,
+    }).then(async (acct) => {
+      if (acct && newWallet) {
+        await db.update(walletsTable)
+          .set({ paystackAccountNumber: acct.accountNumber, paystackAccountBank: acct.bankName })
+          .where(eq(walletsTable.id, newWallet.id));
+      }
+    }).catch(() => {});
+  }
 
   req.log.info({ userId: user.id }, "User registered");
 

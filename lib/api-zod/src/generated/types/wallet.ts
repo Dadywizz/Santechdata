@@ -13,5 +13,7 @@ export interface Wallet {
   currency: string;
   virtualAccountNumber?: string | null;
   virtualAccountBank?: string | null;
+  paystackAccountNumber?: string | null;
+  paystackAccountBank?: string | null;
   updatedAt: string;
 }

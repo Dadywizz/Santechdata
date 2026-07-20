@@ -1543,6 +1543,12 @@ components:
         virtualAccountBank:
           type: string
           nullable: true
+        paystackAccountNumber:
+          type: string
+          nullable: true
+        paystackAccountBank:
+          type: string
+          nullable: true
         updatedAt:
           type: string
 
