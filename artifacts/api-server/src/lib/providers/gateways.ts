@@ -111,7 +111,6 @@ export async function flutterwaveCreatePermanentVA(opts: {
     firstname: opts.firstName,
     lastname: opts.lastName,
     narration: opts.narration,
-    bank_code: "flutterwave", // Route to Flutterwave MFB (Indulge Bank rebranded to Nuvion MFB — switch to FLW MFB per support advice 2026-07)
   };
   // BVN or NIN required for NGN virtual accounts (CBN regulation)
   if (opts.bvn) payload.bvn = opts.bvn;
