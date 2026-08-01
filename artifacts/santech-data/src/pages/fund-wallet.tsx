@@ -53,7 +53,7 @@ export default function FundWallet() {
   const [aspfiyCopied, setAspfiyCopied] = useState(false);
   const [generatedAspfiyVa, setGeneratedAspfiyVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
 
-  const { data: walletData, isLoading: vaLoading } = useGetWallet();
+  const { data: walletData, isLoading: vaLoading, refetch: refetchWallet } = useGetWallet();
 
   const existingFlwVa = walletData?.virtualAccountNumber
     ? { accountNumber: walletData.virtualAccountNumber!, bankName: normalizeBankName(walletData.virtualAccountBank) }
@@ -66,6 +66,17 @@ export default function FundWallet() {
     : null;
 
   const aspfiyVa = generatedAspfiyVa ?? existingAspfiyVa;
+
+  // Auto-generate Aspfiy account when wallet loads and user doesn't have one yet
+  useEffect(() => {
+    if (!vaLoading && walletData && !existingAspfiyVa && !generatedAspfiyVa && !aspfiyGenerating) {
+      handleGenerateAspfiyVA().then(() => {
+        // Refetch wallet so WalletCard on dashboard also updates
+        refetchWallet();
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vaLoading, walletData]);
 
   useEffect(() => {
     fetch("/api/settings/public")
@@ -294,12 +305,13 @@ export default function FundWallet() {
                       </div>
                     </div>
                   ) : (
-                    <div className="px-4 py-4 space-y-3">
-                      <p className="text-sm text-muted-foreground">Instant dedicated account — no identity verification needed. Get yours in seconds.</p>
-                      {aspfiyError && <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{aspfiyError}</p>}
-                      <Button size="sm" className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 h-10" onClick={handleGenerateAspfiyVA} disabled={aspfiyGenerating}>
-                        {aspfiyGenerating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <>Activate Account</>}
-                      </Button>
+                    <div className="px-4 py-4 flex items-center gap-3 text-muted-foreground text-sm">
+                      <Loader2 size={16} className="animate-spin shrink-0" />
+                      {aspfiyError ? (
+                        <span className="text-destructive">{aspfiyError}</span>
+                      ) : (
+                        <span>Setting up your account automatically…</span>
+                      )}
                     </div>
                   )}
                 </div>

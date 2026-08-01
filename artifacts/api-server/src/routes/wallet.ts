@@ -16,6 +16,30 @@ router.get("/wallet", authenticate, async (req: AuthRequest, res): Promise<void>
     res.status(404).json({ error: "Wallet not found" });
     return;
   }
+
+  // Auto-generate Aspfiy account in the background if the user doesn't have one yet
+  if (!wallet.aspfiyAccountNumber && process.env.ASPFIY_SECRET_KEY) {
+    void (async () => {
+      try {
+        const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+        if (!user) return;
+        const nameParts = (user.fullName || "").trim().split(/\s+/);
+        const appBaseUrl = process.env.APP_URL ?? "https://santechdata.com.ng";
+        const acct = await aspfiyCreateReservedAccount({
+          reference: `aspfiy-${user.id}`,
+          firstName: nameParts[0] || "Customer",
+          lastName: nameParts.slice(1).join(" ") || nameParts[0] || "User",
+          email: user.email,
+          phone: user.phone || "09000000000",
+          webhookUrl: `${appBaseUrl}/api/wallet/webhook/aspfiy`,
+        });
+        await db.update(walletsTable)
+          .set({ aspfiyAccountNumber: acct.accountNumber, aspfiyAccountBank: acct.bankName })
+          .where(eq(walletsTable.id, wallet.id));
+      } catch {}
+    })();
+  }
+
   res.json({
     id: wallet.id,
     userId: wallet.userId,

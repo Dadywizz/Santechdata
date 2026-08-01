@@ -19,7 +19,9 @@ export function WalletCard() {
     query: { queryKey: getGetWalletQueryKey() }
   });
 
+  const [aspfiyCopied, setAspfiyCopied] = useState(false);
   const hasVA = !!wallet?.virtualAccountNumber;
+  const hasAspfiyVA = !!(wallet as any)?.aspfiyAccountNumber;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(wallet!.virtualAccountNumber!).then(() => {
@@ -27,6 +29,19 @@ export function WalletCard() {
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  const handleAspfiyCopy = () => {
+    navigator.clipboard.writeText((wallet as any).aspfiyAccountNumber).then(() => {
+      setAspfiyCopied(true);
+      setTimeout(() => setAspfiyCopied(false), 2000);
+    });
+  };
+
+  function normalizeBankNameLocal(name: string | null | undefined): string {
+    if (!name) return "Bank";
+    if (/indulge/i.test(name)) return "Nuvion MFB";
+    return name;
+  }
 
   return (
     <Card className="bg-primary text-primary-foreground border-none overflow-hidden relative">
@@ -58,31 +73,54 @@ export function WalletCard() {
           </div>
         </div>
 
-        {/* Show bank account if already set up */}
-        {!isLoading && hasVA && (
-          <div className="mb-4 p-3 rounded-xl bg-white/10 border border-white/20">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">Your Dedicated Account</p>
-                  <p className="font-mono font-bold text-base tracking-widest">{wallet!.virtualAccountNumber}</p>
-                  <p className="text-xs text-primary-foreground/70">{normalizeBankName(wallet!.virtualAccountBank)}</p>
+        {/* Show dedicated accounts if set up */}
+        {!isLoading && (hasVA || hasAspfiyVA) && (
+          <div className="mb-4 space-y-2">
+            {hasVA && (
+              <div className="p-3 rounded-xl bg-white/10 border border-white/20">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">{normalizeBankNameLocal(wallet!.virtualAccountBank)}</p>
+                      <p className="font-mono font-bold text-base tracking-widest">{wallet!.virtualAccountNumber}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCopy}
+                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                    title="Copy account number"
+                  >
+                    {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={handleCopy}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0"
-                title="Copy account number"
-              >
-                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-              </button>
-            </div>
+            )}
+            {hasAspfiyVA && (
+              <div className="p-3 rounded-xl bg-white/10 border border-white/20">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Landmark size={14} className="text-primary-foreground/70 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-primary-foreground/60 uppercase tracking-wide font-semibold">{(wallet as any).aspfiyAccountBank ?? "Aspfiy"}</p>
+                      <p className="font-mono font-bold text-base tracking-widest">{(wallet as any).aspfiyAccountNumber}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAspfiyCopy}
+                    className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors shrink-0"
+                    title="Copy account number"
+                  >
+                    {aspfiyCopied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Prompt to set up bank account if not yet done */}
-        {!isLoading && !hasVA && (
+        {/* Prompt to set up bank account if none yet */}
+        {!isLoading && !hasVA && !hasAspfiyVA && (
           <Link href="/fund-wallet">
             <div className="mb-4 p-3 rounded-xl bg-white/15 border border-white/30 cursor-pointer hover:bg-white/20 transition-colors flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
