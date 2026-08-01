@@ -131,12 +131,14 @@ router.post("/wallet/generate-aspfiy-account", authenticate, async (req: AuthReq
 
   const nameParts = (user.fullName || "").trim().split(/\s+/);
   try {
+    const appBaseUrl = process.env.APP_URL ?? "https://santechdata.com.ng";
     const acct = await aspfiyCreateReservedAccount({
       reference: `aspfiy-${user.id}`,
       firstName: nameParts[0] || "Customer",
       lastName: nameParts.slice(1).join(" ") || nameParts[0] || "User",
       email: user.email,
       phone: user.phone || "09000000000",
+      webhookUrl: `${appBaseUrl}/api/wallet/webhook/aspfiy`,
     });
 
     await db.update(walletsTable)
@@ -426,7 +428,8 @@ router.post("/wallet/webhook/aspfiy", async (req: Request, res: Response): Promi
     };
   };
 
-  if (event.event === "PAYMENT_NOTIFICATION" && event.data?.reference && event.data?.amount) {
+  // Aspfiy docs have a typo: "PAYMENT_NOTIFIFICATION" (double F) — accept both
+  if ((event.event === "PAYMENT_NOTIFICATION" || event.event === "PAYMENT_NOTIFIFICATION") && event.data?.reference && event.data?.amount) {
     const reference = event.data.reference as string;
     const amountPaid = Number(event.data.amount);
     if (!amountPaid || amountPaid <= 0) { res.sendStatus(200); return; }

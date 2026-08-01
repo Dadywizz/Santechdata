@@ -361,6 +361,7 @@ export async function aspfiyCreateReservedAccount(opts: {
   lastName: string;
   email: string;
   phone: string;
+  webhookUrl: string;
 }): Promise<{ accountNumber: string; bankName: string }> {
   const key = process.env.ASPFIY_SECRET_KEY;
   if (!key) throw new Error("Aspfiy not configured");
@@ -380,6 +381,7 @@ export async function aspfiyCreateReservedAccount(opts: {
           lastName: opts.lastName,
           email: opts.email,
           phone: opts.phone,
+          webhookUrl: opts.webhookUrl,
         }),
       });
       const data = await res.json() as {
