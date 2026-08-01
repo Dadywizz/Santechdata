@@ -189,165 +189,134 @@ export default function FundWallet() {
 
         {/* ── BANK TRANSFER — dedicated virtual accounts ── */}
         {tab === "bank" && (
-          <Card>
-            <CardContent className="p-6 space-y-6">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
-                <Landmark className="text-orange-500 shrink-0" size={18} />
-                <p className="text-sm text-orange-900 dark:text-orange-100 font-medium">
-                  Your <strong>personal bank account</strong> — transfer any amount anytime and your wallet is credited automatically.
-                </p>
+          <div className="space-y-4">
+            {/* Info strip */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Landmark size={15} className="text-primary" />
               </div>
+              <p className="text-sm text-foreground/80">
+                Transfer any amount to any account below — your wallet is credited <strong>automatically</strong>.
+              </p>
+            </div>
 
-              {/* ── Flutterwave dedicated account ── */}
-              {vaLoading ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-                  <Loader2 size={18} className="animate-spin" /> Loading account details...
-                </div>
-              ) : flwVa ? (
-                <div className="space-y-4">
-                  <div className="rounded-xl border-2 border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20 p-5 space-y-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Dedicated Account</p>
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-                        <p className="font-bold text-3xl tracking-widest font-mono">{flwVa.accountNumber}</p>
+            {vaLoading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+                <Loader2 size={20} className="animate-spin" /> Loading your accounts…
+              </div>
+            ) : (
+              <div className="space-y-3">
+
+                {/* ── Account 1: Flutterwave / Nuvion MFB ── */}
+                <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+                  {/* card header */}
+                  <div className="flex items-center gap-3 px-4 py-3 bg-orange-500/10 border-b border-orange-200/60 dark:border-orange-800/40">
+                    <span className="w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0">1</span>
+                    <span className="font-semibold text-sm text-orange-700 dark:text-orange-300">Nuvion MFB</span>
+                    <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300">Requires BVN/NIN</span>
+                  </div>
+
+                  {flwVa ? (
+                    <div className="px-4 py-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono font-bold text-2xl tracking-widest">{flwVa.accountNumber}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { navigator.clipboard.writeText(flwVa.accountNumber).then(() => { setFlwCopied(true); setTimeout(() => setFlwCopied(false), 2500); }); }}
+                          className="shrink-0 gap-1.5 h-8 px-3"
+                        >
+                          {flwCopied ? <CheckCircle2 size={13} className="text-green-600" /> : <Copy size={13} />}
+                          {flwCopied ? "Copied" : "Copy"}
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { navigator.clipboard.writeText(flwVa.accountNumber).then(() => { setFlwCopied(true); setTimeout(() => setFlwCopied(false), 2500); }); }}
-                        className="shrink-0 gap-1.5"
-                      >
-                        {flwCopied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
-                        {flwCopied ? "Copied!" : "Copy"}
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>Bank: <strong className="text-foreground">{flwVa.bankName}</strong></span>
+                        <span>Name: <strong className="text-foreground">SanTech Data</strong></span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-4 space-y-3">
+                      <p className="text-sm text-muted-foreground">CBN requires identity verification. Your details go directly to the bank — never stored on our servers.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setIdType("bvn"); setIdNumber(""); setFlwError(""); }}
+                          className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "bvn" ? "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" : "border-border text-muted-foreground"}`}
+                        >BVN</button>
+                        <button
+                          onClick={() => { setIdType("nin"); setIdNumber(""); setFlwError(""); }}
+                          className={`flex-1 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "nin" ? "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" : "border-border text-muted-foreground"}`}
+                        >NIN</button>
+                      </div>
+                      <Input
+                        type="tel" inputMode="numeric" maxLength={11}
+                        placeholder={`Enter your 11-digit ${idType.toUpperCase()}`}
+                        value={idNumber}
+                        onChange={(e) => { setIdNumber(e.target.value.replace(/\D/g, "")); setFlwError(""); }}
+                        className="h-11 font-mono tracking-widest"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {idType === "bvn" ? <>Dial <strong>*565*0#</strong> to get your BVN</> : <>Dial <strong>*346#</strong> to get your NIN</>}
+                      </p>
+                      {flwError && <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{flwError}</p>}
+                      <Button size="sm" className="w-full gap-2 bg-orange-500 hover:bg-orange-600 h-10" onClick={handleGenerateFlwVA} disabled={flwGenerating || idNumber.length !== 11}>
+                        {flwGenerating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <>Activate Account</>}
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-orange-200 dark:border-orange-700">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Bank</p>
-                        <p className="font-semibold text-sm">{flwVa.bankName}</p>
+                  )}
+                </div>
+
+                {/* ── Account 2: Aspfiy (PalmPay / Paga) ── */}
+                <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/10 border-b border-emerald-200/60 dark:border-emerald-800/40">
+                    <span className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center shrink-0">2</span>
+                    <span className="font-semibold text-sm text-emerald-700 dark:text-emerald-300">Aspfiy Virtual Account</span>
+                    <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300">No BVN Required</span>
+                  </div>
+
+                  {aspfiyVa ? (
+                    <div className="px-4 py-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono font-bold text-2xl tracking-widest">{aspfiyVa.accountNumber}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { navigator.clipboard.writeText(aspfiyVa.accountNumber).then(() => { setAspfiyCopied(true); setTimeout(() => setAspfiyCopied(false), 2500); }); }}
+                          className="shrink-0 gap-1.5 h-8 px-3"
+                        >
+                          {aspfiyCopied ? <CheckCircle2 size={13} className="text-green-600" /> : <Copy size={13} />}
+                          {aspfiyCopied ? "Copied" : "Copy"}
+                        </Button>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Account Name</p>
-                        <p className="font-semibold text-sm">SanTech Data</p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>Bank: <strong className="text-foreground">{aspfiyVa.bankName}</strong></span>
+                        <span>Name: <strong className="text-foreground">SanTech Data</strong></span>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-1.5">
-                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">How it works</p>
-                    <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-decimal list-inside">
-                      <li>Copy the account number above</li>
-                      <li>Transfer from any bank app, USSD, or internet banking</li>
-                      <li>Your wallet is credited automatically</li>
-                    </ol>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">BVN or NIN required</p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300">CBN regulation requires this account to be linked to your identity. Your details go directly to the bank — never stored on our servers.</p>
-                  </div>
-
-                  <div>
-                    <div className="flex gap-2 mb-3">
-                      <button
-                        onClick={() => { setIdType("bvn"); setIdNumber(""); setFlwError(""); }}
-                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "bvn" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
-                      >BVN</button>
-                      <button
-                        onClick={() => { setIdType("nin"); setIdNumber(""); setFlwError(""); }}
-                        className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all ${idType === "nin" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-border text-muted-foreground"}`}
-                      >NIN</button>
-                    </div>
-                    <Input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={11}
-                      placeholder={`Enter your 11-digit ${idType.toUpperCase()}`}
-                      value={idNumber}
-                      onChange={(e) => { setIdNumber(e.target.value.replace(/\D/g, "")); setFlwError(""); }}
-                      className="h-12 font-mono tracking-widest text-lg"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {idType === "bvn"
-                        ? <>Dial <strong>*565*0#</strong> on any phone to get your BVN.</>
-                        : <>Dial <strong>*346#</strong> on your NIN-registered phone to get your NIN.</>}
-                    </p>
-                  </div>
-
-                  {flwError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{flwError}</p>}
-
-                  <Button
-                    size="lg"
-                    className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
-                    onClick={handleGenerateFlwVA}
-                    disabled={flwGenerating || idNumber.length !== 11}
-                  >
-                    {flwGenerating
-                      ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
-                      : <><Landmark size={16} /> Get My Bank Account</>}
-                  </Button>
-                </div>
-              )}
-
-              {/* ── Aspfiy dedicated account ── */}
-              <div className="pt-2 border-t border-border space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Aspfiy Virtual Account</p>
-
-                {vaLoading ? (
-                  <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
-                    <Loader2 size={16} className="animate-spin" /> Loading...
-                  </div>
-                ) : aspfiyVa ? (
-                  <div className="rounded-xl border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 p-5 space-y-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Aspfiy Account</p>
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-                        <p className="font-bold text-3xl tracking-widest font-mono">{aspfiyVa.accountNumber}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { navigator.clipboard.writeText(aspfiyVa.accountNumber).then(() => { setAspfiyCopied(true); setTimeout(() => setAspfiyCopied(false), 2500); }); }}
-                        className="shrink-0 gap-1.5"
-                      >
-                        {aspfiyCopied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
-                        {aspfiyCopied ? "Copied!" : "Copy"}
+                  ) : (
+                    <div className="px-4 py-4 space-y-3">
+                      <p className="text-sm text-muted-foreground">Instant dedicated account — no identity verification needed. Get yours in seconds.</p>
+                      {aspfiyError && <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{aspfiyError}</p>}
+                      <Button size="sm" className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 h-10" onClick={handleGenerateAspfiyVA} disabled={aspfiyGenerating}>
+                        {aspfiyGenerating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <>Activate Account</>}
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-green-200 dark:border-green-700">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Bank</p>
-                        <p className="font-semibold text-sm">{aspfiyVa.bankName}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Account Name</p>
-                        <p className="font-semibold text-sm">SanTech Data</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">Get a second dedicated account powered by Aspfiy — no BVN or NIN required.</p>
-                    {aspfiyError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{aspfiyError}</p>}
-                    <Button
-                      size="lg"
-                      className="w-full gap-2 bg-green-600 hover:bg-green-700"
-                      onClick={handleGenerateAspfiyVA}
-                      disabled={aspfiyGenerating}
-                    >
-                      {aspfiyGenerating
-                        ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
-                        : <><Landmark size={16} /> Get Aspfiy Account</>}
-                    </Button>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* How it works */}
+                <div className="flex gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/40">
+                  <div className="text-blue-500 shrink-0 mt-0.5">💡</div>
+                  <ol className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-decimal list-inside">
+                    <li>Copy any account number above</li>
+                    <li>Transfer from any bank app, USSD, or internet banking</li>
+                    <li>Your SanTech wallet is credited automatically</li>
+                  </ol>
+                </div>
+
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         )}
 
         {/* ── FUND WALLET (Paystack + Flutterwave checkout) ── */}

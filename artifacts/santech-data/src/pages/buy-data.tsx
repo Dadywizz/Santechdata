@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useGetDataPlans, getGetDataPlansQueryKey, usePurchaseData, DataPlanNetwork, DataPlan } from "@workspace/api-client-react";
-import { Check, Wifi, X } from "lucide-react";
+import { Check, Wifi, X, Wrench } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { ReceiptModal, ReceiptData } from "@/components/ReceiptModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,6 +89,18 @@ export default function BuyData() {
   return (
     <AppLayout>
       <PageHeader title="Buy Data" description="Instant data top-up for all networks" />
+
+      {/* ── Maintenance banner ── */}
+      <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3.5">
+        <Wrench size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-sm text-amber-900 dark:text-amber-200">Scheduled Maintenance in Progress</p>
+          <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 leading-relaxed">
+            Our data delivery service is currently undergoing maintenance to improve performance and reliability.
+            Orders placed during this period may experience slight delays. We appreciate your patience and will restore full service shortly.
+          </p>
+        </div>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-3 pb-28">
         {/* Left column — network + phone */}
