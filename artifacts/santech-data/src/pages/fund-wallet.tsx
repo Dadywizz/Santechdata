@@ -216,7 +216,7 @@ export default function FundWallet() {
                 <Loader2 size={20} className="animate-spin" /> Loading your accounts…
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
 
                 {/* ── Account 1: Flutterwave / Nuvion MFB ── */}
                 <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
@@ -230,7 +230,7 @@ export default function FundWallet() {
                   {flwVa ? (
                     <div className="px-4 py-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-mono font-bold text-2xl tracking-widest">{flwVa.accountNumber}</p>
+                        <p className="font-mono font-bold text-base tracking-wider break-all">{flwVa.accountNumber}</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -288,7 +288,7 @@ export default function FundWallet() {
                   {aspfiyVa ? (
                     <div className="px-4 py-4 space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-mono font-bold text-2xl tracking-widest">{aspfiyVa.accountNumber}</p>
+                        <p className="font-mono font-bold text-base tracking-wider break-all">{aspfiyVa.accountNumber}</p>
                         <Button
                           variant="ghost"
                           size="sm"
