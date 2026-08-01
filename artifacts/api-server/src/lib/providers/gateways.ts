@@ -367,7 +367,7 @@ export async function aspfiyCreateReservedAccount(opts: {
   if (!key) throw new Error("Aspfiy not configured");
 
   // Try Paga first, fall back to Palmpay
-  for (const endpoint of ["/reserve-paga", "/reserve-palmpay"]) {
+  for (const endpoint of ["/reserve-paga/", "/reserve-palmpay/"]) {
     try {
       const res = await fetch(`${ASPFIY_BASE_URL}${endpoint}`, {
         method: "POST",
