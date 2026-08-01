@@ -21,6 +21,7 @@ const registerSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(10, "Valid phone number required"),
+  nin: z.string().length(11, "NIN must be exactly 11 digits").regex(/^\d+$/, "NIN must contain digits only"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   referralCode: z.string().optional(),
 });
@@ -38,6 +39,7 @@ export default function Register() {
       fullName: "",
       email: "",
       phone: "",
+      nin: "",
       password: "",
       referralCode: "",
     },
@@ -49,7 +51,7 @@ export default function Register() {
         setAuth(data);
         toast({
           title: "Account created",
-          description: "Welcome to SanTech Data!",
+          description: "Welcome to SanTech Data! Your virtual accounts are being set up.",
         });
         setLocation("/dashboard");
       },
@@ -67,7 +69,8 @@ export default function Register() {
     registerMutation.mutate({ 
       data: {
         ...data,
-        referralCode: data.referralCode || null
+        referralCode: data.referralCode || null,
+        nin: data.nin || null,
       } 
     });
   }
@@ -119,6 +122,29 @@ export default function Register() {
                   <FormControl>
                     <Input placeholder="08012345678" {...field} disabled={registerMutation.isPending} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>NIN (National Identity Number)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter your 11-digit NIN"
+                      inputMode="numeric"
+                      maxLength={11}
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                      disabled={registerMutation.isPending}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Used to instantly set up your dedicated bank accounts. Dial <strong>*346#</strong> to get yours.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   role: text("role", { enum: ["customer", "reseller", "admin"] }).notNull().default("customer"),
   status: text("status", { enum: ["active", "suspended"] }).notNull().default("active"),
   emailVerified: boolean("email_verified").notNull().default(false),
+  nin: varchar("nin", { length: 11 }),
   referralCode: varchar("referral_code", { length: 20 }).unique(),
   referredBy: text("referred_by").references((): AnyPgColumn => usersTable.id),
   resellerSince: timestamp("reseller_since"),

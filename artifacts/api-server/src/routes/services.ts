@@ -102,6 +102,70 @@ const KYB_ELEC_DISCO_ID: Record<string, string> = {
   "kano-electric":         "63",
 };
 
+// ── REFERRAL BONUS HELPER (first purchase ≥ ₦1,000) ──────────────────────────
+async function creditReferralBonusIfEligible(
+  userId: string,
+  purchaseAmount: number,
+  log?: any
+): Promise<void> {
+  if (purchaseAmount < 1000) return;
+  try {
+    const [buyer] = await db.select({ referredBy: usersTable.referredBy })
+      .from(usersTable).where(eq(usersTable.id, userId));
+    if (!buyer?.referredBy) return;
+
+    // Check referral bonus hasn't already been paid for this user
+    const alreadyPaid = await db.select({ id: transactionsTable.id })
+      .from(transactionsTable)
+      .where(
+        and(
+          eq(transactionsTable.userId, buyer.referredBy),
+          eq(transactionsTable.reference, `REF-BONUS-${userId.slice(0, 8).toUpperCase()}`)
+        )
+      );
+    if (alreadyPaid.length > 0) return;
+
+    // Check this is the user's first successful purchase
+    const prevPurchases = await db.select({ id: transactionsTable.id })
+      .from(transactionsTable)
+      .where(
+        and(
+          eq(transactionsTable.userId, userId),
+          eq(transactionsTable.status, "success")
+        )
+      );
+    // prevPurchases includes the one we just inserted, so ≤ 1 means this is the first
+    if (prevPurchases.length > 1) return;
+
+    const REFERRAL_BONUS = 100;
+    const [referrerWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, buyer.referredBy));
+    if (!referrerWallet) return;
+
+    await db.update(walletsTable)
+      .set({ balance: sql`balance + ${REFERRAL_BONUS}`, updatedAt: new Date() })
+      .where(eq(walletsTable.id, referrerWallet.id));
+
+    await db.insert(transactionsTable).values({
+      userId: buyer.referredBy,
+      type: "wallet_fund",
+      amount: String(REFERRAL_BONUS),
+      status: "success",
+      reference: `REF-BONUS-${userId.slice(0, 8).toUpperCase()}`,
+      description: "Referral bonus – your referral made their first purchase",
+      metadata: { referralBonus: true, referredUserId: userId },
+    });
+
+    await db.insert(notificationsTable).values({
+      userId: buyer.referredBy,
+      title: "🎉 Referral Bonus!",
+      message: `You earned ₦${REFERRAL_BONUS.toLocaleString()} — your referral just completed their first purchase!`,
+      type: "wallet",
+    });
+  } catch (err: any) {
+    log?.error({ err }, "Referral bonus error");
+  }
+}
+
 // ── RESELLER COMMISSION HELPER ────────────────────────────────────────────────
 async function creditResellerCommission(
   userId: string,
@@ -270,6 +334,7 @@ router.post("/data/purchase", authenticate, async (req: AuthRequest, res): Promi
     message: `${plan.network} ${plan.size} data has been sent to ${phone}.`, type: "data",
   });
   void creditResellerCommission(req.userId!, price, `${plan.network} ${plan.name} data`, req.log);
+  void creditReferralBonusIfEligible(req.userId!, price, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -350,6 +415,7 @@ router.post("/airtime/purchase", authenticate, async (req: AuthRequest, res): Pr
     message: `₦${amount} ${network} airtime has been sent to ${phone}.`, type: "airtime",
   });
   void creditResellerCommission(req.userId!, amount, `${network} airtime`, req.log);
+  void creditReferralBonusIfEligible(req.userId!, amount, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -490,6 +556,7 @@ router.post("/electricity/purchase", authenticate, async (req: AuthRequest, res)
     message: `Token: ${elecToken} for meter ${meterNumber}`, type: "electricity",
   });
   void creditResellerCommission(req.userId!, amount, "electricity token", req.log);
+  void creditReferralBonusIfEligible(req.userId!, amount, req.log);
   res.json({ id: tx.id, status: "success", token: elecToken, amount, meterNumber, createdAt: tx.createdAt });
 });
 
@@ -629,6 +696,7 @@ router.post("/cable/subscribe", authenticate, async (req: AuthRequest, res): Pro
     message: `${plan.name} activated for smartcard ${smartcardNumber}.`, type: "cable",
   });
   void creditResellerCommission(req.userId!, plan.price, `${plan.name} cable`, req.log);
+  void creditReferralBonusIfEligible(req.userId!, plan.price, req.log);
   res.json({ id: tx.id, type: tx.type, status: tx.status, amount: parseFloat(tx.amount), description: tx.description, reference: tx.reference, metadata: tx.metadata, userId: tx.userId, createdAt: tx.createdAt });
 });
 
@@ -726,6 +794,7 @@ router.post("/exam/purchase", authenticate, async (req: AuthRequest, res): Promi
     message: `${quantity} ${examType.name} PIN(s) purchased successfully.`, type: "exam",
   });
   void creditResellerCommission(req.userId!, totalCost, `${examType.name} exam token`, req.log);
+  void creditReferralBonusIfEligible(req.userId!, totalCost, req.log);
   res.json({ id: tx.id, status: "success", pins, examType: examType.code, amount: totalCost, createdAt: tx.createdAt });
 });
 

@@ -24,7 +24,8 @@ export const RegisterBody = zod.object({
   "email": zod.string(),
   "phone": zod.string(),
   "password": zod.string(),
-  "referralCode": zod.string().nullish()
+  "referralCode": zod.string().nullish(),
+  "nin": zod.string().nullish().describe('11-digit National Identity Number — used to instantly generate your virtual bank accounts')
 })
 
 

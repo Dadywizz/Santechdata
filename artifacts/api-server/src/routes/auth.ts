@@ -17,6 +17,7 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import { authenticate, signToken, type AuthRequest } from "../middlewares/auth";
+import { flutterwaveCreatePermanentVA, aspfiyCreateReservedAccount } from "../lib/providers/gateways";
 import {
   RegisterBody,
   LoginBody,
@@ -61,7 +62,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { fullName, phone, password, referralCode } = parsed.data;
+  const { fullName, phone, password, referralCode, nin } = parsed.data as any;
   const email = parsed.data.email.trim().toLowerCase();
 
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email));
@@ -89,35 +90,56 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     fullName,
     email,
     phone,
+    nin: nin ?? null,
     passwordHash,
     referralCode: myReferralCode,
     referredBy: referredById,
     emailVerified: true,
   }).returning();
 
-  const [newWallet] = await db.insert(walletsTable).values({ userId: user.id }).returning();
+  await db.insert(walletsTable).values({ userId: user.id });
 
   req.log.info({ userId: user.id }, "User registered");
 
-  // Credit ₦100 referral bonus to the referrer's wallet
-  if (referredById) {
-    const REFERRAL_BONUS = 100;
-    const [referrerWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, referredById));
-    if (referrerWallet) {
-      await db.update(walletsTable)
-        .set({ balance: sql`${walletsTable.balance} + ${REFERRAL_BONUS}` })
-        .where(eq(walletsTable.id, referrerWallet.id));
-      await db.insert(transactionsTable).values({
-        userId: referredById,
-        type: "wallet_fund",
-        amount: String(REFERRAL_BONUS),
-        status: "success",
-        reference: `REF-${user.id.slice(0, 8).toUpperCase()}`,
-        description: `Referral bonus – ${user.fullName} joined`,
-        metadata: { referralBonus: true, referredUserId: user.id },
+  // Auto-generate virtual accounts in the background (fire-and-forget)
+  void (async () => {
+    const appBaseUrl = process.env.APP_URL ?? "https://santechdata.com.ng";
+    const nameParts = (user.fullName || "").trim().split(/\s+/);
+    const firstName = nameParts[0] || "Customer";
+    const lastName = nameParts.slice(1).join(" ") || firstName;
+
+    // Aspfiy — always attempt (no NIN required)
+    try {
+      const aspfiy = await aspfiyCreateReservedAccount({
+        reference: `aspfiy-${user.id}`,
+        firstName,
+        lastName,
+        email: user.email,
+        phone: user.phone,
+        webhookUrl: `${appBaseUrl}/api/wallet/webhook/aspfiy`,
       });
+      await db.update(walletsTable)
+        .set({ aspfiyAccountNumber: aspfiy.accountNumber, aspfiyAccountBank: aspfiy.bankName })
+        .where(eq(walletsTable.userId, user.id));
+    } catch {}
+
+    // Flutterwave (Nuvion MFB) — only if NIN was provided
+    if (nin) {
+      try {
+        const flw = await flutterwaveCreatePermanentVA({
+          email: user.email,
+          firstName,
+          lastName,
+          phone: user.phone,
+          nin,
+          narration: `SanTech Data – ${user.fullName}`,
+        });
+        await db.update(walletsTable)
+          .set({ virtualAccountNumber: flw.accountNumber, virtualAccountBank: flw.bankName })
+          .where(eq(walletsTable.userId, user.id));
+      } catch {}
     }
-  }
+  })();
 
   const token = signToken(user.id, user.role);
   res.status(201).json({

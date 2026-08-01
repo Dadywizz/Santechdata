@@ -3,6 +3,9 @@ name: Aspfiy webhook setup
 description: How Aspfiy delivers payment notifications — per-request webhookUrl, not a global dashboard setting; includes the official event-name typo.
 ---
 
+## Correct API base URL
+`https://api-v1.aspfiy.com` — note the `-v1`. The bare `https://api.aspfiy.com` returns HTML (404 page), not JSON.
+
 ## Rule
 Pass `webhookUrl` as a **required body field** in every `POST /reserve-paga` and `POST /reserve-palmpay` call. There is no webhook configuration screen in the Aspfiy merchant dashboard.
 

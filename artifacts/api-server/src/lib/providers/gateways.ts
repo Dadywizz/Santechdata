@@ -353,7 +353,7 @@ export async function monnifyCreateReservedAccount(opts: {
 
 // ── ASPFIY ────────────────────────────────────────────────────────────────────
 
-const ASPFIY_BASE_URL = "https://api.aspfiy.com";
+const ASPFIY_BASE_URL = "https://api-v1.aspfiy.com";
 
 export async function aspfiyCreateReservedAccount(opts: {
   reference: string;

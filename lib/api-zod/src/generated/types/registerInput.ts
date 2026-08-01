@@ -13,4 +13,9 @@ export interface RegisterInput {
   password: string;
   /** @nullable */
   referralCode?: string | null;
+  /**
+     * 11-digit National Identity Number — used to instantly generate your virtual bank accounts
+     * @nullable
+     */
+  nin?: string | null;
 }

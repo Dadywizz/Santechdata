@@ -1406,6 +1406,9 @@ components:
           type: string
         referralCode:
           type: ["string", "null"]
+        nin:
+          type: ["string", "null"]
+          description: 11-digit National Identity Number — used to instantly generate your virtual bank accounts
 
     LoginInput:
       type: object
