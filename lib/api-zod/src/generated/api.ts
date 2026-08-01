@@ -167,6 +167,8 @@ export const GetWalletResponse = zod.object({
   "virtualAccountBank": zod.string().nullish(),
   "paystackAccountNumber": zod.string().nullish(),
   "paystackAccountBank": zod.string().nullish(),
+  "aspfiyAccountNumber": zod.string().nullish(),
+  "aspfiyAccountBank": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 
@@ -204,6 +206,8 @@ export const VerifyFundingResponse = zod.object({
   "virtualAccountBank": zod.string().nullish(),
   "paystackAccountNumber": zod.string().nullish(),
   "paystackAccountBank": zod.string().nullish(),
+  "aspfiyAccountNumber": zod.string().nullish(),
+  "aspfiyAccountBank": zod.string().nullish(),
   "updatedAt": zod.string()
 })
 

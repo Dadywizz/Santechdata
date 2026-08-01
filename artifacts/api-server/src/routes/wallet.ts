@@ -5,7 +5,7 @@ import { walletsTable, transactionsTable, usersTable, notificationsTable } from 
 import { eq, sql } from "drizzle-orm";
 import { authenticate, type AuthRequest } from "../middlewares/auth";
 import { InitiateFundingBody, VerifyFundingBody, WalletTransferBody } from "@workspace/api-zod";
-import { flutterwaveCreatePermanentVA, flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyCreateOneTimeVA, monnifyVerifyOneTimeVA, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction } from "../lib/providers/gateways";
+import { flutterwaveCreatePermanentVA, flutterwaveInitPayment, flutterwaveVerifyTransaction, monnifyCreateReservedAccount, monnifyCreateOneTimeVA, monnifyVerifyOneTimeVA, monnifyInitTransaction, monnifyVerifyTransaction, paystackCreateDedicatedAccount, paystackInitTransaction, paystackVerifyTransaction, aspfiyCreateReservedAccount } from "../lib/providers/gateways";
 
 const router: IRouter = Router();
 
@@ -25,6 +25,8 @@ router.get("/wallet", authenticate, async (req: AuthRequest, res): Promise<void>
     virtualAccountBank: wallet.virtualAccountBank ?? null,
     paystackAccountNumber: wallet.paystackAccountNumber ?? null,
     paystackAccountBank: wallet.paystackAccountBank ?? null,
+    aspfiyAccountNumber: wallet.aspfiyAccountNumber ?? null,
+    aspfiyAccountBank: wallet.aspfiyAccountBank ?? null,
     updatedAt: wallet.updatedAt,
   });
 });
@@ -107,6 +109,45 @@ router.post("/wallet/generate-account", authenticate, async (req: AuthRequest, r
     .where(eq(walletsTable.id, wallet.id));
 
   res.json({ virtualAccountNumber: acct.accountNumber, virtualAccountBank: acct.bankName });
+});
+
+// POST /wallet/generate-aspfiy-account — create a dedicated Aspfiy reserved account for the user
+router.post("/wallet/generate-aspfiy-account", authenticate, async (req: AuthRequest, res): Promise<void> => {
+  if (!process.env.ASPFIY_SECRET_KEY) {
+    res.status(503).json({ error: "Aspfiy not configured" }); return;
+  }
+
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
+  if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+
+  // Return existing account if already created
+  if (wallet.aspfiyAccountNumber) {
+    res.json({ accountNumber: wallet.aspfiyAccountNumber, bankName: wallet.aspfiyAccountBank });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  const nameParts = (user.fullName || "").trim().split(/\s+/);
+  try {
+    const acct = await aspfiyCreateReservedAccount({
+      reference: `aspfiy-${user.id}`,
+      firstName: nameParts[0] || "Customer",
+      lastName: nameParts.slice(1).join(" ") || nameParts[0] || "User",
+      email: user.email,
+      phone: user.phone || "09000000000",
+    });
+
+    await db.update(walletsTable)
+      .set({ aspfiyAccountNumber: acct.accountNumber, aspfiyAccountBank: acct.bankName })
+      .where(eq(walletsTable.id, wallet.id));
+
+    res.json({ accountNumber: acct.accountNumber, bankName: acct.bankName });
+  } catch (err: any) {
+    req.log?.error({ err }, "Aspfiy account creation failed");
+    res.status(503).json({ error: err?.message ?? "Could not generate Aspfiy account. Please try again." });
+  }
 });
 
 // POST /wallet/fund/bank-transfer — generate a one-time Monnify (Sterling Bank) virtual account
@@ -370,6 +411,57 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.userId!));
   res.json({ id: wallet.id, userId: wallet.userId, balance: parseFloat(wallet.balance), currency: wallet.currency, updatedAt: wallet.updatedAt });
+});
+
+// POST /wallet/webhook/aspfiy — Aspfiy PAYMENT_NOTIFICATION webhook
+router.post("/wallet/webhook/aspfiy", async (req: Request, res: Response): Promise<void> => {
+  if (!process.env.ASPFIY_SECRET_KEY) { res.sendStatus(200); return; }
+
+  const event = req.body as {
+    event?: string;
+    data?: {
+      reference?: string;
+      amount?: number;
+      status?: string;
+    };
+  };
+
+  if (event.event === "PAYMENT_NOTIFICATION" && event.data?.reference && event.data?.amount) {
+    const reference = event.data.reference as string;
+    const amountPaid = Number(event.data.amount);
+    if (!amountPaid || amountPaid <= 0) { res.sendStatus(200); return; }
+
+    // Reference format we used: "aspfiy-<userId>"
+    const userId = reference.startsWith("aspfiy-") ? reference.replace("aspfiy-", "") : null;
+    if (!userId) { res.sendStatus(200); return; }
+
+    const txRef = `ASPFIY-DVA-${reference}-${amountPaid}-${Date.now()}`;
+    const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
+    if (!existing.length) {
+      await db.update(walletsTable)
+        .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
+        .where(eq(walletsTable.userId, userId));
+
+      await db.insert(transactionsTable).values({
+        userId,
+        type: "wallet_fund",
+        status: "success",
+        amount: amountPaid.toString(),
+        description: "Wallet funded via Aspfiy dedicated account",
+        reference: txRef,
+        metadata: { gateway: "aspfiy_dva", amount: amountPaid },
+      });
+
+      await db.insert(notificationsTable).values({
+        userId,
+        title: "Wallet Funded",
+        message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
+        type: "wallet",
+      });
+    }
+  }
+
+  res.sendStatus(200);
 });
 
 // POST /wallet/webhook/monnify-dva — Monnify reserved account payment notification

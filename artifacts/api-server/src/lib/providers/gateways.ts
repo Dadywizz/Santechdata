@@ -351,6 +351,57 @@ export async function monnifyCreateReservedAccount(opts: {
   throw new Error("Monnify DVA creation returned success but no account number in response");
 }
 
+// ── ASPFIY ────────────────────────────────────────────────────────────────────
+
+const ASPFIY_BASE_URL = "https://api.aspfiy.com";
+
+export async function aspfiyCreateReservedAccount(opts: {
+  reference: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}): Promise<{ accountNumber: string; bankName: string }> {
+  const key = process.env.ASPFIY_SECRET_KEY;
+  if (!key) throw new Error("Aspfiy not configured");
+
+  // Try Paga first, fall back to Palmpay
+  for (const endpoint of ["/reserve-paga", "/reserve-palmpay"]) {
+    try {
+      const res = await fetch(`${ASPFIY_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference: opts.reference,
+          firstName: opts.firstName,
+          lastName: opts.lastName,
+          email: opts.email,
+          phone: opts.phone,
+        }),
+      });
+      const data = await res.json() as {
+        status?: boolean | string;
+        message?: string;
+        data?: { account_number?: string; bank_name?: string; bank?: string };
+      };
+      if (res.ok && (data.status === true || data.status === "success" || data.status === "200")) {
+        const accountNumber = data.data?.account_number;
+        if (!accountNumber) throw new Error("Aspfiy: no account number in response");
+        return {
+          accountNumber,
+          bankName: data.data?.bank_name ?? data.data?.bank ?? (endpoint.includes("paga") ? "Paga" : "PalmPay"),
+        };
+      }
+    } catch (err: any) {
+      if (endpoint === "/reserve-palmpay") throw err; // last attempt failed
+    }
+  }
+  throw new Error("Aspfiy: all reserve endpoints failed");
+}
+
 export async function monnifyVerifyTransaction(reference: string) {
   const token = await monnifyGetAccessToken();
   const encodedRef = encodeURIComponent(reference);

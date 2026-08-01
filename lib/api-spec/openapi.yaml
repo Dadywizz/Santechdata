@@ -1549,6 +1549,12 @@ components:
         paystackAccountBank:
           type: string
           nullable: true
+        aspfiyAccountNumber:
+          type: string
+          nullable: true
+        aspfiyAccountBank:
+          type: string
+          nullable: true
         updatedAt:
           type: string
 

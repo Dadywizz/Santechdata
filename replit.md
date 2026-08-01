@@ -62,6 +62,7 @@ A full-featured VTU (Virtual Top-Up) self-service web app for purchasing data bu
 - **BigISub** — token loaded from `bigisub_api_token` DB setting (set via Admin → Settings) or `BIGISUB_API_TOKEN` env var. Shown first in Settings UI.
 - **KYB Data** — token loaded from `kybdata_api_token` DB setting (set via Admin → Settings) or `KYBDATA_API_TOKEN` env var. Admin can update via the Settings page without restarting the server.
 - **EasyAccess** — token loaded from `easyaccess_api_token` DB setting (set via Admin → Settings) or `EASYACCESS_API_TOKEN` env var. Electricity-only; toggle which provider handles electricity via Admin → Settings → Provider Routing → Electricity (`elec_provider` setting). Dev and production have separate databases, so this setting must be applied separately in each environment's Admin → Settings after deploying.
+- **Aspfiy** — dedicated virtual account gateway (Paga/PalmPay). Key stored in `ASPFIY_SECRET_KEY` env secret. Users generate their Aspfiy account from the Fund Wallet → Bank Transfer tab (no BVN/NIN required). Accounts stored in `aspfiy_account_number`/`aspfiy_account_bank` wallet columns. Webhook: `POST /api/wallet/webhook/aspfiy` (configure this URL in your Aspfiy merchant dashboard). Reference format used: `aspfiy-<userId>`.
 
 ## Exam Pricing
 

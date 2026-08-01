@@ -15,5 +15,7 @@ export interface Wallet {
   virtualAccountBank?: string | null;
   paystackAccountNumber?: string | null;
   paystackAccountBank?: string | null;
+  aspfiyAccountNumber?: string | null;
+  aspfiyAccountBank?: string | null;
   updatedAt: string;
 }

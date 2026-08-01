@@ -47,6 +47,12 @@ export default function FundWallet() {
   const [idType, setIdType] = useState<"bvn" | "nin">("bvn");
   const [idNumber, setIdNumber] = useState("");
 
+  // Aspfiy VA state
+  const [aspfiyGenerating, setAspfiyGenerating] = useState(false);
+  const [aspfiyError, setAspfiyError] = useState("");
+  const [aspfiyCopied, setAspfiyCopied] = useState(false);
+  const [generatedAspfiyVa, setGeneratedAspfiyVa] = useState<{ accountNumber: string; bankName: string } | null>(null);
+
   const { data: walletData, isLoading: vaLoading } = useGetWallet();
 
   const existingFlwVa = walletData?.virtualAccountNumber
@@ -54,6 +60,12 @@ export default function FundWallet() {
     : null;
 
   const flwVa = generatedFlwVa ?? existingFlwVa;
+
+  const existingAspfiyVa = (walletData as any)?.aspfiyAccountNumber
+    ? { accountNumber: (walletData as any).aspfiyAccountNumber as string, bankName: ((walletData as any).aspfiyAccountBank as string) ?? "Aspfiy" }
+    : null;
+
+  const aspfiyVa = generatedAspfiyVa ?? existingAspfiyVa;
 
   useEffect(() => {
     fetch("/api/settings/public")
@@ -100,6 +112,25 @@ export default function FundWallet() {
   const handleTransfer = () => {
     if (!transferPhone || !transferAmount) { toast({ title: "Fill all fields", variant: "destructive" }); return; }
     transferMutation.mutate({ data: { recipientPhone: transferPhone, amount: parseFloat(transferAmount), note: transferNote } });
+  };
+
+  const handleGenerateAspfiyVA = async () => {
+    setAspfiyGenerating(true);
+    setAspfiyError("");
+    try {
+      const token = sessionStorage.getItem("santech_token");
+      const res = await fetch("/api/wallet/generate-aspfiy-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate account");
+      setGeneratedAspfiyVa({ accountNumber: data.accountNumber, bankName: data.bankName ?? "Aspfiy" });
+    } catch (err: any) {
+      setAspfiyError(err.message || "Could not generate account. Please try again.");
+    } finally {
+      setAspfiyGenerating(false);
+    }
   };
 
   const handleGenerateFlwVA = async () => {
@@ -156,7 +187,7 @@ export default function FundWallet() {
           ))}
         </div>
 
-        {/* ── BANK TRANSFER — Flutterwave MFB dedicated account ── */}
+        {/* ── BANK TRANSFER — dedicated virtual accounts ── */}
         {tab === "bank" && (
           <Card>
             <CardContent className="p-6 space-y-6">
@@ -167,6 +198,7 @@ export default function FundWallet() {
                 </p>
               </div>
 
+              {/* ── Flutterwave dedicated account ── */}
               {vaLoading ? (
                 <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
                   <Loader2 size={18} className="animate-spin" /> Loading account details...
@@ -259,6 +291,61 @@ export default function FundWallet() {
                   </Button>
                 </div>
               )}
+
+              {/* ── Aspfiy dedicated account ── */}
+              <div className="pt-2 border-t border-border space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Aspfiy Virtual Account</p>
+
+                {vaLoading ? (
+                  <div className="flex items-center gap-2 py-2 text-muted-foreground text-sm">
+                    <Loader2 size={16} className="animate-spin" /> Loading...
+                  </div>
+                ) : aspfiyVa ? (
+                  <div className="rounded-xl border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 p-5 space-y-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Aspfiy Account</p>
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                        <p className="font-bold text-3xl tracking-widest font-mono">{aspfiyVa.accountNumber}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { navigator.clipboard.writeText(aspfiyVa.accountNumber).then(() => { setAspfiyCopied(true); setTimeout(() => setAspfiyCopied(false), 2500); }); }}
+                        className="shrink-0 gap-1.5"
+                      >
+                        {aspfiyCopied ? <CheckCircle2 size={14} className="text-green-600" /> : <Copy size={14} />}
+                        {aspfiyCopied ? "Copied!" : "Copy"}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-green-200 dark:border-green-700">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Bank</p>
+                        <p className="font-semibold text-sm">{aspfiyVa.bankName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Account Name</p>
+                        <p className="font-semibold text-sm">SanTech Data</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Get a second dedicated account powered by Aspfiy — no BVN or NIN required.</p>
+                    {aspfiyError && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{aspfiyError}</p>}
+                    <Button
+                      size="lg"
+                      className="w-full gap-2 bg-green-600 hover:bg-green-700"
+                      onClick={handleGenerateAspfiyVA}
+                      disabled={aspfiyGenerating}
+                    >
+                      {aspfiyGenerating
+                        ? <><Loader2 size={16} className="animate-spin" /> Generating...</>
+                        : <><Landmark size={16} /> Get Aspfiy Account</>}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}

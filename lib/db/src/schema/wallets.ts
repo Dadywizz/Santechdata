@@ -12,6 +12,8 @@ export const walletsTable = pgTable("wallets", {
   virtualAccountBank: varchar("virtual_account_bank", { length: 100 }),
   paystackAccountNumber: varchar("paystack_account_number", { length: 20 }),
   paystackAccountBank: varchar("paystack_account_bank", { length: 100 }),
+  aspfiyAccountNumber: varchar("aspfiy_account_number", { length: 20 }),
+  aspfiyAccountBank: varchar("aspfiy_account_bank", { length: 100 }),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
