@@ -4,7 +4,16 @@ description: How Aspfiy delivers payment notifications — per-request webhookUr
 ---
 
 ## Correct API base URL
-`https://api-v1.aspfiy.com` — note the `-v1`. The bare `https://api.aspfiy.com` returns HTML (404 page), not JSON.
+`https://api-v1.aspfiy.com` — note the `-v1`. The bare `https://api.aspfiy.com` returns HTML (404 page), not JSON. Endpoints need trailing slash: `/reserve-paga/`, `/reserve-palmpay/`.
+
+## Phone number format
+Aspfiy requires **11-digit local Nigerian format** (`08012345678`), NOT international (`2348012345678`). Sending international format returns `{"status":false,"message":"Phone should be 11 digit long"}`.
+
+## Response shape
+Success response nests the account under `data.account`, not `data.data`:
+```
+{ status: true, data: { account: { account_number, bank_name }, reference, ... } }
+```
 
 ## Rule
 Pass `webhookUrl` as a **required body field** in every `POST /reserve-paga` and `POST /reserve-palmpay` call. There is no webhook configuration screen in the Aspfiy merchant dashboard.

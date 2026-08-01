@@ -355,6 +355,14 @@ export async function monnifyCreateReservedAccount(opts: {
 
 const ASPFIY_BASE_URL = "https://api-v1.aspfiy.com";
 
+/** Normalize to 11-digit local Nigerian format (080xxxxxxxx) — required by Aspfiy */
+function toNgLocal(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("234") && digits.length === 13) return "0" + digits.slice(3);
+  if (digits.startsWith("0") && digits.length === 11) return digits;
+  return digits; // return as-is and let Aspfiy error if still wrong
+}
+
 export async function aspfiyCreateReservedAccount(opts: {
   reference: string;
   firstName: string;
@@ -366,7 +374,9 @@ export async function aspfiyCreateReservedAccount(opts: {
   const key = process.env.ASPFIY_SECRET_KEY;
   if (!key) throw new Error("Aspfiy not configured");
 
-  // Try Paga first, fall back to Palmpay
+  const intlPhone = toNgLocal(opts.phone);
+  let lastError = "";
+
   for (const endpoint of ["/reserve-paga/", "/reserve-palmpay/"]) {
     try {
       const res = await fetch(`${ASPFIY_BASE_URL}${endpoint}`, {
@@ -374,34 +384,44 @@ export async function aspfiyCreateReservedAccount(opts: {
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
+          "accept": "application/json",
         },
         body: JSON.stringify({
           reference: opts.reference,
           firstName: opts.firstName,
           lastName: opts.lastName,
           email: opts.email,
-          phone: opts.phone,
+          phone: intlPhone,
           webhookUrl: opts.webhookUrl,
         }),
       });
-      const data = await res.json() as {
-        status?: boolean | string;
+
+      const raw = await res.text();
+      let data: {
+        status?: boolean | string | number;
         message?: string;
-        data?: { account_number?: string; bank_name?: string; bank?: string };
+        data?: {
+          account?: { account_number?: string; bank_name?: string };
+          account_number?: string; bank_name?: string; bank?: string;
+        };
       };
-      if (res.ok && (data.status === true || data.status === "success" || data.status === "200")) {
-        const accountNumber = data.data?.account_number;
-        if (!accountNumber) throw new Error("Aspfiy: no account number in response");
+      try { data = JSON.parse(raw); } catch { throw new Error(`Aspfiy non-JSON response (${res.status}): ${raw.slice(0, 200)}`); }
+
+      const ok = data.status === true || data.status === "success" || data.status === "200" || data.status === 200;
+      // Account number lives at data.data.account.account_number
+      const acct = data.data?.account ?? data.data;
+      if (ok && acct?.account_number) {
         return {
-          accountNumber,
-          bankName: data.data?.bank_name ?? data.data?.bank ?? (endpoint.includes("paga") ? "Paga" : "PalmPay"),
+          accountNumber: acct.account_number,
+          bankName: acct.bank_name ?? (endpoint.includes("paga") ? "Paga" : "PalmPay"),
         };
       }
+      lastError = `${endpoint} → HTTP ${res.status}: ${data.message ?? raw.slice(0, 300)}`;
     } catch (err: any) {
-      if (endpoint === "/reserve-palmpay") throw err; // last attempt failed
+      lastError = `${endpoint} → ${err?.message ?? String(err)}`;
     }
   }
-  throw new Error("Aspfiy: all reserve endpoints failed");
+  throw new Error(`Aspfiy reserve failed: ${lastError}`);
 }
 
 export async function monnifyVerifyTransaction(reference: string) {
