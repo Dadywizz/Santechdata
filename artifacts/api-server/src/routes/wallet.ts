@@ -36,7 +36,9 @@ router.get("/wallet", authenticate, async (req: AuthRequest, res): Promise<void>
         await db.update(walletsTable)
           .set({ aspfiyAccountNumber: acct.accountNumber, aspfiyAccountBank: acct.bankName })
           .where(eq(walletsTable.id, wallet.id));
-      } catch {}
+      } catch (err: any) {
+        req.log?.warn({ err: err?.message }, "Aspfiy auto-account creation failed");
+      }
     })();
   }
 
@@ -441,29 +443,59 @@ router.post("/wallet/fund/verify", authenticate, async (req: AuthRequest, res): 
 
 // POST /wallet/webhook/aspfiy — Aspfiy PAYMENT_NOTIFICATION webhook
 router.post("/wallet/webhook/aspfiy", async (req: Request, res: Response): Promise<void> => {
+  // Always log the raw payload so we can diagnose issues
+  req.log?.info({ body: req.body }, "Aspfiy webhook received");
+
   if (!process.env.ASPFIY_SECRET_KEY) { res.sendStatus(200); return; }
 
   const event = req.body as {
     event?: string;
     data?: {
       reference?: string;
-      amount?: number;
+      amount?: number | string;
       status?: string;
+      transactionId?: string;
+      transaction_id?: string;
     };
+    reference?: string;
+    amount?: number | string;
   };
 
-  // Aspfiy docs have a typo: "PAYMENT_NOTIFIFICATION" (double F) — accept both
-  if ((event.event === "PAYMENT_NOTIFICATION" || event.event === "PAYMENT_NOTIFIFICATION") && event.data?.reference && event.data?.amount) {
-    const reference = event.data.reference as string;
-    const amountPaid = Number(event.data.amount);
+  // Extract reference and amount — Aspfiy may nest under "data" or send at top level.
+  // Accept any event name containing "PAYMENT" or "NOTIFICATION" or "CREDIT",
+  // and also fire on any event that carries a valid aspfiy- reference (safety net).
+  const rawReference: string | undefined = event.data?.reference ?? (event as any).reference;
+  const rawAmount: number | string | undefined = event.data?.amount ?? (event as any).amount;
+  const eventName: string = event.event ?? "";
+
+  const isKnownPaymentEvent =
+    !eventName ||  // fire even if no event field (safety net)
+    eventName.toUpperCase().includes("PAYMENT") ||
+    eventName.toUpperCase().includes("NOTIFICATION") ||
+    eventName.toUpperCase().includes("CREDIT");
+
+  if (isKnownPaymentEvent && rawReference && rawAmount !== undefined) {
+    const reference = String(rawReference);
+    const amountPaid = Number(rawAmount);
     if (!amountPaid || amountPaid <= 0) { res.sendStatus(200); return; }
 
     // Reference format we used: "aspfiy-<userId>"
-    const userId = reference.startsWith("aspfiy-") ? reference.replace("aspfiy-", "") : null;
-    if (!userId) { res.sendStatus(200); return; }
+    const userId = reference.startsWith("aspfiy-") ? reference.slice("aspfiy-".length) : null;
+    if (!userId) {
+      req.log?.warn({ reference }, "Aspfiy webhook: unrecognised reference format");
+      res.sendStatus(200);
+      return;
+    }
 
-    const txRef = `ASPFIY-DVA-${reference}-${amountPaid}-${Date.now()}`;
-    const existing = await db.select().from(transactionsTable).where(eq(transactionsTable.reference, txRef));
+    // Deduplication: use a stable key derived from reference + amount + Aspfiy transaction ID
+    const aspfiyTxId: string = String(event.data?.transactionId ?? event.data?.transaction_id ?? "");
+    const stableKey = aspfiyTxId
+      ? `ASPFIY-DVA-${aspfiyTxId}`
+      : `ASPFIY-DVA-${reference}-${amountPaid}`;
+
+    const existing = await db.select().from(transactionsTable)
+      .where(eq(transactionsTable.reference, stableKey));
+
     if (!existing.length) {
       await db.update(walletsTable)
         .set({ balance: sql`balance + ${amountPaid}`, updatedAt: new Date() })
@@ -475,8 +507,8 @@ router.post("/wallet/webhook/aspfiy", async (req: Request, res: Response): Promi
         status: "success",
         amount: amountPaid.toString(),
         description: "Wallet funded via Aspfiy dedicated account",
-        reference: txRef,
-        metadata: { gateway: "aspfiy_dva", amount: amountPaid },
+        reference: stableKey,
+        metadata: { gateway: "aspfiy_dva", amount: amountPaid, aspfiyTxId, eventName },
       });
 
       await db.insert(notificationsTable).values({
@@ -485,7 +517,13 @@ router.post("/wallet/webhook/aspfiy", async (req: Request, res: Response): Promi
         message: `Your wallet has been credited with ₦${amountPaid.toLocaleString()} via bank transfer.`,
         type: "wallet",
       });
+
+      req.log?.info({ userId, amountPaid, stableKey }, "Aspfiy webhook: wallet credited");
+    } else {
+      req.log?.info({ stableKey }, "Aspfiy webhook: duplicate, skipped");
     }
+  } else {
+    req.log?.warn({ eventName, rawReference, rawAmount }, "Aspfiy webhook: no creditable payload");
   }
 
   res.sendStatus(200);
