@@ -1,0 +1,69 @@
+services:
+  - type: web
+    name: santechdata
+    runtime: node
+    region: frankfurt  # closest to Nigeria; change to "oregon" or "ohio" if preferred
+    plan: starter       # upgrade to "standard" for always-on (no spin-down)
+    buildCommand: pnpm install && pnpm --filter @workspace/santech-data run build && pnpm --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        value: https://santechdata.com.ng   # update if using a different domain on Render
+      - key: DATABASE_URL
+        fromDatabase:
+          name: santechdata-db
+          property: connectionString
+      # Auto-generated secrets — Render creates random values on first deploy
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      # Payment gateways — set these manually in the Render dashboard after deploy
+      - key: ASPFIY_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: FLUTTERWAVE_SECRET_KEY
+        sync: false
+      - key: MONNIFY_API_KEY
+        sync: false
+      - key: MONNIFY_SECRET_KEY
+        sync: false
+      - key: MONNIFY_CONTRACT_CODE
+        sync: false
+      # VTU providers
+      - key: EASYACCESS_API_TOKEN
+        sync: false
+      - key: VTPASS_API_KEY
+        sync: false
+      - key: VTPASS_SECRET_KEY
+        sync: false
+      - key: VTPASS_PUBLIC_KEY
+        sync: false
+      - key: CLUBKONNECT_APIKEY
+        sync: false
+      - key: CLUBKONNECT_PASSWORD
+        sync: false
+      - key: CLUBKONNECT_PHONE
+        sync: false
+      # Email (SMTP)
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+databases:
+  - name: santechdata-db
+    databaseName: santechdata
+    user: santechdata
+    plan: free   # Render free Postgres; upgrade to "starter" for production
+    region: frankfurt
